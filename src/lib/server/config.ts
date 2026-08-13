@@ -19,6 +19,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		musicDir,
 		coverDir: `${dataDir}/covers`,
 		podcastsDir: `${dataDir}/podcasts`,
-		databaseUrl: env.DATABASE_URL ?? 'postgresql://capstan:capstan@localhost:5433/capstan'
+		databaseUrl: env.DATABASE_URL ?? 'postgresql://capstan:capstan@localhost:5434/capstan'
 	};
 }

@@ -15,7 +15,7 @@ describe('loadConfig', () => {
 		expect(config.dataDir).toBe('./data');
 		expect(config.coverDir).toBe('./data/covers');
 		expect(config.podcastsDir).toBe('./data/podcasts');
-		expect(config.databaseUrl).toBe('postgresql://capstan:capstan@localhost:5433/capstan');
+		expect(config.databaseUrl).toBe('postgresql://capstan:capstan@localhost:5434/capstan');
 	});
 
 	it('honors explicit CAPSTAN_DATA and DATABASE_URL', () => {
