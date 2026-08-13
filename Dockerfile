@@ -5,7 +5,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN pnpm build
-RUN pnpm prune --prod --ignore-scripts
+RUN pnpm prune --prod
 
 FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
