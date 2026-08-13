@@ -9,7 +9,8 @@ import {
 	primaryKey,
 	uniqueIndex,
 	index,
-	check
+	check,
+	type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -45,7 +46,7 @@ export const items = pgTable(
 	'items',
 	{
 		id: integer('id').generatedByDefaultAsIdentity().primaryKey(),
-		parentId: integer('parent_id').references((): any => items.id, { onDelete: 'cascade' }),
+		parentId: integer('parent_id').references((): AnyPgColumn => items.id, { onDelete: 'cascade' }),
 		kind: text('kind').notNull(),
 		sourcePath: text('source_path').unique(),
 		title: text('title').notNull(),
@@ -68,9 +69,15 @@ export const items = pgTable(
 	(t) => [
 		check('kind_check', sql`${t.kind} IN ('book','album','podcast','episode')`),
 		index('item_kind_sort').on(t.kind, t.sortTitle),
-		index('item_series').on(t.series).where(sql`${t.series} IS NOT NULL`),
-		index('item_parent').on(t.parentId).where(sql`${t.parentId} IS NOT NULL`),
-		uniqueIndex('item_guid').on(t.parentId, t.guid).where(sql`${t.guid} IS NOT NULL`)
+		index('item_series')
+			.on(t.series)
+			.where(sql`${t.series} IS NOT NULL`),
+		index('item_parent')
+			.on(t.parentId)
+			.where(sql`${t.parentId} IS NOT NULL`),
+		uniqueIndex('item_guid')
+			.on(t.parentId, t.guid)
+			.where(sql`${t.guid} IS NOT NULL`)
 	]
 );
 
@@ -149,12 +156,13 @@ export const favorites = pgTable(
 		trackId: integer('track_id').references(() => tracks.id, { onDelete: 'cascade' })
 	},
 	(t) => [
-		check(
-			'favorite_xor',
-			sql`(${t.itemId} IS NULL) <> (${t.trackId} IS NULL)`
-		),
-		uniqueIndex('favorite_item').on(t.userId, t.itemId).where(sql`${t.itemId} IS NOT NULL`),
-		uniqueIndex('favorite_track').on(t.userId, t.trackId).where(sql`${t.trackId} IS NOT NULL`)
+		check('favorite_xor', sql`(${t.itemId} IS NULL) <> (${t.trackId} IS NULL)`),
+		uniqueIndex('favorite_item')
+			.on(t.userId, t.itemId)
+			.where(sql`${t.itemId} IS NOT NULL`),
+		uniqueIndex('favorite_track')
+			.on(t.userId, t.trackId)
+			.where(sql`${t.trackId} IS NOT NULL`)
 	]
 );
 
