@@ -1,4 +1,4 @@
-import { hash, verify, Algorithm } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 import { eq, sql } from 'drizzle-orm';
 import { users } from '../db/schema';
 import type { DrizzleDb } from '../db';
@@ -6,7 +6,8 @@ import type { DrizzleDb } from '../db';
 // Matches argon2-cffi's PasswordHasher() defaults (the reference implementation
 // uses zero customization) so the security posture doesn't silently regress.
 const ARGON2_OPTIONS = {
-	algorithm: Algorithm.Argon2id,
+	algorithm: 2, // Argon2id — @node-rs/argon2's Algorithm.Argon2id; not imported directly because
+	// it's an ambient `const enum` and this project's verbatimModuleSyntax forbids that
 	memoryCost: 65536, // 64 MiB
 	timeCost: 3,
 	parallelism: 4,
@@ -31,6 +32,11 @@ export async function createUser(
 	password: string,
 	isAdmin = false
 ): Promise<number> {
+	// Note: this transaction orders our own statements but does NOT prevent a second
+	// concurrent createUser() call from also seeing count=0 under Postgres's default
+	// READ COMMITTED isolation — matches the Python reference's identical limitation.
+	// Not exploitable in practice: the only paths that can create the very first user
+	// are single-threaded (CLI/bootstrap), not the concurrency-capable HTTP API.
 	return db.transaction(async (tx) => {
 		const [{ count }] = await tx.select({ count: sql<number>`count(*)::int` }).from(users);
 		const isFirst = count === 0;
