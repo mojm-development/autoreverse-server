@@ -1,7 +1,8 @@
-import { error, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema';
 import { db } from '../db';
+import { ApiError } from '../api/errors';
 
 export const SESSION_COOKIE = 'capstan_session';
 
@@ -19,14 +20,14 @@ export function tokenFromRequest(request: Request, cookieToken: string | null): 
 }
 
 export function requireApiUser(locals: Locals): number {
-	if (locals.userId === null) throw error(401, 'Kein Token');
+	if (locals.userId === null) throw new ApiError(401, 'Kein Token');
 	return locals.userId;
 }
 
 export async function requireApiAdmin(locals: Locals): Promise<number> {
 	const userId = requireApiUser(locals);
 	const [row] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId));
-	if (!row?.isAdmin) throw error(403, 'Nur für Verwalter');
+	if (!row?.isAdmin) throw new ApiError(403, 'Nur für Verwalter');
 	return userId;
 }
 

@@ -24,7 +24,8 @@ export async function performLogin(
 	if (!semaphore.tryAcquire()) {
 		throw new ApiError(
 			503,
-			'Gerade zu viele gleichzeitige Anmeldeversuche, bitte kurz erneut versuchen'
+			'Gerade zu viele gleichzeitige Anmeldeversuche, bitte kurz erneut versuchen',
+			1
 		);
 	}
 	let userId: number | null;
