@@ -1,8 +1,9 @@
-import { json, error, type RequestHandler } from '@sveltejs/kit';
+import { json, type RequestHandler } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
 import { users } from '$lib/server/db/schema';
+import { apiError } from '$lib/server/api/error';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	const userId = requireApiUser(locals);
@@ -10,6 +11,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		.select({ id: users.id, name: users.name, isAdmin: users.isAdmin })
 		.from(users)
 		.where(eq(users.id, userId));
-	if (!row) throw error(404, { message: 'Unbekannter Nutzer' });
+	if (!row) return apiError(404, 'Unbekannter Nutzer');
 	return json({ id: row.id, name: row.name, is_admin: row.isAdmin });
 };

@@ -23,7 +23,7 @@ describe('performLogin', () => {
 			const semaphore = new Semaphore(4);
 			await expect(performLogin(db, throttle, semaphore, 'oliver', 'wrong')).rejects.toMatchObject({
 				status: 401,
-				body: { message: 'Anmeldung fehlgeschlagen' }
+				detail: 'Anmeldung fehlgeschlagen'
 			});
 		});
 	});
