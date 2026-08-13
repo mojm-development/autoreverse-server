@@ -12,7 +12,7 @@ export async function withTestDb<T>(
 	).start();
 	const url = container.getConnectionUri();
 	try {
-		execSync('bash node_modules/.bin/drizzle-kit push --force', {
+		execSync('node node_modules/drizzle-kit/bin.cjs push --force', {
 			env: { ...process.env, DATABASE_URL: url },
 			stdio: 'inherit'
 		});
