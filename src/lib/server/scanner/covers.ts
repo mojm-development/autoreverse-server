@@ -7,13 +7,15 @@ const SUFFIXES = ['.jpg', '.jpeg', '.png', '.webp'];
 /** File-in-folder cover, checked before any embedded artwork — direct port
  * of scanner/covers.py::find_cover_file's nested name-then-suffix priority. */
 export async function findCoverFile(dir: string): Promise<string | null> {
-	let entries: string[];
+	let entries: { name: string; isFile: () => boolean }[];
 	try {
-		entries = await readdir(dir);
+		entries = await readdir(dir, { withFileTypes: true });
 	} catch {
 		return null;
 	}
-	const lowerToActual = new Map(entries.map((e) => [e.toLowerCase(), e]));
+	const lowerToActual = new Map(
+		entries.filter((e) => e.isFile()).map((e) => [e.name.toLowerCase(), e.name])
+	);
 	for (const name of NAMES) {
 		for (const suffix of SUFFIXES) {
 			const actual = lowerToActual.get(`${name}${suffix}`);
