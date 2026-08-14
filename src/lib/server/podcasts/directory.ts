@@ -11,9 +11,27 @@ export interface DirectoryResult {
 	genre: string | null;
 }
 
+interface iTunesSearchResult {
+	feedUrl?: string;
+	collectionName?: string;
+	trackName?: string;
+	artistName?: string;
+	artworkUrl100?: string;
+	artworkUrl60?: string;
+	trackCount?: number;
+	genres?: string[];
+}
+
+interface iTunesSearchResponse {
+	results?: iTunesSearchResult[];
+}
+
 export class DirectorySearchError extends Error {}
 
-export async function searchDirectory(term: string, opts: { limit?: number; country?: string } = {}): Promise<DirectoryResult[]> {
+export async function searchDirectory(
+	term: string,
+	opts: { limit?: number; country?: string } = {}
+): Promise<DirectoryResult[]> {
 	if (!term.trim()) return [];
 	const url = new URL(DIRECTORY_URL);
 	url.searchParams.set('media', 'podcast');
@@ -23,13 +41,14 @@ export async function searchDirectory(term: string, opts: { limit?: number; coun
 	url.searchParams.set('country', opts.country ?? DEFAULT_COUNTRY);
 
 	const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-	let body: any;
+	let body: iTunesSearchResponse;
 	try {
 		body = await response.json();
 	} catch {
 		throw new DirectorySearchError('Unerwartete Antwort des Podcast-Verzeichnisses');
 	}
-	if (!Array.isArray(body?.results)) throw new DirectorySearchError('Unerwartete Antwort des Podcast-Verzeichnisses');
+	if (!Array.isArray(body?.results))
+		throw new DirectorySearchError('Unerwartete Antwort des Podcast-Verzeichnisses');
 
 	const results: DirectoryResult[] = [];
 	for (const entry of body.results) {

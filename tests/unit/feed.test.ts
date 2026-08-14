@@ -44,7 +44,10 @@ describe('parseFeed', () => {
 	});
 
 	it('falls back to "Ohne Titel" for an empty title', async () => {
-		const emptyTitleRss = SAMPLE_RSS.replace('<title>&lt;b&gt;Der lange Weg&lt;/b&gt; zum Netz</title>', '<title></title>');
+		const emptyTitleRss = SAMPLE_RSS.replace(
+			'<title>&lt;b&gt;Der lange Weg&lt;/b&gt; zum Netz</title>',
+			'<title></title>'
+		);
 		const parsed = await parseFeed(emptyTitleRss);
 		expect(parsed.episodes[0].title).toBe('Ohne Titel');
 	});

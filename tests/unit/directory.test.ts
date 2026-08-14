@@ -18,7 +18,14 @@ describe('searchDirectory', () => {
 				ok: true,
 				json: async () => ({
 					results: [
-						{ collectionName: 'Maschinenraum', artistName: 'M. Raum', feedUrl: 'https://x/feed.xml', artworkUrl100: 'https://x/art.png', trackCount: 118, genres: ['Technology'] },
+						{
+							collectionName: 'Maschinenraum',
+							artistName: 'M. Raum',
+							feedUrl: 'https://x/feed.xml',
+							artworkUrl100: 'https://x/art.png',
+							trackCount: 118,
+							genres: ['Technology']
+						},
 						{ collectionName: 'No Feed' } // no feedUrl — must be dropped
 					]
 				})
@@ -26,7 +33,14 @@ describe('searchDirectory', () => {
 		);
 		const results = await searchDirectory('maschinenraum');
 		expect(results).toHaveLength(1);
-		expect(results[0]).toEqual({ name: 'Maschinenraum', author: 'M. Raum', feedUrl: 'https://x/feed.xml', artworkUrl: 'https://x/art.png', episodeCount: 118, genre: 'Technology' });
+		expect(results[0]).toEqual({
+			name: 'Maschinenraum',
+			author: 'M. Raum',
+			feedUrl: 'https://x/feed.xml',
+			artworkUrl: 'https://x/art.png',
+			episodeCount: 118,
+			genre: 'Technology'
+		});
 	});
 
 	it('uses DEFAULT_COUNTRY=DE and DEFAULT_LIMIT=25 when not overridden', async () => {

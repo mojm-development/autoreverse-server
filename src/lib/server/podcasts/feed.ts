@@ -12,6 +12,17 @@ export interface ParsedFeed {
 	episodes: ParsedEpisode[];
 }
 
+interface RSSItem {
+	guid?: string;
+	link?: string;
+	title?: string;
+	pubDate?: string;
+	enclosure?: {
+		url?: string;
+		$?: { url?: string };
+	};
+}
+
 function cleanTitle(raw: string | undefined): string {
 	const stripped = (raw ?? '').replace(/<[^>]+>/g, '');
 	const decoded = stripped
@@ -24,10 +35,12 @@ function cleanTitle(raw: string | undefined): string {
 	return decoded || 'Ohne Titel';
 }
 
-function guidFor(item: any, index: number): string {
+function guidFor(item: RSSItem, index: number): string {
 	const raw = item.guid || item.link;
 	if (raw) return String(raw);
-	const digest = createHash('sha256').update(`${index}:${item.title ?? ''}`).digest('hex');
+	const digest = createHash('sha256')
+		.update(`${index}:${item.title ?? ''}`)
+		.digest('hex');
 	return `generated:${digest}`;
 }
 
@@ -40,7 +53,7 @@ const parser = new Parser({ customFields: { item: [['enclosure', 'enclosure']] }
  * update call sites (fetch.ts, Task 25) accordingly. */
 export async function parseFeed(xml: string): Promise<ParsedFeed> {
 	const parsed = await parser.parseString(xml);
-	const episodes = (parsed.items ?? []).map((item: any, index: number) => ({
+	const episodes = (parsed.items ?? []).map((item: RSSItem, index: number) => ({
 		guid: guidFor(item, index),
 		title: cleanTitle(item.title),
 		publishedAt: item.pubDate ? new Date(item.pubDate) : null,
