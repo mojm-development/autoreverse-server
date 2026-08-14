@@ -2,7 +2,12 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { withTestDb } from '../fixtures';
 import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { subscribe, refresh, unsubscribe } from '../../src/lib/server/podcasts/store';
+import {
+	subscribe,
+	refresh,
+	unsubscribe,
+	InvalidFeedError
+} from '../../src/lib/server/podcasts/store';
 import {
 	downloadEpisode,
 	EpisodeNotDownloadableError
@@ -29,6 +34,28 @@ describe('podcasts store', () => {
 				.from(itemsTable)
 				.where(eq(itemsTable.parentId, podcast1.id));
 			expect(episodes).toHaveLength(1); // not duplicated on the second subscribe
+		});
+	});
+
+	it('subscribe rejects with InvalidFeedError when the fetched body is not parseable RSS/Atom', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({ ok: true, text: async () => '<html>not a feed</html>' })
+		);
+		await withTestDb(async (db) => {
+			await expect(subscribe(db, 'https://x/feed.xml')).rejects.toThrow(InvalidFeedError);
+		});
+	});
+
+	it('refresh rejects with InvalidFeedError when the fetched body is not parseable RSS/Atom', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
+		await withTestDb(async (db) => {
+			const podcast = await subscribe(db, 'https://x/feed.xml');
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({ ok: true, text: async () => '<html>not a feed</html>' })
+			);
+			await expect(refresh(db, podcast.id)).rejects.toThrow(InvalidFeedError);
 		});
 	});
 
@@ -71,6 +98,24 @@ describe('podcasts store', () => {
 			await expect(downloadEpisode(db, episode.id, dir)).rejects.toThrow(
 				EpisodeNotDownloadableError
 			);
+		});
+	});
+
+	it('downloadEpisode rejects when passed a podcast id instead of an episode id (kind filter)', async () => {
+		await withTestDb(async (db) => {
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'podcast',
+					title: 'P',
+					sortTitle: 'p',
+					feedUrl: 'https://x/feed.xml' // a real feed URL, not a media URL — would corrupt tracks if used
+				})
+				.returning();
+			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
+			await expect(downloadEpisode(db, podcast.id, dir)).rejects.toThrow();
+			const tracks = await db.select().from(tracksTable).where(eq(tracksTable.itemId, podcast.id));
+			expect(tracks).toHaveLength(0); // no spurious track attached to the podcast item
 		});
 	});
 

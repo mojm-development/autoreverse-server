@@ -1,7 +1,7 @@
 import { join, extname } from 'node:path';
 import { rename, unlink, mkdir, writeFile } from 'node:fs/promises';
 import { readTags } from '../scanner/tags';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable } from '../db/schema';
 import type { DrizzleDb } from '../db';
 
@@ -19,12 +19,14 @@ export async function downloadEpisode(
 	episodeId: number,
 	podcastsDir: string
 ): Promise<{ trackId: number; duration: number }> {
-	const [episode] = await db.select().from(itemsTable).where(eq(itemsTable.id, episodeId));
+	const [episode] = await db
+		.select()
+		.from(itemsTable)
+		.where(and(eq(itemsTable.id, episodeId), eq(itemsTable.kind, 'episode')));
 	if (!episode) throw new Error('not found');
 	const mediaUrl = episode.feedUrl; // repurposed field on episode rows
 	if (!mediaUrl) throw new EpisodeNotDownloadableError('Keine Audiodatei in diesem Feed-Eintrag');
 
-	await mkdir(podcastsDir, { recursive: true });
 	const destination = destinationFor(podcastsDir, episodeId, mediaUrl);
 	const temp = `${destination}.part`;
 
@@ -37,6 +39,7 @@ export async function downloadEpisode(
 	}
 
 	try {
+		await mkdir(podcastsDir, { recursive: true });
 		await writeFile(temp, Buffer.from(await response.arrayBuffer()));
 		await rename(temp, destination);
 	} catch (e: unknown) {

@@ -8,6 +8,7 @@ import { items as itemsTable } from '../../src/lib/server/db/schema';
 import { callRoute } from './_callRoute';
 import { podcastsPostHandler } from '../../src/routes/podcasts/+server';
 import { podcastDeleteHandler } from '../../src/routes/podcasts/[id]/+server';
+import { podcastRefreshPostHandler } from '../../src/routes/podcasts/[id]/refresh/+server';
 import { episodeDownloadPostHandler } from '../../src/routes/episodes/[id]/download/+server';
 
 const FEED = `<?xml version="1.0"?><rss version="2.0"><channel><title>Maschinenraum</title>
@@ -75,6 +76,22 @@ describe('podcasts API routes', () => {
 		});
 	});
 
+	it('POST /podcasts 422s when the fetched body is not parseable RSS/Atom', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({ ok: true, text: async () => '<html>not a feed</html>' })
+		);
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const res = await callRoute(podcastsPostHandler, {
+				db,
+				locals: { userId, token: null },
+				body: { feed_url: 'https://x/feed.xml' }
+			});
+			expect(res.status).toBe(422);
+		});
+	});
+
 	it('non-admin gets 403 from POST /podcasts', async () => {
 		await withTestDb(async (db) => {
 			await createUser(db, 'admin', 'hunter2hunter2', true); // first user is always admin — throwaway
@@ -106,6 +123,29 @@ describe('podcasts API routes', () => {
 			expect(res.status).toBe(200);
 			const body = await res.json();
 			expect(body).toEqual({ episodes: 1, files_deleted: 0, files_kept: 0 });
+		});
+	});
+
+	it('POST /podcasts/{id}/refresh 422s (not 404) when an existing podcast now serves an unparseable feed', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const subscribeRes = await callRoute(podcastsPostHandler, {
+				db,
+				locals: { userId, token: null },
+				body: { feed_url: 'https://x/feed.xml' }
+			});
+			const podcastId = (await subscribeRes.json()).id;
+			vi.stubGlobal(
+				'fetch',
+				vi.fn().mockResolvedValue({ ok: true, text: async () => '<html>not a feed</html>' })
+			);
+			const res = await callRoute(podcastRefreshPostHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: String(podcastId) }
+			});
+			expect(res.status).toBe(422);
 		});
 	});
 

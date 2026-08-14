@@ -55,7 +55,12 @@ async function syncEpisodes(
 
 export async function subscribe(db: DrizzleDb, feedUrl: string) {
 	const raw = await fetchFeedText(feedUrl);
-	const parsed = await parseFeed(raw);
+	let parsed: Awaited<ReturnType<typeof parseFeed>>;
+	try {
+		parsed = await parseFeed(raw);
+	} catch (e: unknown) {
+		throw new InvalidFeedError(e instanceof Error ? e.message : String(e));
+	}
 	if (parsed.episodes.length === 0 && !parsed.title)
 		throw new InvalidFeedError('Feed enthält weder Titel noch Folgen');
 
@@ -85,7 +90,12 @@ export async function refresh(db: DrizzleDb, podcastId: number) {
 	const [podcast] = await db.select().from(itemsTable).where(eq(itemsTable.id, podcastId));
 	if (!podcast) throw new Error('not found');
 	const raw = await fetchFeedText(podcast.feedUrl!);
-	const parsed = await parseFeed(raw);
+	let parsed: Awaited<ReturnType<typeof parseFeed>>;
+	try {
+		parsed = await parseFeed(raw);
+	} catch (e: unknown) {
+		throw new InvalidFeedError(e instanceof Error ? e.message : String(e));
+	}
 	await syncEpisodes(db, podcast.id, parsed.episodes);
 	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
 	return podcast;
