@@ -1,10 +1,14 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
 import { item } from '$lib/server/library/queries';
 import { addBookmark, bookmarksForItem } from '$lib/server/library/bookmarks';
-import { bookmarks, type bookmarks as BookmarksType } from '$lib/server/db/schema';
+import {
+	bookmarks,
+	items as itemsTable,
+	type bookmarks as BookmarksType
+} from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
@@ -19,7 +23,13 @@ export async function bookmarksGetHandler(
 		const itemIdParam = event.url.searchParams.get('item_id');
 		const rows = itemIdParam
 			? await bookmarksForItem(db, userId, Number(itemIdParam))
-			: await db.select().from(bookmarks).where(eq(bookmarks.userId, userId));
+			: await db
+					.select({ bookmark: bookmarks })
+					.from(bookmarks)
+					.innerJoin(itemsTable, eq(itemsTable.id, bookmarks.itemId))
+					.where(eq(bookmarks.userId, userId))
+					.orderBy(sql`lower(${itemsTable.sortTitle})`, bookmarks.position)
+					.then((rows) => rows.map((r) => r.bookmark));
 		return json({
 			bookmarks: rows.map((r: Bookmark) => ({
 				id: r.id,
@@ -41,6 +51,8 @@ export async function bookmarksPostHandler(
 	try {
 		const userId = requireApiUser(event.locals);
 		const { item_id, position, title } = await event.request.json();
+		if (typeof item_id !== 'number' || !Number.isFinite(item_id))
+			return apiError(422, 'item_id muss eine Zahl sein');
 		if (typeof position !== 'number' || position < 0)
 			return apiError(422, 'position muss ≥ 0 sein');
 		if (typeof title !== 'string' || title.length < 1 || title.length > 200)

@@ -35,3 +35,10 @@ export async function removeBookmark(
 		.returning({ id: bookmarks.id });
 	return rows.length > 0;
 }
+
+export async function countBookmarks(db: DrizzleDb, userId: number): Promise<number> {
+	const rows = await db.execute(
+		sql`SELECT count(*)::int AS n FROM bookmarks WHERE user_id = ${userId}`
+	);
+	return (rows[0] as { n: number }).n;
+}

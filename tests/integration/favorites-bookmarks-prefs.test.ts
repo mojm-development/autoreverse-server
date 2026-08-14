@@ -11,6 +11,8 @@ import { favoritesGetHandler } from '../../src/routes/favorites/+server';
 import { bookmarksPostHandler } from '../../src/routes/bookmarks/+server';
 import { bookmarkDeleteHandler } from '../../src/routes/bookmarks/[id]/+server';
 import { playbackPutHandler } from '../../src/routes/me/playback/+server';
+import { isItemFavorite, addItemFavorite } from '../../src/lib/server/library/favorites';
+import { countBookmarks, addBookmark } from '../../src/lib/server/library/bookmarks';
 
 describe('favorites/bookmarks/preferences API', () => {
 	it('favoriting twice is idempotent, unfavoriting a non-favorite is a no-op', async () => {
@@ -89,6 +91,39 @@ describe('favorites/bookmarks/preferences API', () => {
 			expect(res.status).toBe(200);
 			const body = await res.json();
 			expect(body.playback_speed).toBe(1.25);
+		});
+	});
+
+	it('isItemFavorite detects favorited items correctly', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [item] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'X', sortTitle: 'x' })
+				.returning();
+			const isFavorited = await isItemFavorite(db, userId, item.id);
+			expect(isFavorited).toBe(false);
+			await addItemFavorite(db, userId, item.id);
+			const isNowFavorited = await isItemFavorite(db, userId, item.id);
+			expect(isNowFavorited).toBe(true);
+		});
+	});
+
+	it('countBookmarks returns correct count', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [item] = await db
+				.insert(itemsTable)
+				.values({ kind: 'book', title: 'X', sortTitle: 'x' })
+				.returning();
+			const initialCount = await countBookmarks(db, userId);
+			expect(initialCount).toBe(0);
+			await addBookmark(db, userId, item.id, 10, 'Chapter 1');
+			const countAfterOne = await countBookmarks(db, userId);
+			expect(countAfterOne).toBe(1);
+			await addBookmark(db, userId, item.id, 20, 'Chapter 2');
+			const countAfterTwo = await countBookmarks(db, userId);
+			expect(countAfterTwo).toBe(2);
 		});
 	});
 }, 60_000);

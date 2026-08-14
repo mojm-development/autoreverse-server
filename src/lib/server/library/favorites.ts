@@ -40,3 +40,15 @@ export async function listFavoriteTracks(db: DrizzleDb, userId: number) {
 		.where(and(eq(favorites.userId, userId), isNotNull(favorites.trackId)))
 		.orderBy(sql`lower(${itemsTable.sortTitle})`, tracksTable.position);
 }
+
+export async function isItemFavorite(
+	db: DrizzleDb,
+	userId: number,
+	itemId: number
+): Promise<boolean> {
+	const rows = await db
+		.select()
+		.from(favorites)
+		.where(and(eq(favorites.userId, userId), eq(favorites.itemId, itemId)));
+	return rows.length > 0;
+}
