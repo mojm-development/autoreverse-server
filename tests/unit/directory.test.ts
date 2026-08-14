@@ -51,4 +51,76 @@ describe('searchDirectory', () => {
 		expect(url.searchParams.get('country')).toBe('DE');
 		expect(url.searchParams.get('limit')).toBe('25');
 	});
+
+	it('throws DirectorySearchError when response.json() rejects', async () => {
+		const { DirectorySearchError } = await import('../../src/lib/server/podcasts/directory');
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => {
+					throw new Error('not json');
+				}
+			})
+		);
+		await expect(searchDirectory('x')).rejects.toThrow(DirectorySearchError);
+	});
+
+	it('throws DirectorySearchError when results is not an array', async () => {
+		const { DirectorySearchError } = await import('../../src/lib/server/podcasts/directory');
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({ results: {} })
+			})
+		);
+		await expect(searchDirectory('x')).rejects.toThrow(DirectorySearchError);
+	});
+
+	it('throws DirectorySearchError when results is missing entirely', async () => {
+		const { DirectorySearchError } = await import('../../src/lib/server/podcasts/directory');
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({})
+			})
+		);
+		await expect(searchDirectory('x')).rejects.toThrow(DirectorySearchError);
+	});
+
+	it('skips non-object entries in results array and returns only valid entries', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					results: [
+						123,
+						null,
+						'invalid string',
+						{
+							collectionName: 'Valid Podcast',
+							artistName: 'Valid Artist',
+							feedUrl: 'https://x/feed.xml',
+							artworkUrl100: 'https://x/art.png',
+							trackCount: 50,
+							genres: ['Technology']
+						}
+					]
+				})
+			})
+		);
+		const results = await searchDirectory('x');
+		expect(results).toHaveLength(1);
+		expect(results[0]).toEqual({
+			name: 'Valid Podcast',
+			author: 'Valid Artist',
+			feedUrl: 'https://x/feed.xml',
+			artworkUrl: 'https://x/art.png',
+			episodeCount: 50,
+			genre: 'Technology'
+		});
+	});
 });

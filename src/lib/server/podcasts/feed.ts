@@ -46,11 +46,7 @@ function guidFor(item: RSSItem, index: number): string {
 
 const parser = new Parser({ customFields: { item: [['enclosure', 'enclosure']] } });
 
-/** Synchronous wrapper over rss-parser's async API for call-site parity with
- * the Python feedparser.parse(raw) (also synchronous) — rss-parser's
- * parseString is async under the hood, so this is actually async; keep it
- * `async` here despite the type-signature-looking-sync docstring below and
- * update call sites (fetch.ts, Task 25) accordingly. */
+/** Async because rss-parser has no synchronous XML-parsing API (unlike Python's feedparser.parse). */
 export async function parseFeed(xml: string): Promise<ParsedFeed> {
 	const parsed = await parser.parseString(xml);
 	const episodes = (parsed.items ?? []).map((item: RSSItem, index: number) => ({
