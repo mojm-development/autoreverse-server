@@ -5,14 +5,14 @@ import { createUser } from '../../src/lib/server/auth/passwords';
 // constructed RequestEvent-shaped object, avoiding a full HTTP server in unit
 // scope — see tests/integration/_callRoute.ts helper introduced here.
 import { callRoute } from './_callRoute';
-import { POST as usersPost } from '../../src/routes/users/+server';
-import { PATCH as userPatch } from '../../src/routes/users/[id]/+server';
+import { usersPostHandler } from '../../src/routes/users/+server';
+import { usersPatchHandler } from '../../src/routes/users/[id]/+server';
 
 describe('users API', () => {
 	it('POST /users promotes the first user to admin, second stays a regular user', async () => {
 		await withTestDb(async (db) => {
 			const first = await createUser(db, 'oliver', 'hunter2hunter2');
-			const res = await callRoute(usersPost, {
+			const res = await callRoute(usersPostHandler, {
 				db,
 				locals: { userId: first, token: null },
 				body: { name: 'mara', password: 'hunter2hunter2' }
@@ -26,12 +26,12 @@ describe('users API', () => {
 	it('POST /users returns 409 on duplicate name', async () => {
 		await withTestDb(async (db) => {
 			const first = await createUser(db, 'oliver', 'hunter2hunter2');
-			await callRoute(usersPost, {
+			await callRoute(usersPostHandler, {
 				db,
 				locals: { userId: first, token: null },
 				body: { name: 'mara', password: 'hunter2hunter2' }
 			});
-			const res = await callRoute(usersPost, {
+			const res = await callRoute(usersPostHandler, {
 				db,
 				locals: { userId: first, token: null },
 				body: { name: 'mara', password: 'hunter2hunter2' }
@@ -44,7 +44,7 @@ describe('users API', () => {
 	it('PATCH /users/{id} refuses to demote the last admin with 409', async () => {
 		await withTestDb(async (db) => {
 			const first = await createUser(db, 'oliver', 'hunter2hunter2');
-			const res = await callRoute(userPatch, {
+			const res = await callRoute(usersPatchHandler, {
 				db,
 				locals: { userId: first, token: null },
 				params: { id: String(first) },

@@ -1,4 +1,4 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiAdmin } from '$lib/server/auth/session';
@@ -7,12 +7,14 @@ import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export const PATCH: RequestHandler = async ({ locals, params, request, platform }) => {
+export async function usersPatchHandler(
+	db: DrizzleDb,
+	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
+): Promise<Response> {
 	try {
-		const db = (platform as unknown as { context: { db: DrizzleDb } })?.context?.db ?? defaultDb;
-		await requireApiAdmin(locals, db);
-		const { is_admin } = await request.json();
-		const userId = Number(params.id);
+		await requireApiAdmin(event.locals, db);
+		const { is_admin } = await event.request.json();
+		const userId = Number(event.params.id);
 		try {
 			const resultingIsAdmin = await setAdmin(db, userId, is_admin);
 			const [row] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
@@ -26,4 +28,6 @@ export const PATCH: RequestHandler = async ({ locals, params, request, platform 
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		throw e;
 	}
-};
+}
+
+export const PATCH: RequestHandler = (event) => usersPatchHandler(defaultDb, event);

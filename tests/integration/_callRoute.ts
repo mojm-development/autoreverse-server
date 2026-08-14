@@ -1,9 +1,9 @@
-import type { RequestHandler } from '@sveltejs/kit';
 import type { DrizzleDb } from '../../src/lib/server/db';
 import type { Locals } from '../../src/lib/server/auth/session';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function callRoute(
-	handler: RequestHandler,
+	handler: (db: DrizzleDb, event: any) => Promise<Response>,
 	opts: {
 		db: DrizzleDb;
 		locals: Locals;
@@ -24,9 +24,7 @@ export async function callRoute(
 		request,
 		locals: opts.locals,
 		params: opts.params ?? {},
-		url: new URL(opts.url ?? 'http://test/'),
-		cookies: { get: () => undefined, set: () => {} },
-		platform: { context: { db: opts.db } }
-	} as unknown;
-	return handler(event as Parameters<RequestHandler>[0]);
+		url: new URL(opts.url ?? 'http://test/')
+	};
+	return handler(opts.db, event);
 }
