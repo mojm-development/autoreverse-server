@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { users } from '../db/schema';
-import { db } from '../db';
+import { db as defaultDb, type DrizzleDb } from '../db';
 import { ApiError } from '../api/errors';
 
 export const SESSION_COOKIE = 'capstan_session';
@@ -24,7 +24,7 @@ export function requireApiUser(locals: Locals): number {
 	return locals.userId;
 }
 
-export async function requireApiAdmin(locals: Locals): Promise<number> {
+export async function requireApiAdmin(locals: Locals, db: DrizzleDb = defaultDb): Promise<number> {
 	const userId = requireApiUser(locals);
 	const [row] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId));
 	if (!row?.isAdmin) throw new ApiError(403, 'Nur für Verwalter');
