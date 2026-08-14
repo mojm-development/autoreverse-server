@@ -1,0 +1,73 @@
+:root {
+	--bg: #08080a;
+	--text: #f5f5f7;
+	--dim: rgb(245 245 247 / 0.56);
+	--faint: rgb(245 245 247 / 0.34);
+	--panel: rgb(255 255 255 / 0.045);
+	--panel-hi: rgb(255 255 255 / 0.08);
+	--line: rgb(255 255 255 / 0.09);
+	--line-strong: rgb(255 255 255 / 0.12);
+	--sidebar: #0d0d10;
+	--tile: #1a1a1f;
+	--stripe: rgb(255 255 255 / 0.055);
+	--track: rgb(255 255 255 / 0.14);
+	--track-tick: rgb(255 255 255 / 0.3);
+
+	/* Content-type accents — fixed across both themes. */
+	--music: #e05a4e;
+	--book: #2fb08c;
+	--podcast: #9b6ff0;
+
+	/* Type */
+	--font-sans: 'Helvetica Neue', Helvetica, system-ui, sans-serif;
+	--font-mono: ui-monospace, Menlo, monospace;
+
+	/* Radius scale, most-used values from the design export */
+	--radius-pill: 99px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-sm: 4px;
+
+	color-scheme: dark;
+}
+
+/* ponytail: the design export never defines light values (only a theme
+   toggle placeholder) — this palette is our own derivation, following the
+   same bg/text-inversion + fixed-accent approach the existing capstan app's
+   style.css already uses successfully. Revisit if the design later ships
+   real light tokens. */
+:root[data-theme='light'] {
+	--bg: #f7f7f8;
+	--text: #14141a;
+	--dim: rgb(20 20 26 / 0.6);
+	--faint: rgb(20 20 26 / 0.4);
+	--panel: rgb(20 20 26 / 0.04);
+	--panel-hi: rgb(20 20 26 / 0.07);
+	--line: rgb(20 20 26 / 0.1);
+	--line-strong: rgb(20 20 26 / 0.14);
+	--sidebar: #ffffff;
+	--tile: #e9e9ec;
+	--stripe: rgb(20 20 26 / 0.05);
+	--track: rgb(20 20 26 / 0.12);
+	--track-tick: rgb(20 20 26 / 0.28);
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+	:root:not([data-theme='dark']) {
+		--bg: #f7f7f8;
+		--text: #14141a;
+		--dim: rgb(20 20 26 / 0.6);
+		--faint: rgb(20 20 26 / 0.4);
+		--panel: rgb(20 20 26 / 0.04);
+		--panel-hi: rgb(20 20 26 / 0.07);
+		--line: rgb(20 20 26 / 0.1);
+		--line-strong: rgb(20 20 26 / 0.14);
+		--sidebar: #ffffff;
+		--tile: #e9e9ec;
+		--stripe: rgb(20 20 26 / 0.05);
+		--track: rgb(20 20 26 / 0.12);
+		--track-tick: rgb(20 20 26 / 0.28);
+		color-scheme: light;
+	}
+}

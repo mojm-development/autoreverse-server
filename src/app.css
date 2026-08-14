@@ -1,0 +1,60 @@
+@import './lib/styles/tokens.css';
+
+* {
+	box-sizing: border-box;
+}
+html,
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+}
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+/* Eyebrow labels — mono, uppercase, letter-spacing .1–.16em, used for
+   sidebar section headers, content-type badges, column headers. */
+.eyebrow {
+	font: 600 9.5px/1 var(--font-mono);
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+/* Mono numerics — durations, counts, timestamps. */
+.mono {
+	font-family: var(--font-mono);
+}
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 30px;
+	padding: 0 13px;
+	border-radius: var(--radius-pill);
+	font: 500 12px/1 var(--font-sans);
+	border: 1px solid var(--line-strong);
+	color: var(--dim);
+	background: transparent;
+	cursor: pointer;
+}
+.pill[aria-current='true'],
+.pill.active {
+	background: var(--a, var(--book));
+	color: var(--bg);
+	border-color: transparent;
+}
+
+.badge {
+	display: inline-flex;
+	align-items: center;
+	font: 600 10px/1 var(--font-mono);
+	color: var(--bg);
+	background: var(--a, var(--book));
+	padding: 2px 5px;
+	border-radius: var(--radius-pill);
+}
