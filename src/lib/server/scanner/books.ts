@@ -84,6 +84,11 @@ export async function scanFolder(
 		stats.set(file, [s.mtimeMs / 1000, s.size]);
 	}
 	const knownForFolder = files.every((f) => f in known);
+	const dirPrefix = `${dir}${sep}`;
+	const knownPathsInFolder = Object.keys(known).filter((k) => {
+		if (!k.startsWith(dirPrefix)) return false;
+		return !k.slice(dirPrefix.length).includes(sep); // direct child only, matches audioFilesIn's own non-recursive semantics
+	});
 	const unchanged =
 		knownForFolder &&
 		files.every((f) => {
@@ -91,7 +96,7 @@ export async function scanFolder(
 			const [actualMtime, actualSize] = stats.get(f)!;
 			return mtime === actualMtime && size === actualSize;
 		}) &&
-		Object.keys(known).filter((k) => stats.has(k)).length === files.length;
+		knownPathsInFolder.length === files.length;
 
 	const parts = relative(root, dir).split(sep).filter(Boolean);
 	const folderAuthorOrArtist = parts.length >= 2 ? parts[0] : null;
