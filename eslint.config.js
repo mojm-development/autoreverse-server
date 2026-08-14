@@ -37,5 +37,19 @@ export default defineConfig(
 		// Override or add rule settings here, such as:
 		// 'svelte/button-has-type': 'error'
 		rules: {}
+	},
+	{
+		files: ['src/lib/components/**/*.svelte'],
+		rules: {
+			// Shared design-system components render <a href> to routes that
+			// either don't exist yet (the library screens these link to land in
+			// Task 29+) or are arbitrary caller-supplied strings (ListRow is a
+			// generic row shell reused across many future screens with
+			// different route shapes). resolve() needs a statically-known
+			// route id from SvelteKit's generated types, which fits neither
+			// case for this component library. Revisit per-component once the
+			// consuming routes exist.
+			'svelte/no-navigation-without-resolve': 'off'
+		}
 	}
 );

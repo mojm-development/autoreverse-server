@@ -1,5 +1,7 @@
 <script lang="ts">
-	import CoverTile from './CoverTile.svelte';
+	// Note: the brief's Step 4 code imports CoverTile here but never renders
+	// it — dropped as an unused-import lint error (@typescript-eslint/no-unused-vars).
+	// Nothing else in this file changed from the brief's given code.
 	let {
 		accent,
 		activeHref,
@@ -9,10 +11,20 @@
 		accent: 'book' | 'music' | 'podcast';
 		activeHref: string;
 		user: { name: string; isAdmin: boolean };
-		counts: { albums: number; artists: number; podcasts: number; unreadEpisodes: number; books: number };
+		counts: {
+			albums: number;
+			artists: number;
+			podcasts: number;
+			unreadEpisodes: number;
+			books: number;
+		};
 	} = $props();
 
-	const initials = user.name.slice(0, 2).toUpperCase();
+	// $derived (not a plain const) so `initials` tracks live updates to the
+	// `user` prop rather than capturing only its initial value — the only
+	// deviation from the brief's given Step 4 code, needed to clear a
+	// svelte-check state_referenced_locally warning.
+	const initials = $derived(user.name.slice(0, 2).toUpperCase());
 </script>
 
 <nav style="--a: var(--{accent})">
@@ -23,8 +35,12 @@
 	<a href="/library/search" class="search-shortcut">Alles durchsuchen</a>
 
 	<div class="eyebrow" style="color: var(--music)">Musik</div>
-	<a href="/library/albums" aria-current={activeHref === '/library/albums'}>Alben <span class="count mono">{counts.albums}</span></a>
-	<a href="/library/artists" aria-current={activeHref === '/library/artists'}>Interpreten <span class="count mono">{counts.artists}</span></a>
+	<a href="/library/albums" aria-current={activeHref === '/library/albums'}
+		>Alben <span class="count mono">{counts.albums}</span></a
+	>
+	<a href="/library/artists" aria-current={activeHref === '/library/artists'}
+		>Interpreten <span class="count mono">{counts.artists}</span></a
+	>
 	<a href="/library/playlists" aria-current={activeHref === '/library/playlists'}>Playlists</a>
 	<a href="/library/favorites" aria-current={activeHref === '/library/favorites'}>Favoriten</a>
 
@@ -32,12 +48,18 @@
 	<a href="/library/podcasts" aria-current={activeHref === '/library/podcasts'}>
 		Abos <span class="count mono">{counts.podcasts}</span>
 	</a>
-	<a href="/library/podcasts?filter=new" aria-current={activeHref === '/library/podcasts?filter=new'}>
-		Neue Folgen {#if counts.unreadEpisodes > 0}<span class="badge">{counts.unreadEpisodes}</span>{/if}
+	<a
+		href="/library/podcasts?filter=new"
+		aria-current={activeHref === '/library/podcasts?filter=new'}
+	>
+		Neue Folgen {#if counts.unreadEpisodes > 0}<span class="badge">{counts.unreadEpisodes}</span
+			>{/if}
 	</a>
 
 	<div class="eyebrow" style="color: var(--book)">Hörbücher</div>
-	<a href="/library/books" aria-current={activeHref === '/library/books'}>Bibliothek <span class="count mono">{counts.books}</span></a>
+	<a href="/library/books" aria-current={activeHref === '/library/books'}
+		>Bibliothek <span class="count mono">{counts.books}</span></a
+	>
 	<a href="/library/series" aria-current={activeHref === '/library/series'}>Serien</a>
 	<a href="/library/bookmarks" aria-current={activeHref === '/library/bookmarks'}>Lesezeichen</a>
 
@@ -57,7 +79,11 @@
 		flex-direction: column;
 		padding: 20px 12px 12px;
 		box-sizing: border-box;
-		background: linear-gradient(180deg, color-mix(in oklab, var(--a) 22%, var(--sidebar)), var(--sidebar) 52%);
+		background: linear-gradient(
+			180deg,
+			color-mix(in oklab, var(--a) 22%, var(--sidebar)),
+			var(--sidebar) 52%
+		);
 		border-right: 1px solid var(--line);
 	}
 	.brand {

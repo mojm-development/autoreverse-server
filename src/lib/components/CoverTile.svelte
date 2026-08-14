@@ -1,5 +1,17 @@
 <script lang="ts">
-	let { kind, coverUrl, title, subtitle, size = 100 }: { kind: string; coverUrl: string | null; title: string; subtitle: string; size?: number } = $props();
+	let {
+		kind,
+		coverUrl,
+		title,
+		subtitle,
+		size = 100
+	}: {
+		kind: string;
+		coverUrl: string | null;
+		title: string;
+		subtitle: string;
+		size?: number;
+	} = $props();
 </script>
 
 <figure style="--size:{size}px">

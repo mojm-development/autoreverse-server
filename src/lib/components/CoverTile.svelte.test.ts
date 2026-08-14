@@ -5,7 +5,12 @@ import CoverTile from './CoverTile.svelte';
 
 describe('CoverTile.svelte', () => {
 	it('renders an <img> when coverUrl is set', async () => {
-		render(CoverTile, { kind: 'album', coverUrl: '/items/1/cover', title: 'Nordlicht', subtitle: 'Ansa Volt' });
+		render(CoverTile, {
+			kind: 'album',
+			coverUrl: '/items/1/cover',
+			title: 'Nordlicht',
+			subtitle: 'Ansa Volt'
+		});
 		// CoverTile sets alt="" (decorative cover art), which per ARIA/HTML-AAM
 		// gives the <img> an implicit "presentation" role rather than "img" —
 		// so getByRole('img') can never match it (confirmed empirically; `page`
