@@ -102,6 +102,14 @@ describe('podcasts store', () => {
 	});
 
 	it('downloadEpisode rejects when passed a podcast id instead of an episode id (kind filter)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				body: {}, // truthy — would allow download to proceed if the podcast row passed the kind filter
+				arrayBuffer: async () => new Uint8Array([0, 1, 2, 3]).buffer
+			})
+		);
 		await withTestDb(async (db) => {
 			const [podcast] = await db
 				.insert(itemsTable)
@@ -113,7 +121,7 @@ describe('podcasts store', () => {
 				})
 				.returning();
 			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
-			await expect(downloadEpisode(db, podcast.id, dir)).rejects.toThrow();
+			await expect(downloadEpisode(db, podcast.id, dir)).rejects.toThrow('not found');
 			const tracks = await db.select().from(tracksTable).where(eq(tracksTable.itemId, podcast.id));
 			expect(tracks).toHaveLength(0); // no spurious track attached to the podcast item
 		});
