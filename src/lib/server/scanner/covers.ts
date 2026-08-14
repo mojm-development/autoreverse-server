@@ -1,0 +1,65 @@
+import { join } from 'node:path';
+import { readdir, writeFile, rename, mkdir } from 'node:fs/promises';
+
+const NAMES = ['cover', 'folder', 'front', 'album', 'albumart'];
+const SUFFIXES = ['.jpg', '.jpeg', '.png', '.webp'];
+
+/** File-in-folder cover, checked before any embedded artwork — direct port
+ * of scanner/covers.py::find_cover_file's nested name-then-suffix priority. */
+export async function findCoverFile(dir: string): Promise<string | null> {
+	let entries: string[];
+	try {
+		entries = await readdir(dir);
+	} catch {
+		return null;
+	}
+	const lowerToActual = new Map(entries.map((e) => [e.toLowerCase(), e]));
+	for (const name of NAMES) {
+		for (const suffix of SUFFIXES) {
+			const actual = lowerToActual.get(`${name}${suffix}`);
+			if (actual) return join(dir, actual);
+		}
+	}
+	return null;
+}
+
+const MAGIC: Array<[Buffer, string]> = [
+	[Buffer.from([0xff, 0xd8, 0xff]), '.jpg'],
+	[Buffer.from('89504e470d0a1a0a', 'hex'), '.png'],
+	[Buffer.from('RIFF'), '.webp'],
+	[Buffer.from('GIF8'), '.gif']
+];
+
+function sniffSuffix(data: Buffer): string {
+	for (const [magic, suffix] of MAGIC) {
+		if (data.subarray(0, magic.length).equals(magic)) return suffix;
+	}
+	return '.bin';
+}
+
+/** Extracts embedded artwork (FLAC picture / ID3 APIC / MP4 covr) from a
+ * track and writes it to `{coversDir}/{itemId}.{ext}`, atomically via a
+ * `.part` temp file + rename — direct port of scanner/covers.py::extract_embedded. */
+export async function extractEmbedded(
+	trackPath: string,
+	coversDir: string,
+	itemId: number
+): Promise<string | null> {
+	const { parseFile } = await import('music-metadata');
+	let picture: Buffer | null = null;
+	try {
+		const meta = await parseFile(trackPath);
+		const pic = meta.common.picture?.[0];
+		if (pic) picture = Buffer.from(pic.data);
+	} catch {
+		return null;
+	}
+	if (!picture) return null;
+
+	await mkdir(coversDir, { recursive: true });
+	const destination = join(coversDir, `${itemId}${sniffSuffix(picture)}`);
+	const temp = `${destination}.part`;
+	await writeFile(temp, picture);
+	await rename(temp, destination);
+	return destination;
+}
