@@ -1,13 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
-import { items as itemsTable, playlists as playlistsTable, playlistEntries } from '../../src/lib/server/db/schema';
+import {
+	items as itemsTable,
+	playlists as playlistsTable,
+	playlistEntries
+} from '../../src/lib/server/db/schema';
+import type { DrizzleDb } from '../../src/lib/server/db';
 import { eq, asc } from 'drizzle-orm';
 import { appendEntry, removeEntry, moveEntry } from '../../src/lib/server/library/playlistEntries';
 
-async function positions(db: any, playlistId: number) {
-	const rows = await db.select().from(playlistEntries).where(eq(playlistEntries.playlistId, playlistId)).orderBy(asc(playlistEntries.position));
-	return rows.map((r: any) => ({ id: r.id, position: r.position }));
+async function positions(db: DrizzleDb, playlistId: number) {
+	const rows = await db
+		.select()
+		.from(playlistEntries)
+		.where(eq(playlistEntries.playlistId, playlistId))
+		.orderBy(asc(playlistEntries.position));
+	return rows.map((r) => ({ id: r.id, position: r.position }));
 }
 
 describe('playlist gapless reorder', () => {
@@ -15,7 +24,10 @@ describe('playlist gapless reorder', () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const [playlist] = await db.insert(playlistsTable).values({ userId, name: 'X' }).returning();
-			const [track] = await db.insert(itemsTable).values({ kind: 'album', title: 'A', sortTitle: 'a' }).returning();
+			const [track] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
 			await appendEntry(db, playlist.id, { itemId: track.id });
 			await appendEntry(db, playlist.id, { itemId: track.id });
 			await appendEntry(db, playlist.id, { itemId: track.id });
@@ -27,13 +39,19 @@ describe('playlist gapless reorder', () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const [playlist] = await db.insert(playlistsTable).values({ userId, name: 'X' }).returning();
-			const [track] = await db.insert(itemsTable).values({ kind: 'album', title: 'A', sortTitle: 'a' }).returning();
+			const [track] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
 			const e1 = await appendEntry(db, playlist.id, { itemId: track.id });
 			const e2 = await appendEntry(db, playlist.id, { itemId: track.id });
 			const e3 = await appendEntry(db, playlist.id, { itemId: track.id });
 			await removeEntry(db, playlist.id, e2, 2);
 			const remaining = await positions(db, playlist.id);
-			expect(remaining).toEqual([{ id: e1, position: 1 }, { id: e3, position: 2 }]);
+			expect(remaining).toEqual([
+				{ id: e1, position: 1 },
+				{ id: e3, position: 2 }
+			]);
 		});
 	});
 
@@ -41,7 +59,10 @@ describe('playlist gapless reorder', () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const [playlist] = await db.insert(playlistsTable).values({ userId, name: 'X' }).returning();
-			const [track] = await db.insert(itemsTable).values({ kind: 'album', title: 'A', sortTitle: 'a' }).returning();
+			const [track] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
 			const e1 = await appendEntry(db, playlist.id, { itemId: track.id }); // pos 1
 			const e2 = await appendEntry(db, playlist.id, { itemId: track.id }); // pos 2
 			const e3 = await appendEntry(db, playlist.id, { itemId: track.id }); // pos 3
@@ -57,7 +78,10 @@ describe('playlist gapless reorder', () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const [playlist] = await db.insert(playlistsTable).values({ userId, name: 'X' }).returning();
-			const [track] = await db.insert(itemsTable).values({ kind: 'album', title: 'A', sortTitle: 'a' }).returning();
+			const [track] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
 			const e1 = await appendEntry(db, playlist.id, { itemId: track.id }); // pos 1
 			const e2 = await appendEntry(db, playlist.id, { itemId: track.id }); // pos 2
 			const e3 = await appendEntry(db, playlist.id, { itemId: track.id }); // pos 3
@@ -73,7 +97,10 @@ describe('playlist gapless reorder', () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const [playlist] = await db.insert(playlistsTable).values({ userId, name: 'X' }).returning();
-			const [track] = await db.insert(itemsTable).values({ kind: 'album', title: 'A', sortTitle: 'a' }).returning();
+			const [track] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
 			const e1 = await appendEntry(db, playlist.id, { itemId: track.id });
 			await moveEntry(db, playlist.id, e1, 1, 1);
 			expect((await positions(db, playlist.id))[0]).toEqual({ id: e1, position: 1 });

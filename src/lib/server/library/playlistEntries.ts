@@ -1,5 +1,5 @@
 import { and, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
-import { playlists, playlistEntries } from '../db/schema';
+import { playlistEntries } from '../db/schema';
 import type { DrizzleDb } from '../db';
 
 /** Locks the parent playlist row to serialize concurrent mutations —
@@ -21,20 +21,32 @@ export async function appendEntry(
 			.where(eq(playlistEntries.playlistId, playlistId));
 		const [row] = await tx
 			.insert(playlistEntries)
-			.values({ playlistId, itemId: entry.itemId ?? null, trackId: entry.trackId ?? null, position: next })
+			.values({
+				playlistId,
+				itemId: entry.itemId ?? null,
+				trackId: entry.trackId ?? null,
+				position: next
+			})
 			.returning({ id: playlistEntries.id });
 		return row.id;
 	});
 }
 
-export async function removeEntry(db: DrizzleDb, playlistId: number, entryId: number, position: number): Promise<void> {
+export async function removeEntry(
+	db: DrizzleDb,
+	playlistId: number,
+	entryId: number,
+	position: number
+): Promise<void> {
 	await db.transaction(async (tx) => {
 		await lockPlaylist(tx as unknown as DrizzleDb, playlistId);
 		await tx.delete(playlistEntries).where(eq(playlistEntries.id, entryId));
 		await tx
 			.update(playlistEntries)
 			.set({ position: sql`${playlistEntries.position} - 1` })
-			.where(and(eq(playlistEntries.playlistId, playlistId), gt(playlistEntries.position, position)));
+			.where(
+				and(eq(playlistEntries.playlistId, playlistId), gt(playlistEntries.position, position))
+			);
 	});
 }
 
@@ -67,7 +79,10 @@ export async function moveEntry(
 				)
 				.orderBy(sql`${playlistEntries.position} DESC`);
 			for (const entry of entriesToShift) {
-				await tx.update(playlistEntries).set({ position: entry.position + 1 }).where(eq(playlistEntries.id, entry.id));
+				await tx
+					.update(playlistEntries)
+					.set({ position: entry.position + 1 })
+					.where(eq(playlistEntries.id, entry.id));
 			}
 		} else {
 			// Moving later: decrement positions (oldPosition, newPosition] in ascending order to avoid constraint violation
@@ -83,13 +98,23 @@ export async function moveEntry(
 				)
 				.orderBy(sql`${playlistEntries.position} ASC`);
 			for (const entry of entriesToShift) {
-				await tx.update(playlistEntries).set({ position: entry.position - 1 }).where(eq(playlistEntries.id, entry.id));
+				await tx
+					.update(playlistEntries)
+					.set({ position: entry.position - 1 })
+					.where(eq(playlistEntries.id, entry.id));
 			}
 		}
-		await tx.update(playlistEntries).set({ position: newPosition }).where(eq(playlistEntries.id, entryId));
+		await tx
+			.update(playlistEntries)
+			.set({ position: newPosition })
+			.where(eq(playlistEntries.id, entryId));
 	});
 }
 
 export async function listEntries(db: DrizzleDb, playlistId: number) {
-	return db.select().from(playlistEntries).where(eq(playlistEntries.playlistId, playlistId)).orderBy(playlistEntries.position);
+	return db
+		.select()
+		.from(playlistEntries)
+		.where(eq(playlistEntries.playlistId, playlistId))
+		.orderBy(playlistEntries.position);
 }
