@@ -1,5 +1,9 @@
 import { and, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
-import { items as itemsTable, tracks as tracksTable, chapters as chaptersTable } from '../db/schema';
+import {
+	items as itemsTable,
+	tracks as tracksTable,
+	chapters as chaptersTable
+} from '../db/schema';
 import { findCoverFile, extractEmbedded } from './covers';
 import type { ScannedItem } from './books';
 import type { DrizzleDb } from '../db';
@@ -49,12 +53,25 @@ export async function storeItems(
 	const report = { new: 0, updated: 0, unchanged: 0, skipped: 0 };
 	for (const entry of scanned) {
 		await db.transaction(async (tx) => {
-			const [existing] = await tx.select().from(itemsTable).where(eq(itemsTable.sourcePath, entry.sourcePath));
+			const [existing] = await tx
+				.select()
+				.from(itemsTable)
+				.where(eq(itemsTable.sourcePath, entry.sourcePath));
 
 			if (entry.unchanged) {
 				if (existing) {
-					const cover = await resolveCover(tx as unknown as DrizzleDb, existing.id, entry.sourcePath, [], coversDir, existing.coverPath);
-					await tx.update(itemsTable).set({ missingSince: null, coverPath: cover }).where(eq(itemsTable.id, existing.id));
+					const cover = await resolveCover(
+						tx as unknown as DrizzleDb,
+						existing.id,
+						entry.sourcePath,
+						[],
+						coversDir,
+						existing.coverPath
+					);
+					await tx
+						.update(itemsTable)
+						.set({ missingSince: null, coverPath: cover })
+						.where(eq(itemsTable.id, existing.id));
 				}
 				report.unchanged += 1;
 				return;
@@ -101,26 +118,60 @@ export async function storeItems(
 			// renumbering (same ordering as store.py::_upsert_item_with_tracks).
 			const currentPaths = entry.tracks.map((t) => t.path);
 			if (currentPaths.length > 0) {
-				await tx.delete(tracksTable).where(and(eq(tracksTable.itemId, itemId), notInArray(tracksTable.path, currentPaths)));
+				await tx
+					.delete(tracksTable)
+					.where(and(eq(tracksTable.itemId, itemId), notInArray(tracksTable.path, currentPaths)));
 			} else {
 				await tx.delete(tracksTable).where(eq(tracksTable.itemId, itemId));
 			}
 			for (const t of entry.tracks) {
 				await tx
 					.insert(tracksTable)
-					.values({ itemId, position: t.position, path: t.path, duration: t.duration, title: t.title, disc: t.disc, mtime: t.mtime, size: t.size })
+					.values({
+						itemId,
+						position: t.position,
+						path: t.path,
+						duration: t.duration,
+						title: t.title,
+						disc: t.disc,
+						mtime: t.mtime,
+						size: t.size
+					})
 					.onConflictDoUpdate({
 						target: tracksTable.path,
-						set: { itemId, position: t.position, duration: t.duration, title: t.title, disc: t.disc, mtime: t.mtime, size: t.size }
+						set: {
+							itemId,
+							position: t.position,
+							duration: t.duration,
+							title: t.title,
+							disc: t.disc,
+							mtime: t.mtime,
+							size: t.size
+						}
 					});
 			}
 
 			await tx.delete(chaptersTable).where(eq(chaptersTable.itemId, itemId));
 			if (entry.chapters.length > 0) {
-				await tx.insert(chaptersTable).values(entry.chapters.map((c, i) => ({ itemId, position: i + 1, title: c.title, start: c.start, end: c.end })));
+				await tx.insert(chaptersTable).values(
+					entry.chapters.map((c, i) => ({
+						itemId,
+						position: i + 1,
+						title: c.title,
+						start: c.start,
+						end: c.end
+					}))
+				);
 			}
 
-			const cover = await resolveCover(tx as unknown as DrizzleDb, itemId, entry.sourcePath, currentPaths, coversDir, existing?.coverPath ?? null);
+			const cover = await resolveCover(
+				tx as unknown as DrizzleDb,
+				itemId,
+				entry.sourcePath,
+				currentPaths,
+				coversDir,
+				existing?.coverPath ?? null
+			);
 			await tx.update(itemsTable).set({ coverPath: cover }).where(eq(itemsTable.id, itemId));
 		});
 	}
@@ -133,20 +184,38 @@ export async function storeItems(
  * IS NULL (already-missing rows are never re-touched — this is the fix for
  * the old 50%-threshold bug where re-marked items polluted their own
  * denominator on a second run). */
-export async function markMissing(db: DrizzleDb, root: string, found: Set<string>, skippedPaths: string[]): Promise<number> {
+export async function markMissing(
+	db: DrizzleDb,
+	root: string,
+	found: Set<string>,
+	skippedPaths: string[]
+): Promise<number> {
 	const prefix = `${root}/`;
-	const isSkipped = (path: string) => skippedPaths.some((entry) => path === entry || path.startsWith(`${entry}/`));
+	const isSkipped = (path: string) =>
+		skippedPaths.some((entry) => path === entry || path.startsWith(`${entry}/`));
 
 	const candidates = await db
 		.select({ id: itemsTable.id, sourcePath: itemsTable.sourcePath })
 		.from(itemsTable)
-		.where(and(sql`substr(${itemsTable.sourcePath}, 1, ${prefix.length}) = ${prefix}`, isNull(itemsTable.missingSince)));
+		.where(
+			and(
+				sql`substr(${itemsTable.sourcePath}, 1, ${prefix.length}) = ${prefix}`,
+				isNull(itemsTable.missingSince)
+			)
+		);
 
 	let count = 0;
 	await db.transaction(async (tx) => {
 		for (const candidate of candidates) {
-			if (candidate.sourcePath && (found.has(candidate.sourcePath) || isSkipped(candidate.sourcePath))) continue;
-			await tx.update(itemsTable).set({ missingSince: sql`now()` }).where(eq(itemsTable.id, candidate.id));
+			if (
+				candidate.sourcePath &&
+				(found.has(candidate.sourcePath) || isSkipped(candidate.sourcePath))
+			)
+				continue;
+			await tx
+				.update(itemsTable)
+				.set({ missingSince: sql`now()` })
+				.where(eq(itemsTable.id, candidate.id));
 			count += 1;
 		}
 	});

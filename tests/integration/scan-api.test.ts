@@ -57,13 +57,21 @@ describe('admin scan API', () => {
 	it('DELETE /items/missing removes missing items and 409s mid-scan', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			await db.insert(itemsTable).values({ kind: 'book', title: 'X', sortTitle: 'x', missingSince: new Date() });
-			const res = await callRoute(itemsMissingDeleteHandler, { db, locals: { userId, token: null } });
+			await db
+				.insert(itemsTable)
+				.values({ kind: 'book', title: 'X', sortTitle: 'x', missingSince: new Date() });
+			const res = await callRoute(itemsMissingDeleteHandler, {
+				db,
+				locals: { userId, token: null }
+			});
 			expect(res.status).toBe(200);
 			expect((await res.json()).removed).toBe(1);
 
 			scanState.running = true;
-			const res2 = await callRoute(itemsMissingDeleteHandler, { db, locals: { userId, token: null } });
+			const res2 = await callRoute(itemsMissingDeleteHandler, {
+				db,
+				locals: { userId, token: null }
+			});
 			expect(res2.status).toBe(409);
 		});
 	});
