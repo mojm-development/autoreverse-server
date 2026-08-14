@@ -16,16 +16,21 @@ export async function callRoute(
 		params?: Record<string, string>;
 		body?: unknown;
 		url?: string;
+		headers?: Record<string, string>;
 	}
 ) {
+	const headers = new Headers(opts.headers ?? {});
+	if (opts.body !== undefined) {
+		headers.set('content-type', 'application/json');
+	}
 	const request =
 		opts.body !== undefined
 			? new Request(opts.url ?? 'http://test/', {
 					method: 'POST',
 					body: JSON.stringify(opts.body),
-					headers: { 'content-type': 'application/json' }
+					headers
 				})
-			: new Request(opts.url ?? 'http://test/');
+			: new Request(opts.url ?? 'http://test/', { headers });
 	const event: FakeRequestEvent = {
 		request,
 		locals: opts.locals,
