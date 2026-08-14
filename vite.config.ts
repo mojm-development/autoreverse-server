@@ -1,7 +1,10 @@
 import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 import { playwright } from '@vitest/browser-playwright';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
+
+const testEnv = loadEnv('test', process.cwd(), '');
 
 export default defineConfig({
 	plugins: [
@@ -21,6 +24,7 @@ export default defineConfig({
 	],
 	test: {
 		expect: { requireAssertions: true },
+		env: testEnv,
 		projects: [
 			{
 				extends: './vite.config.ts',
