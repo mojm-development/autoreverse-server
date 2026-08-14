@@ -30,18 +30,34 @@ export async function playlistEntriesPostHandler(
 			trackId: track_id ?? undefined
 		});
 		const [entry] = await db.select().from(playlistEntries).where(eq(playlistEntries.id, entryId));
+		if (entry.itemId) {
+			return json({
+				id: entry.id,
+				position: entry.position,
+				item: toItemSummary(await item(db, entry.itemId)),
+				track: null
+			});
+		}
+		const t = await track(db, entry.trackId!);
+		if (!t) {
+			return json({
+				id: entry.id,
+				position: entry.position,
+				item: null,
+				track: null
+			});
+		}
+		const parentItem = await item(db, t.itemId);
 		return json({
 			id: entry.id,
 			position: entry.position,
-			item: entry.itemId ? toItemSummary(await item(db, entry.itemId)) : null,
-			track: entry.trackId
-				? toTrackSummary({
-						...(await track(db, entry.trackId))!,
-						item_id: 0,
-						item_title: '',
-						item_kind: ''
-					})
-				: null
+			item: null,
+			track: toTrackSummary({
+				...t,
+				item_id: t.itemId,
+				item_title: parentItem?.title ?? '',
+				item_kind: parentItem?.kind ?? ''
+			})
 		});
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);

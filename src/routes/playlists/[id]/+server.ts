@@ -1,8 +1,8 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
-import { playlists } from '$lib/server/db/schema';
+import { playlists, playlistEntries } from '$lib/server/db/schema';
 import { listEntries } from '$lib/server/library/playlistEntries';
 import { item, track } from '$lib/server/library/queries';
 import { toItemSummary, toTrackSummary } from '$lib/server/api/serialize';
@@ -36,13 +36,18 @@ export async function playlistGetHandler(
 						track: null
 					};
 				const t = await track(db, e.trackId!);
+				if (!t) return { id: e.id, position: e.position, item: null, track: null };
+				const parentItem = await item(db, t.itemId);
 				return {
 					id: e.id,
 					position: e.position,
 					item: null,
-					track: t
-						? toTrackSummary({ ...t, item_id: t.itemId, item_title: '', item_kind: '' })
-						: null
+					track: toTrackSummary({
+						...t,
+						item_id: t.itemId,
+						item_title: parentItem?.title ?? '',
+						item_kind: parentItem?.kind ?? ''
+					})
 				};
 			})
 		);
@@ -72,7 +77,16 @@ export async function playlistPatchHandler(
 			.set({ name })
 			.where(eq(playlists.id, playlist.id))
 			.returning();
-		return json({ id: row.id, name: row.name, created_at: row.createdAt });
+		const [{ count }] = await db
+			.select({ count: sql<number>`count(*)::int` })
+			.from(playlistEntries)
+			.where(eq(playlistEntries.playlistId, row.id));
+		return json({
+			id: row.id,
+			name: row.name,
+			created_at: row.createdAt,
+			entry_count: count
+		});
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		throw e;

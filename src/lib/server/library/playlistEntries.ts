@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
 import { playlistEntries } from '../db/schema';
 import type { DrizzleDb } from '../db';
 
@@ -41,12 +41,21 @@ export async function removeEntry(
 	await db.transaction(async (tx) => {
 		await lockPlaylist(tx as unknown as DrizzleDb, playlistId);
 		await tx.delete(playlistEntries).where(eq(playlistEntries.id, entryId));
-		await tx
-			.update(playlistEntries)
-			.set({ position: sql`${playlistEntries.position} - 1` })
+		// Shift positions down in ascending order to avoid constraint violation
+		// (smallest position first, each row moves into slot vacated by previous)
+		const toShift = await tx
+			.select({ id: playlistEntries.id, position: playlistEntries.position })
+			.from(playlistEntries)
 			.where(
 				and(eq(playlistEntries.playlistId, playlistId), gt(playlistEntries.position, position))
-			);
+			)
+			.orderBy(asc(playlistEntries.position));
+		for (const row of toShift) {
+			await tx
+				.update(playlistEntries)
+				.set({ position: row.position - 1 })
+				.where(eq(playlistEntries.id, row.id));
+		}
 	});
 }
 

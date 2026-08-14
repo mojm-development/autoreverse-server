@@ -106,4 +106,40 @@ describe('playlist gapless reorder', () => {
 			expect((await positions(db, playlist.id))[0]).toEqual({ id: e1, position: 1 });
 		});
 	});
+
+	it('remove after reorder: deleting entry after prior moves does not trigger 23505 constraint violation', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [playlist] = await db.insert(playlistsTable).values({ userId, name: 'X' }).returning();
+			const [track] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
+			// Append 5 entries: positions 1, 2, 3, 4, 5
+			const e1 = await appendEntry(db, playlist.id, { itemId: track.id });
+			const e2 = await appendEntry(db, playlist.id, { itemId: track.id });
+			const e3 = await appendEntry(db, playlist.id, { itemId: track.id });
+			const e4 = await appendEntry(db, playlist.id, { itemId: track.id });
+			const e5 = await appendEntry(db, playlist.id, { itemId: track.id });
+			// Move e5 to position 2 (causing physical row order to diverge from position order)
+			// This makes removeEntry on e3 risky: without ordered loop, it triggers 23505
+			await moveEntry(db, playlist.id, e5, 5, 2);
+			// Verify state after move
+			let state = await positions(db, playlist.id);
+			expect(state.map((r) => r.position)).toEqual([1, 2, 3, 4, 5]);
+			// Now remove e3 (currently at position 3, with e4 at 4 and e1 at 1 etc)
+			// This triggers the bug: removing position 3 needs to shift positions 4,5 down to 3,4
+			// Old code with bulk UPDATE fails here due to constraint conflict from physical order divergence
+			await removeEntry(db, playlist.id, e3, 3);
+			// Verify final positions are still gapless 1..n
+			state = await positions(db, playlist.id);
+			expect(state.map((r) => r.position)).toEqual([1, 2, 3, 4]);
+			expect(state).toEqual([
+				{ id: e1, position: 1 },
+				{ id: e5, position: 2 },
+				{ id: e2, position: 3 },
+				{ id: e4, position: 4 }
+			]);
+		});
+	});
 }, 60_000);
