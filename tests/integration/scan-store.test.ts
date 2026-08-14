@@ -131,6 +131,82 @@ describe('storeItems', () => {
 			expect(rows).toHaveLength(1);
 		});
 	});
+
+	it('swaps two surviving tracks positions on rescan without throwing a UNIQUE violation', async () => {
+		await withTestDb(async (db) => {
+			await storeItems(
+				db,
+				[
+					fakeScanned({
+						tracks: [
+							{
+								path: '/library/books/A/B/01.mp3',
+								position: 1,
+								title: 'T1',
+								disc: null,
+								duration: 5,
+								mtime: 1,
+								size: 1
+							},
+							{
+								path: '/library/books/A/B/02.mp3',
+								position: 2,
+								title: 'T2',
+								disc: null,
+								duration: 5,
+								mtime: 1,
+								size: 1
+							}
+						]
+					})
+				],
+				'/library/books',
+				'/data/covers'
+			);
+
+			// Same two paths, positions swapped -- both tracks still exist, so
+			// the delete-tracks-no-longer-present step removes nothing.
+			await expect(
+				storeItems(
+					db,
+					[
+						fakeScanned({
+							tracks: [
+								{
+									path: '/library/books/A/B/02.mp3',
+									position: 1,
+									title: 'T2',
+									disc: null,
+									duration: 5,
+									mtime: 1,
+									size: 1
+								},
+								{
+									path: '/library/books/A/B/01.mp3',
+									position: 2,
+									title: 'T1',
+									disc: null,
+									duration: 5,
+									mtime: 1,
+									size: 1
+								}
+							]
+						})
+					],
+					'/library/books',
+					'/data/covers'
+				)
+			).resolves.not.toThrow();
+
+			const [item] = await db.select().from(itemsTable);
+			const rows = await db.select().from(tracksTable).where(eq(tracksTable.itemId, item.id));
+			expect(rows).toHaveLength(2);
+			const track01 = rows.find((r) => r.path === '/library/books/A/B/01.mp3')!;
+			const track02 = rows.find((r) => r.path === '/library/books/A/B/02.mp3')!;
+			expect(track01.position).toBe(2);
+			expect(track02.position).toBe(1);
+		});
+	});
 });
 
 describe('markMissing', () => {

@@ -124,6 +124,22 @@ export async function storeItems(
 			} else {
 				await tx.delete(tracksTable).where(eq(tracksTable.itemId, itemId));
 			}
+
+			// Push every surviving track out of positive-position space before
+			// assigning final positions below. Without this, a same-item
+			// position swap among tracks that all still exist (e.g. an ID3 tag
+			// fix flips two track numbers -- no file added/removed, so the
+			// delete step above frees nothing) can hit a transient
+			// UNIQUE(item_id, position) collision, since Postgres gives no
+			// row-processing-order guarantee across the per-row upserts below.
+			// A track's own id is globally unique, so negating it as a
+			// sentinel position can never collide with a real 1-based target
+			// position or another track's sentinel.
+			await tx
+				.update(tracksTable)
+				.set({ position: sql`-${tracksTable.id}` })
+				.where(eq(tracksTable.itemId, itemId));
+
 			for (const t of entry.tracks) {
 				await tx
 					.insert(tracksTable)
