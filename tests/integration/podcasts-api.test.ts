@@ -1,0 +1,144 @@
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { withTestDb } from '../fixtures';
+import { createUser } from '../../src/lib/server/auth/passwords';
+import { items as itemsTable } from '../../src/lib/server/db/schema';
+import { callRoute } from './_callRoute';
+import { podcastsPostHandler } from '../../src/routes/podcasts/+server';
+import { podcastDeleteHandler } from '../../src/routes/podcasts/[id]/+server';
+import { episodeDownloadPostHandler } from '../../src/routes/episodes/[id]/download/+server';
+
+const FEED = `<?xml version="1.0"?><rss version="2.0"><channel><title>Maschinenraum</title>
+<item><title>Folge 118</title><guid>ep-118</guid><pubDate>Mon, 01 Jan 2026 10:00:00 GMT</pubDate><enclosure url="https://x/118.mp3"/></item>
+</channel></rss>`;
+
+describe('podcasts API routes', () => {
+	let booksDir: string;
+	let musicDir: string;
+	let dataDir: string;
+	const originalEnv = process.env;
+
+	beforeEach(() => {
+		booksDir = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		musicDir = mkdtempSync(join(tmpdir(), 'capstan-music-'));
+		dataDir = mkdtempSync(join(tmpdir(), 'capstan-data-'));
+		process.env.CAPSTAN_BOOKS = booksDir;
+		process.env.CAPSTAN_MUSIC = musicDir;
+		process.env.CAPSTAN_DATA = dataDir;
+	});
+
+	afterEach(() => {
+		process.env = originalEnv;
+		vi.unstubAllGlobals();
+		try {
+			rmSync(booksDir, { recursive: true, force: true });
+			rmSync(musicDir, { recursive: true, force: true });
+			rmSync(dataDir, { recursive: true, force: true });
+		} catch {
+			// ignore cleanup errors
+		}
+	});
+
+	it('POST /podcasts subscribes and returns the PodcastOut shape', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const res = await callRoute(podcastsPostHandler, {
+				db,
+				locals: { userId, token: null },
+				body: { feed_url: 'https://x/feed.xml' }
+			});
+			expect(res.status).toBe(200);
+			const body = await res.json();
+			expect(body).toMatchObject({
+				title: 'Maschinenraum',
+				feed_url: 'https://x/feed.xml',
+				new_episodes: 0,
+				updated_episodes: 0
+			});
+			expect(body.id).toBeTruthy();
+		});
+	});
+
+	it('POST /podcasts 502s when the feed fetch fails', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const res = await callRoute(podcastsPostHandler, {
+				db,
+				locals: { userId, token: null },
+				body: { feed_url: 'https://x/feed.xml' }
+			});
+			expect(res.status).toBe(502);
+		});
+	});
+
+	it('non-admin gets 403 from POST /podcasts', async () => {
+		await withTestDb(async (db) => {
+			await createUser(db, 'admin', 'hunter2hunter2', true); // first user is always admin — throwaway
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', false);
+			const res = await callRoute(podcastsPostHandler, {
+				db,
+				locals: { userId, token: null },
+				body: { feed_url: 'https://x/feed.xml' }
+			});
+			expect(res.status).toBe(403);
+		});
+	});
+
+	it('DELETE /podcasts/{id} returns 200 with the UnsubscribeOut shape (not 204)', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const subscribeRes = await callRoute(podcastsPostHandler, {
+				db,
+				locals: { userId, token: null },
+				body: { feed_url: 'https://x/feed.xml' }
+			});
+			const podcastId = (await subscribeRes.json()).id;
+			const res = await callRoute(podcastDeleteHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: String(podcastId) }
+			});
+			expect(res.status).toBe(200);
+			const body = await res.json();
+			expect(body).toEqual({ episodes: 1, files_deleted: 0, files_kept: 0 });
+		});
+	});
+
+	it('DELETE /podcasts/{id} 404s for an unknown podcast', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const res = await callRoute(podcastDeleteHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: '999999' }
+			});
+			expect(res.status).toBe(404);
+			expect((await res.json()).detail).toBe('Unbekannter Podcast');
+		});
+	});
+
+	it('POST /episodes/{id}/download 422s when the episode has no media_url', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'P', sortTitle: 'p' })
+				.returning();
+			const [episode] = await db
+				.insert(itemsTable)
+				.values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e', guid: 'g1' })
+				.returning();
+			const res = await callRoute(episodeDownloadPostHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: String(episode.id) }
+			});
+			expect(res.status).toBe(422);
+		});
+	});
+}, 60_000);

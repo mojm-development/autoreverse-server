@@ -3,7 +3,10 @@ import { withTestDb } from '../fixtures';
 import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { subscribe, refresh, unsubscribe } from '../../src/lib/server/podcasts/store';
-import { downloadEpisode, EpisodeNotDownloadableError } from '../../src/lib/server/podcasts/download';
+import {
+	downloadEpisode,
+	EpisodeNotDownloadableError
+} from '../../src/lib/server/podcasts/download';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,7 +24,10 @@ describe('podcasts store', () => {
 			const podcast1 = await subscribe(db, 'https://x/feed.xml');
 			const podcast2 = await subscribe(db, 'https://x/feed.xml');
 			expect(podcast2.id).toBe(podcast1.id);
-			const episodes = await db.select().from(itemsTable).where(eq(itemsTable.parentId, podcast1.id));
+			const episodes = await db
+				.select()
+				.from(itemsTable)
+				.where(eq(itemsTable.parentId, podcast1.id));
 			expect(episodes).toHaveLength(1); // not duplicated on the second subscribe
 		});
 	});
@@ -31,7 +37,10 @@ describe('podcasts store', () => {
 		await withTestDb(async (db) => {
 			const podcast = await subscribe(db, 'https://x/feed.xml');
 			await refresh(db, podcast.id);
-			const episodes = await db.select().from(itemsTable).where(eq(itemsTable.parentId, podcast.id));
+			const episodes = await db
+				.select()
+				.from(itemsTable)
+				.where(eq(itemsTable.parentId, podcast.id));
 			expect(episodes).toHaveLength(1);
 		});
 	});
@@ -42,16 +51,26 @@ describe('podcasts store', () => {
 			const podcast = await subscribe(db, 'https://x/feed.xml');
 			const report = await unsubscribe(db, podcast.id, '/nonexistent/podcasts-dir');
 			expect(report.episodes).toBe(1);
-			expect(await db.select().from(itemsTable).where(eq(itemsTable.id, podcast.id))).toHaveLength(0);
+			expect(await db.select().from(itemsTable).where(eq(itemsTable.id, podcast.id))).toHaveLength(
+				0
+			);
 		});
 	});
 
 	it('downloadEpisode throws EpisodeNotDownloadableError when the episode has no media_url', async () => {
 		await withTestDb(async (db) => {
-			const [podcast] = await db.insert(itemsTable).values({ kind: 'podcast', title: 'P', sortTitle: 'p' }).returning();
-			const [episode] = await db.insert(itemsTable).values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e', guid: 'g1' }).returning();
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'P', sortTitle: 'p' })
+				.returning();
+			const [episode] = await db
+				.insert(itemsTable)
+				.values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e', guid: 'g1' })
+				.returning();
 			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
-			await expect(downloadEpisode(db, episode.id, dir)).rejects.toThrow(EpisodeNotDownloadableError);
+			await expect(downloadEpisode(db, episode.id, dir)).rejects.toThrow(
+				EpisodeNotDownloadableError
+			);
 		});
 	});
 
@@ -65,10 +84,20 @@ describe('podcasts store', () => {
 			})
 		);
 		await withTestDb(async (db) => {
-			const [podcast] = await db.insert(itemsTable).values({ kind: 'podcast', title: 'P', sortTitle: 'p' }).returning();
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'P', sortTitle: 'p' })
+				.returning();
 			const [episode] = await db
 				.insert(itemsTable)
-				.values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e', guid: 'g2', feedUrl: 'https://x/ep.mp3' })
+				.values({
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'E',
+					sortTitle: 'e',
+					guid: 'g2',
+					feedUrl: 'https://x/ep.mp3'
+				})
 				.returning();
 			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
 			const result = await downloadEpisode(db, episode.id, dir);
