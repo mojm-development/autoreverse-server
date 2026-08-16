@@ -30,7 +30,10 @@
 
 <div class="content" style="--a: var(--book)">
 	<header>
-		<h1>Bibliothek <span class="count mono">{data.total}</span></h1>
+		<h1>
+			{data.series ? `Serie ${data.series}` : 'Bibliothek'}
+			<span class="count mono">{data.total}</span>
+		</h1>
 	</header>
 
 	<div class="pills">

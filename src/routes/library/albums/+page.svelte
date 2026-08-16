@@ -23,7 +23,10 @@
 
 <div class="content" style="--a: var(--music)">
 	<header>
-		<h1>Alben <span class="count mono">{data.total}</span></h1>
+		<h1>
+			{data.artist ? `Alben von ${data.artist}` : 'Alben'}
+			<span class="count mono">{data.total}</span>
+		</h1>
 	</header>
 
 	<div class="pills">

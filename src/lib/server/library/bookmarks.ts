@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { bookmarks } from '../db/schema';
+import { bookmarks, items as itemsTable } from '../db/schema';
 import type { DrizzleDb } from '../db';
 
 export async function addBookmark(
@@ -41,4 +41,13 @@ export async function countBookmarks(db: DrizzleDb, userId: number): Promise<num
 		sql`SELECT count(*)::int AS n FROM bookmarks WHERE user_id = ${userId}`
 	);
 	return (rows[0] as { n: number }).n;
+}
+
+export async function allBookmarks(db: DrizzleDb, userId: number) {
+	return db
+		.select({ bookmark: bookmarks, item: itemsTable })
+		.from(bookmarks)
+		.innerJoin(itemsTable, eq(itemsTable.id, bookmarks.itemId))
+		.where(eq(bookmarks.userId, userId))
+		.orderBy(sql`lower(${itemsTable.sortTitle})`, bookmarks.position);
 }
