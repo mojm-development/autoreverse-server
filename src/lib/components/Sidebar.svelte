@@ -2,6 +2,8 @@
 	// Note: the brief's Step 4 code imports CoverTile here but never renders
 	// it — dropped as an unused-import lint error (@typescript-eslint/no-unused-vars).
 	// Nothing else in this file changed from the brief's given code.
+	import ThemeToggle from './ThemeToggle.svelte';
+
 	let {
 		accent,
 		activeHref,
@@ -69,6 +71,7 @@
 			<span class="name">{user.name}</span>
 			<span class="role mono">{user.isAdmin ? 'Verwalter' : 'Nutzer'}</span>
 		</span>
+		<ThemeToggle />
 	</div>
 </nav>
 
@@ -172,5 +175,20 @@
 	.role {
 		font-size: 10px;
 		color: var(--faint);
+	}
+
+	@media (max-width: 700px) {
+		nav {
+			width: 100%;
+			flex-direction: row;
+			position: fixed;
+			bottom: 0;
+			height: 56px;
+			padding: 0;
+			border-right: none;
+			border-top: 1px solid var(--line);
+		}
+		/* Collapses to a bottom tab bar — same CSS-only breakpoint technique
+		   as the existing app's _nav.html, no separate mobile markup/component. */
 	}
 </style>

@@ -4,6 +4,23 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<script>
+			// Runs before anything is painted: a stored choice (see
+			// src/lib/theme.ts) takes effect immediately, otherwise it stays
+			// with prefers-color-scheme (see tokens.css) — without this early
+			// script there would be a brief flash of the wrong theme on load.
+			(function () {
+				try {
+					var stored = localStorage.getItem('capstan-theme');
+					if (stored === 'light' || stored === 'dark') {
+						document.documentElement.setAttribute('data-theme', stored);
+					}
+				} catch (error) {
+					// e.g. private mode with no localStorage — falls back to the
+					// system theme, not worth erroring over.
+				}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
