@@ -12,7 +12,9 @@ export async function _podcastsPostHandler(
 ): Promise<Response> {
 	try {
 		await requireApiAdmin(event.locals, db);
-		const { feed_url } = await readJson<{ feed_url: string }>(event.request);
+		const { feed_url } = await readJson<{ feed_url?: unknown }>(event.request);
+		if (typeof feed_url !== 'string' || feed_url.length < 1)
+			return apiError(422, 'feed_url muss eine nicht-leere Zeichenkette sein');
 		const podcast = await subscribe(db, feed_url);
 		return json({
 			id: podcast.id,

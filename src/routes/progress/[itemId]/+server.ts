@@ -16,9 +16,11 @@ export async function _progressPutHandler(
 		const row = await item(db, Number(event.params.itemId));
 		if (!row) return apiError(404, 'Unbekanntes Item');
 		const { position, finished = false } = await readJson<{
-			position: number;
+			position?: unknown;
 			finished?: boolean;
 		}>(event.request);
+		if (typeof position !== 'number' || !Number.isFinite(position))
+			return apiError(422, 'position muss eine Zahl sein');
 		await savePosition(db, userId, row.id, position, finished);
 		return new Response(null, { status: 204 });
 	} catch (e) {

@@ -162,6 +162,32 @@ describe('podcasts API routes', () => {
 		});
 	});
 
+	it('POST /podcasts/{id}/refresh 404s for an unknown podcast', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const res = await callRoute(_podcastRefreshPostHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: '999999' }
+			});
+			expect(res.status).toBe(404);
+			expect((await res.json()).detail).toBe('Unbekannter Podcast');
+		});
+	});
+
+	it('POST /episodes/{id}/download 404s at the route level for an unknown episode', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
+			const res = await callRoute(_episodeDownloadPostHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: '999999' }
+			});
+			expect(res.status).toBe(404);
+			expect((await res.json()).detail).toBe('Unbekannte Folge');
+		});
+	});
+
 	it('POST /episodes/{id}/download 422s when the episode has no media_url', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);

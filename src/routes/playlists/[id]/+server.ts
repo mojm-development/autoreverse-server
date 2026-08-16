@@ -72,7 +72,9 @@ export async function _playlistPatchHandler(
 		const userId = requireApiUser(event.locals);
 		const playlist = await ownedPlaylist(db, userId, Number(event.params.id));
 		if (!playlist) return apiError(404, 'Unbekannte Playlist');
-		const { name } = await readJson<{ name: string }>(event.request);
+		const { name } = await readJson<{ name?: unknown }>(event.request);
+		if (typeof name !== 'string' || name.length < 1 || name.length > 100)
+			return apiError(422, 'name muss 1–100 Zeichen haben');
 		const [row] = await db
 			.update(playlists)
 			.set({ name })

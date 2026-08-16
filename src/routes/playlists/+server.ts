@@ -43,7 +43,9 @@ export async function _playlistsPostHandler(
 ): Promise<Response> {
 	try {
 		const userId = requireApiUser(event.locals);
-		const { name } = await readJson<{ name: string }>(event.request);
+		const { name } = await readJson<{ name?: unknown }>(event.request);
+		if (typeof name !== 'string' || name.length < 1 || name.length > 100)
+			return apiError(422, 'name muss 1–100 Zeichen haben');
 		const [row] = await db.insert(playlists).values({ userId, name }).returning();
 		return json(serialize({ ...row, entryCount: 0 }));
 	} catch (e) {
