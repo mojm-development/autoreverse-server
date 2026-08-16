@@ -135,6 +135,20 @@
 		align-items: center;
 		gap: 6px;
 	}
+	.password-field input {
+		flex: 1;
+	}
+	.password-field button {
+		flex-shrink: 0;
+		border: none;
+		background: none;
+		padding: 4px 2px;
+		font: 500 12px/1 var(--font-sans);
+		color: var(--dim);
+	}
+	.password-field button:hover {
+		color: var(--text);
+	}
 	.warning {
 		margin-top: 30px;
 		padding: 12px 14px;
