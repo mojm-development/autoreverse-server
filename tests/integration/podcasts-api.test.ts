@@ -54,7 +54,9 @@ describe('podcasts API routes', () => {
 			expect(body).toMatchObject({
 				title: 'Maschinenraum',
 				feed_url: 'https://x/feed.xml',
-				new_episodes: 0,
+				// I-4 fix: real counts from syncEpisodes, not hardcoded zeros — this
+				// feed has exactly one <item>, freshly inserted.
+				new_episodes: 1,
 				updated_episodes: 0
 			});
 			expect(body.id).toBeTruthy();

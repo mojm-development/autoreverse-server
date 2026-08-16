@@ -21,7 +21,9 @@ export async function _podcastDeleteHandler(
 		}); // 200, not 204
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
-		return apiError(404, 'Unbekannter Podcast');
+		if (e instanceof Error && e.message === 'not found')
+			return apiError(404, 'Unbekannter Podcast');
+		throw e;
 	}
 }
 

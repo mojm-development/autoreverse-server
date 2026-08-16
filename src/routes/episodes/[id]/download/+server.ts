@@ -25,7 +25,8 @@ export async function _episodeDownloadPostHandler(
 		if (e instanceof EpisodeNotDownloadableError) return apiError(422, e.message);
 		if (e instanceof EpisodeFetchError) return apiError(502, e.message);
 		if (e instanceof EpisodeStorageError) return apiError(507, e.message);
-		return apiError(404, 'Unbekannte Folge');
+		if (e instanceof Error && e.message === 'not found') return apiError(404, 'Unbekannte Folge');
+		throw e;
 	}
 }
 

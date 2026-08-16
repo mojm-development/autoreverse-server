@@ -16,14 +16,16 @@ export async function _podcastRefreshPostHandler(
 			id: podcast.id,
 			title: podcast.title,
 			feed_url: podcast.feedUrl,
-			new_episodes: 0,
-			updated_episodes: 0
+			new_episodes: podcast.newEpisodes,
+			updated_episodes: podcast.updatedEpisodes
 		});
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		if (e instanceof FeedFetchError) return apiError(502, e.message);
 		if (e instanceof InvalidFeedError) return apiError(422, e.message);
-		return apiError(404, 'Unbekannter Podcast');
+		if (e instanceof Error && e.message === 'not found')
+			return apiError(404, 'Unbekannter Podcast');
+		throw e;
 	}
 }
 

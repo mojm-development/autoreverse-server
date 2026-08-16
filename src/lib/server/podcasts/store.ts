@@ -23,7 +23,9 @@ async function syncEpisodes(
 	db: DrizzleDb,
 	podcastId: number,
 	episodes: Awaited<ReturnType<typeof parseFeed>>['episodes']
-) {
+): Promise<{ newEpisodes: number; updatedEpisodes: number }> {
+	let newEpisodes = 0;
+	let updatedEpisodes = 0;
 	for (const episode of episodes) {
 		const [existing] = await db
 			.select({ id: itemsTable.id })
@@ -39,6 +41,7 @@ async function syncEpisodes(
 					publishedAt: episode.publishedAt
 				})
 				.where(eq(itemsTable.id, existing.id));
+			updatedEpisodes += 1;
 		} else {
 			await db.insert(itemsTable).values({
 				kind: 'episode',
@@ -49,8 +52,10 @@ async function syncEpisodes(
 				feedUrl: episode.mediaUrl, // repurposed on episode rows to hold the media/enclosure URL, not a feed address
 				publishedAt: episode.publishedAt
 			});
+			newEpisodes += 1;
 		}
 	}
+	return { newEpisodes, updatedEpisodes };
 }
 
 export async function subscribe(db: DrizzleDb, feedUrl: string) {
@@ -81,13 +86,19 @@ export async function subscribe(db: DrizzleDb, feedUrl: string) {
 			})
 			.returning();
 	}
-	await syncEpisodes(db, podcast.id, parsed.episodes);
+	const { newEpisodes, updatedEpisodes } = await syncEpisodes(db, podcast.id, parsed.episodes);
 	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
-	return podcast;
+	return { ...podcast, newEpisodes, updatedEpisodes };
 }
 
 export async function refresh(db: DrizzleDb, podcastId: number) {
-	const [podcast] = await db.select().from(itemsTable).where(eq(itemsTable.id, podcastId));
+	// kind-scoped: without this, POST /podcasts/{a-book-id}/refresh would read a
+	// non-podcast item's (null) feedUrl — the same bug class Task 25 already
+	// fixed for downloadEpisode (see download.ts).
+	const [podcast] = await db
+		.select()
+		.from(itemsTable)
+		.where(and(eq(itemsTable.id, podcastId), eq(itemsTable.kind, 'podcast')));
 	if (!podcast) throw new Error('not found');
 	const raw = await fetchFeedText(podcast.feedUrl!);
 	let parsed: Awaited<ReturnType<typeof parseFeed>>;
@@ -96,9 +107,9 @@ export async function refresh(db: DrizzleDb, podcastId: number) {
 	} catch (e: unknown) {
 		throw new InvalidFeedError(e instanceof Error ? e.message : String(e));
 	}
-	await syncEpisodes(db, podcast.id, parsed.episodes);
+	const { newEpisodes, updatedEpisodes } = await syncEpisodes(db, podcast.id, parsed.episodes);
 	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
-	return podcast;
+	return { ...podcast, newEpisodes, updatedEpisodes };
 }
 
 function isInside(path: string, root: string): boolean {
