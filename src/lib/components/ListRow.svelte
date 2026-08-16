@@ -1,14 +1,15 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	let { href, children }: { href?: string; children: Snippet } = $props();
+	let { href, ariaCurrent, children }: { href?: string; ariaCurrent?: boolean; children: Snippet } =
+		$props();
 </script>
 
 {#if href}
-	<a {href} role="row" class="row">
+	<a {href} role="row" aria-current={ariaCurrent} class="row">
 		{@render children()}
 	</a>
 {:else}
-	<div role="row" class="row">
+	<div role="row" aria-current={ariaCurrent} class="row">
 		{@render children()}
 	</div>
 {/if}
