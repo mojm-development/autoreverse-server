@@ -1,13 +1,15 @@
+import { hostname } from 'node:os';
 import { fail, redirect, type Actions } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { performLogin } from '$lib/server/auth/login';
 import { loginThrottle, loginHashSemaphore } from '$lib/server/auth/semaphore';
 import { SESSION_COOKIE } from '$lib/server/auth/session';
 import { ApiError } from '$lib/server/api/errors';
+import { libraryCounts } from '$lib/server/library/queries';
 
 export const load = async ({ locals }) => {
 	if (locals.userId !== null) throw redirect(303, '/library');
-	return {};
+	return { counts: await libraryCounts(db), hostname: hostname() };
 };
 
 export const actions: Actions = {
