@@ -11,7 +11,8 @@ import {
 async function ensureBook(
 	title: string,
 	narrator: string | null,
-	withProgress: boolean
+	withProgress: boolean,
+	progressPosition?: number
 ): Promise<number> {
 	const [existing] = await db
 		.select({ id: itemsTable.id })
@@ -47,9 +48,12 @@ async function ensureBook(
 				.from(progressTable)
 				.where(and(eq(progressTable.userId, userRow.id), eq(progressTable.itemId, bookId)));
 			if (!existingProgress) {
-				await db
-					.insert(progressTable)
-					.values({ userId: userRow.id, itemId: bookId, position: 1234, finished: false });
+				await db.insert(progressTable).values({
+					userId: userRow.id,
+					itemId: bookId,
+					position: progressPosition ?? 1234,
+					finished: false
+				});
 			}
 		}
 	}
@@ -70,4 +74,16 @@ test('the narrator line is omitted entirely when narrator is null, not shown as 
 	const bookId = await ensureBook('E2E-Fixture-Book-NoNarrator', null, false);
 	await page.goto(`/library/books/${bookId}`);
 	await expect(page.getByText('gelesen von null')).not.toBeVisible();
+});
+
+test('"Von vorn" button restarts playback from position 0', async ({ page }) => {
+	// Create a book with progress at 500 seconds (well into the track)
+	const bookId = await ensureBook('E2E-Fixture-Book-Restart', 'A Narrator', true, 500);
+	await page.goto(`/library/books/${bookId}`);
+
+	// Click the "Von vorn" button
+	await page.getByRole('button', { name: 'Von vorn' }).click();
+
+	// Wait for the MiniPlayerBar to appear and show time at 0:00
+	await expect(page.locator('.time').first()).toContainText('0:00');
 });

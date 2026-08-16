@@ -35,8 +35,9 @@
 		return hours >= 1 ? `${hours.toFixed(1)} Std` : `${Math.round(seconds / 60)} min`;
 	}
 
-	function restart() {
-		void player.play(data.book.id);
+	async function restart() {
+		await player.play(data.book.id);
+		player.seek(0);
 	}
 	async function addBookmarkHere() {
 		const position = currentPosition;
