@@ -3,6 +3,7 @@
 	// it — dropped as an unused-import lint error (@typescript-eslint/no-unused-vars).
 	// Nothing else in this file changed from the brief's given code.
 	import ThemeToggle from './ThemeToggle.svelte';
+	import Icon from './Icon.svelte';
 
 	let {
 		accent,
@@ -72,6 +73,11 @@
 			<span class="role mono">{user.isAdmin ? 'Verwalter' : 'Nutzer'}</span>
 		</span>
 		<ThemeToggle />
+		<form method="POST" action="/logout" class="logout-form">
+			<button type="submit" class="logout-button" aria-label="Abmelden">
+				<Icon name="logout" />
+			</button>
+		</form>
 	</div>
 </nav>
 
@@ -175,6 +181,24 @@
 	.role {
 		font-size: 10px;
 		color: var(--faint);
+	}
+	.logout-form {
+		display: contents;
+	}
+	.logout-button {
+		flex: none;
+		width: 26px;
+		height: 26px;
+		display: grid;
+		place-items: center;
+		border-radius: var(--radius-pill, 999px);
+		border: 1px solid var(--line);
+		background: transparent;
+		color: var(--dim);
+	}
+	.logout-button:hover {
+		color: var(--text);
+		background: var(--panel);
 	}
 
 	@media (max-width: 700px) {
