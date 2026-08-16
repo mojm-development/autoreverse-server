@@ -29,7 +29,7 @@
 {#if current && track && !isFullscreenPlayer}
 	<div class="bar">
 		<div class="transport">
-			<button aria-label="Zurück" onclick={() => player.skipBack(30)}
+			<button class="icon-btn" aria-label="Zurück" onclick={() => player.skipBack(30)}
 				><Icon name="previous" /></button
 			>
 			<button
@@ -39,7 +39,9 @@
 			>
 				<Icon name={current.playing ? 'pause' : 'play'} />
 			</button>
-			<button aria-label="Vor" onclick={() => player.skipForward(15)}><Icon name="next" /></button>
+			<button class="icon-btn" aria-label="Vor" onclick={() => player.skipForward(15)}
+				><Icon name="next" /></button
+			>
 		</div>
 		<div class="cover"></div>
 		<div class="info">

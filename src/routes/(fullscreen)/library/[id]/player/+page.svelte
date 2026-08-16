@@ -117,7 +117,7 @@
 					<option value={1}>1,00×</option>
 				</select>
 				<button class="skip" onclick={() => player.skipBack(30)}>30</button>
-				<button aria-label="Vorheriges Kapitel"><Icon name="previous" /></button>
+				<button class="icon-btn" aria-label="Vorheriges Kapitel"><Icon name="previous" /></button>
 				<button
 					class="play"
 					aria-label={player.current?.playing ? 'Pause' : 'Abspielen'}
@@ -125,7 +125,7 @@
 				>
 					<Icon name={player.current?.playing ? 'pause' : 'play'} />
 				</button>
-				<button aria-label="Nächstes Kapitel"><Icon name="next" /></button>
+				<button class="icon-btn" aria-label="Nächstes Kapitel"><Icon name="next" /></button>
 				<button class="skip" onclick={() => player.skipForward(15)}>15</button>
 				<select class="pill sleep" onchange={(e) => setSleepTimer(e.currentTarget.value)}>
 					<option value="0">Sleep-Timer</option>

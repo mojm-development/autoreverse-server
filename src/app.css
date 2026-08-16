@@ -128,10 +128,14 @@ button:disabled {
 	opacity: 0.5;
 }
 
-/* Plain, unclassed <button type="submit"> (no explicit .primary/.secondary) — a handful of
-   secondary form actions (Aufräumen, Suchen, Anlegen, Abonnieren) never opted into either
-   class. Give them the .secondary look by default rather than raw UA styling. */
-button[type='submit']:not(.primary, .secondary) {
+/* Plain, unclassed <button> (no explicit .primary/.secondary/.icon-btn) — a handful of
+   secondary form actions (Aufräumen, Suchen, Anlegen, Abonnieren) never opted into any
+   class, and the original version of this rule only matched a literal type="submit"
+   attribute, which several of them never wrote out (relying on the implicit default
+   instead) — so they stayed unstyled too. Match every type now; icon-only buttons opt out
+   via .icon-btn below rather than being excluded here, since a plain type/attribute
+   selector can't tell an icon button from a text one. */
+button:not(.primary, .secondary, .icon-btn) {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -142,4 +146,29 @@ button[type='submit']:not(.primary, .secondary) {
 	background: transparent;
 	color: var(--dim);
 	font: 500 12px/1 var(--font-sans);
+}
+
+/* Icon-only buttons (transport controls, chapter nav, etc.) — a ghost circular hit target,
+   not the text-pill treatment above. Was already an established naming convention (one
+   file already used it, locally) but never defined anywhere globally, and several bare
+   icon buttons elsewhere (mini-player skip controls, fullscreen-player chapter nav) used
+   no class at all and rendered as raw native buttons around a lone icon. */
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border: none;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--dim);
+	padding: 0;
+}
+.icon-btn:hover:not(:disabled) {
+	background: var(--panel-hi);
+	color: var(--text);
+}
+.icon-btn:disabled {
+	opacity: 0.5;
 }
