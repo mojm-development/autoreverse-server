@@ -7,7 +7,7 @@ import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function usersPatchHandler(
+export async function _usersPatchHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
@@ -30,4 +30,4 @@ export async function usersPatchHandler(
 	}
 }
 
-export const PATCH: RequestHandler = (event) => usersPatchHandler(defaultDb, event);
+export const PATCH: RequestHandler = (event) => _usersPatchHandler(defaultDb, event);

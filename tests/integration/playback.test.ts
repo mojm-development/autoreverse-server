@@ -9,9 +9,9 @@ import {
 } from '../../src/lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { callRoute } from './_callRoute';
-import { playPostHandler } from '../../src/routes/play/[itemId]/+server';
-import { sessionClosePostHandler } from '../../src/routes/sessions/[sessionId]/close/+server';
-import { progressPutHandler } from '../../src/routes/progress/[itemId]/+server';
+import { _playPostHandler } from '../../src/routes/play/[itemId]/+server';
+import { _sessionClosePostHandler } from '../../src/routes/sessions/[sessionId]/close/+server';
+import { _progressPutHandler } from '../../src/routes/progress/[itemId]/+server';
 
 describe('playback API', () => {
 	it('POST /play/{id} opens a session and returns tracks/chapters', async () => {
@@ -24,7 +24,7 @@ describe('playback API', () => {
 			await db
 				.insert(tracksTable)
 				.values({ itemId: book.id, position: 1, path: '/a', duration: 120 });
-			const res = await callRoute(playPostHandler, {
+			const res = await callRoute(_playPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { itemId: String(book.id) }
@@ -47,7 +47,7 @@ describe('playback API', () => {
 				.insert(itemsTable)
 				.values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e' })
 				.returning();
-			const res = await callRoute(playPostHandler, {
+			const res = await callRoute(_playPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { itemId: String(episode.id) }
@@ -64,13 +64,13 @@ describe('playback API', () => {
 				.insert(itemsTable)
 				.values({ kind: 'book', title: 'X', sortTitle: 'x' })
 				.returning();
-			const playRes = await callRoute(playPostHandler, {
+			const playRes = await callRoute(_playPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { itemId: String(book.id) }
 			});
 			const { session_id } = await playRes.json();
-			await callRoute(sessionClosePostHandler, {
+			await callRoute(_sessionClosePostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { sessionId: session_id },
@@ -93,13 +93,13 @@ describe('playback API', () => {
 				.insert(itemsTable)
 				.values({ kind: 'book', title: 'X', sortTitle: 'x' })
 				.returning();
-			await callRoute(progressPutHandler, {
+			await callRoute(_progressPutHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { itemId: String(book.id) },
 				body: { position: 100, finished: true }
 			});
-			await callRoute(progressPutHandler, {
+			await callRoute(_progressPutHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { itemId: String(book.id) },

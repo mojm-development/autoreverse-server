@@ -5,7 +5,7 @@ import { continueListening } from '$lib/server/library/queries';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function progressContinueGetHandler(
+export async function _progressContinueGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
@@ -26,4 +26,4 @@ export async function progressContinueGetHandler(
 		throw e;
 	}
 }
-export const GET: RequestHandler = (event) => progressContinueGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _progressContinueGetHandler(defaultDb, event);

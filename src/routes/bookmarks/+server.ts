@@ -14,7 +14,7 @@ import { ApiError } from '$lib/server/api/errors';
 
 type Bookmark = typeof BookmarksType.$inferSelect;
 
-export async function bookmarksGetHandler(
+export async function _bookmarksGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
@@ -44,7 +44,7 @@ export async function bookmarksGetHandler(
 	}
 }
 
-export async function bookmarksPostHandler(
+export async function _bookmarksPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'request'>
 ): Promise<Response> {
@@ -74,5 +74,5 @@ export async function bookmarksPostHandler(
 		throw e;
 	}
 }
-export const GET: RequestHandler = (event) => bookmarksGetHandler(defaultDb, event);
-export const POST: RequestHandler = (event) => bookmarksPostHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _bookmarksGetHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _bookmarksPostHandler(defaultDb, event);

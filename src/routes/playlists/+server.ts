@@ -10,7 +10,7 @@ function serialize(p: { id: number; name: string; createdAt: Date; entryCount: n
 	return { id: p.id, name: p.name, created_at: p.createdAt, entry_count: p.entryCount };
 }
 
-export async function playlistsGetHandler(
+export async function _playlistsGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -35,7 +35,7 @@ export async function playlistsGetHandler(
 	}
 }
 
-export async function playlistsPostHandler(
+export async function _playlistsPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'request'>
 ): Promise<Response> {
@@ -49,5 +49,5 @@ export async function playlistsPostHandler(
 		throw e;
 	}
 }
-export const GET: RequestHandler = (event) => playlistsGetHandler(defaultDb, event);
-export const POST: RequestHandler = (event) => playlistsPostHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _playlistsGetHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _playlistsPostHandler(defaultDb, event);

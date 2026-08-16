@@ -3,10 +3,10 @@ import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { scanState } from '../../src/lib/server/admin/scanState';
 import { callRoute } from './_callRoute';
-import { scanPostHandler } from '../../src/routes/scan/+server';
-import { scanCancelPostHandler } from '../../src/routes/scan/cancel/+server';
-import { scanStatusGetHandler } from '../../src/routes/scan/status/+server';
-import { itemsMissingDeleteHandler } from '../../src/routes/items/missing/+server';
+import { _scanPostHandler } from '../../src/routes/scan/+server';
+import { _scanCancelPostHandler } from '../../src/routes/scan/cancel/+server';
+import { _scanStatusGetHandler } from '../../src/routes/scan/status/+server';
+import { _itemsMissingDeleteHandler } from '../../src/routes/items/missing/+server';
 import { items as itemsTable } from '../../src/lib/server/db/schema';
 
 describe('admin scan API', () => {
@@ -19,7 +19,7 @@ describe('admin scan API', () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
 			scanState.running = true;
-			const res = await callRoute(scanPostHandler, { db, locals: { userId, token: null } });
+			const res = await callRoute(_scanPostHandler, { db, locals: { userId, token: null } });
 			expect(res.status).toBe(409);
 			expect((await res.json()).detail).toBe('Es läuft bereits ein Scan');
 		});
@@ -28,7 +28,7 @@ describe('admin scan API', () => {
 	it('POST /scan/cancel 409s when nothing is running', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const res = await callRoute(scanCancelPostHandler, { db, locals: { userId, token: null } });
+			const res = await callRoute(_scanCancelPostHandler, { db, locals: { userId, token: null } });
 			expect(res.status).toBe(409);
 			expect((await res.json()).detail).toBe('Es läuft gerade kein Scan');
 		});
@@ -37,7 +37,7 @@ describe('admin scan API', () => {
 	it('GET /scan/status returns the ScanStatus shape', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const res = await callRoute(scanStatusGetHandler, { db, locals: { userId, token: null } });
+			const res = await callRoute(_scanStatusGetHandler, { db, locals: { userId, token: null } });
 			const body = await res.json();
 			expect(body).toHaveProperty('running');
 			expect(body).toHaveProperty('last_report');
@@ -49,7 +49,7 @@ describe('admin scan API', () => {
 		await withTestDb(async (db) => {
 			await createUser(db, 'admin', 'hunter2hunter2', true); // first user is always admin — create a throwaway one first
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', false);
-			const res = await callRoute(scanStatusGetHandler, { db, locals: { userId, token: null } });
+			const res = await callRoute(_scanStatusGetHandler, { db, locals: { userId, token: null } });
 			expect(res.status).toBe(403);
 		});
 	});
@@ -60,7 +60,7 @@ describe('admin scan API', () => {
 			await db
 				.insert(itemsTable)
 				.values({ kind: 'book', title: 'X', sortTitle: 'x', missingSince: new Date() });
-			const res = await callRoute(itemsMissingDeleteHandler, {
+			const res = await callRoute(_itemsMissingDeleteHandler, {
 				db,
 				locals: { userId, token: null }
 			});
@@ -68,7 +68,7 @@ describe('admin scan API', () => {
 			expect((await res.json()).removed).toBe(1);
 
 			scanState.running = true;
-			const res2 = await callRoute(itemsMissingDeleteHandler, {
+			const res2 = await callRoute(_itemsMissingDeleteHandler, {
 				db,
 				locals: { userId, token: null }
 			});

@@ -4,9 +4,9 @@ import { requireApiAdmin } from '$lib/server/auth/session';
 import { scanState, snapshot } from '$lib/server/admin/scanState';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
-import { toWire } from '../+server';
+import { _toWire } from '../+server';
 
-export async function scanCancelPostHandler(
+export async function _scanCancelPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -14,11 +14,11 @@ export async function scanCancelPostHandler(
 		await requireApiAdmin(event.locals, db);
 		if (!scanState.running) throw new ApiError(409, 'Es läuft gerade kein Scan');
 		scanState.cancelRequested = true;
-		return json(toWire(snapshot()), { status: 202 });
+		return json(_toWire(snapshot()), { status: 202 });
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		throw e;
 	}
 }
 
-export const POST: RequestHandler = (event) => scanCancelPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _scanCancelPostHandler(defaultDb, event);

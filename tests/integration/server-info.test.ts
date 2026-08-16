@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { callRoute } from './_callRoute';
-import { serverInfoGetHandler } from '../../src/routes/server/info/+server';
+import { _serverInfoGetHandler } from '../../src/routes/server/info/+server';
 
 describe('GET /server/info', () => {
 	it('includes user_count for an admin', async () => {
 		await withTestDb(async (db) => {
 			const admin = await createUser(db, 'oliver', 'hunter2hunter2'); // first user, auto-admin
-			const res = await callRoute(serverInfoGetHandler, {
+			const res = await callRoute(_serverInfoGetHandler, {
 				db,
 				locals: { userId: admin, token: null }
 			});
@@ -20,7 +20,7 @@ describe('GET /server/info', () => {
 		await withTestDb(async (db) => {
 			await createUser(db, 'oliver', 'hunter2hunter2');
 			const nonAdmin = await createUser(db, 'mara', 'hunter2hunter2');
-			const res = await callRoute(serverInfoGetHandler, {
+			const res = await callRoute(_serverInfoGetHandler, {
 				db,
 				locals: { userId: nonAdmin, token: null }
 			});

@@ -6,7 +6,7 @@ import { toItemSummary, toTrackSummary } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function searchGetHandler(
+export async function _searchGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
@@ -35,4 +35,4 @@ export async function searchGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => searchGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _searchGetHandler(defaultDb, event);

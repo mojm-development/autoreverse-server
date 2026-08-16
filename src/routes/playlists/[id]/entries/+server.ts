@@ -9,7 +9,7 @@ import { toItemSummary, toTrackSummary } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function playlistEntriesPostHandler(
+export async function _playlistEntriesPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
@@ -64,4 +64,4 @@ export async function playlistEntriesPostHandler(
 		throw e;
 	}
 }
-export const POST: RequestHandler = (event) => playlistEntriesPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _playlistEntriesPostHandler(defaultDb, event);

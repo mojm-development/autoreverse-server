@@ -21,7 +21,7 @@ function isInside(path: string, root: string): boolean {
 	return !rel.startsWith('..') && !resolve(rel).includes('..');
 }
 
-export async function coverGetHandler(
+export async function _coverGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -57,4 +57,4 @@ export async function coverGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => coverGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _coverGetHandler(defaultDb, event);

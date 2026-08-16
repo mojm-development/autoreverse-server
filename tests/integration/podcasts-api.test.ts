@@ -6,10 +6,10 @@ import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { items as itemsTable } from '../../src/lib/server/db/schema';
 import { callRoute } from './_callRoute';
-import { podcastsPostHandler } from '../../src/routes/podcasts/+server';
-import { podcastDeleteHandler } from '../../src/routes/podcasts/[id]/+server';
-import { podcastRefreshPostHandler } from '../../src/routes/podcasts/[id]/refresh/+server';
-import { episodeDownloadPostHandler } from '../../src/routes/episodes/[id]/download/+server';
+import { _podcastsPostHandler } from '../../src/routes/podcasts/+server';
+import { _podcastDeleteHandler } from '../../src/routes/podcasts/[id]/+server';
+import { _podcastRefreshPostHandler } from '../../src/routes/podcasts/[id]/refresh/+server';
+import { _episodeDownloadPostHandler } from '../../src/routes/episodes/[id]/download/+server';
 
 const FEED = `<?xml version="1.0"?><rss version="2.0"><channel><title>Maschinenraum</title>
 <item><title>Folge 118</title><guid>ep-118</guid><pubDate>Mon, 01 Jan 2026 10:00:00 GMT</pubDate><enclosure url="https://x/118.mp3"/></item>
@@ -46,7 +46,7 @@ describe('podcasts API routes', () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const res = await callRoute(podcastsPostHandler, {
+			const res = await callRoute(_podcastsPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
@@ -67,7 +67,7 @@ describe('podcasts API routes', () => {
 		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const res = await callRoute(podcastsPostHandler, {
+			const res = await callRoute(_podcastsPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
@@ -83,7 +83,7 @@ describe('podcasts API routes', () => {
 		);
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const res = await callRoute(podcastsPostHandler, {
+			const res = await callRoute(_podcastsPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
@@ -96,7 +96,7 @@ describe('podcasts API routes', () => {
 		await withTestDb(async (db) => {
 			await createUser(db, 'admin', 'hunter2hunter2', true); // first user is always admin — throwaway
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', false);
-			const res = await callRoute(podcastsPostHandler, {
+			const res = await callRoute(_podcastsPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
@@ -109,13 +109,13 @@ describe('podcasts API routes', () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const subscribeRes = await callRoute(podcastsPostHandler, {
+			const subscribeRes = await callRoute(_podcastsPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
 			});
 			const podcastId = (await subscribeRes.json()).id;
-			const res = await callRoute(podcastDeleteHandler, {
+			const res = await callRoute(_podcastDeleteHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(podcastId) }
@@ -130,7 +130,7 @@ describe('podcasts API routes', () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const subscribeRes = await callRoute(podcastsPostHandler, {
+			const subscribeRes = await callRoute(_podcastsPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
@@ -140,7 +140,7 @@ describe('podcasts API routes', () => {
 				'fetch',
 				vi.fn().mockResolvedValue({ ok: true, text: async () => '<html>not a feed</html>' })
 			);
-			const res = await callRoute(podcastRefreshPostHandler, {
+			const res = await callRoute(_podcastRefreshPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(podcastId) }
@@ -152,7 +152,7 @@ describe('podcasts API routes', () => {
 	it('DELETE /podcasts/{id} 404s for an unknown podcast', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', true);
-			const res = await callRoute(podcastDeleteHandler, {
+			const res = await callRoute(_podcastDeleteHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: '999999' }
@@ -173,7 +173,7 @@ describe('podcasts API routes', () => {
 				.insert(itemsTable)
 				.values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e', guid: 'g1' })
 				.returning();
-			const res = await callRoute(episodeDownloadPostHandler, {
+			const res = await callRoute(_episodeDownloadPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(episode.id) }

@@ -6,7 +6,7 @@ import { addItemFavorite, removeItemFavorite } from '$lib/server/library/favorit
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function favoriteItemPostHandler(
+export async function _favoriteItemPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -21,7 +21,7 @@ export async function favoriteItemPostHandler(
 		throw e;
 	}
 }
-export async function favoriteItemDeleteHandler(
+export async function _favoriteItemDeleteHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -34,5 +34,5 @@ export async function favoriteItemDeleteHandler(
 		throw e;
 	}
 }
-export const POST: RequestHandler = (event) => favoriteItemPostHandler(defaultDb, event);
-export const DELETE: RequestHandler = (event) => favoriteItemDeleteHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _favoriteItemPostHandler(defaultDb, event);
+export const DELETE: RequestHandler = (event) => _favoriteItemDeleteHandler(defaultDb, event);

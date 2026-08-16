@@ -5,7 +5,7 @@ import { closeSession } from '$lib/server/library/playback';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function sessionClosePostHandler(
+export async function _sessionClosePostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
@@ -20,4 +20,4 @@ export async function sessionClosePostHandler(
 		throw e;
 	}
 }
-export const POST: RequestHandler = (event) => sessionClosePostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _sessionClosePostHandler(defaultDb, event);

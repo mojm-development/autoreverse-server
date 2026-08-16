@@ -11,7 +11,7 @@ import { loadConfig } from '$lib/server/config';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function episodeDownloadPostHandler(
+export async function _episodeDownloadPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -29,4 +29,4 @@ export async function episodeDownloadPostHandler(
 	}
 }
 
-export const POST: RequestHandler = (event) => episodeDownloadPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _episodeDownloadPostHandler(defaultDb, event);

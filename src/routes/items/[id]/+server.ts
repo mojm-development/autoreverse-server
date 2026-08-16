@@ -6,7 +6,7 @@ import { toItemSummary, toTrackOut, toChapterOut } from '$lib/server/api/seriali
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function itemGetHandler(
+export async function _itemGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -26,4 +26,4 @@ export async function itemGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => itemGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _itemGetHandler(defaultDb, event);

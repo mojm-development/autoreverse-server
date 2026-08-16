@@ -3,8 +3,8 @@ import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
 import { callRoute } from './_callRoute';
-import { itemsGetHandler } from '../../src/routes/items/+server';
-import { itemGetHandler } from '../../src/routes/items/[id]/+server';
+import { _itemsGetHandler } from '../../src/routes/items/+server';
+import { _itemGetHandler } from '../../src/routes/items/[id]/+server';
 
 describe('items API', () => {
 	it('GET /items omits cover_path but exposes has_cover', async () => {
@@ -13,7 +13,7 @@ describe('items API', () => {
 			await db
 				.insert(itemsTable)
 				.values({ kind: 'album', title: 'X', sortTitle: 'x', coverPath: '/covers/1.jpg' });
-			const res = await callRoute(itemsGetHandler, {
+			const res = await callRoute(_itemsGetHandler, {
 				db,
 				locals: { userId, token: null },
 				url: 'http://test/items'
@@ -27,7 +27,7 @@ describe('items API', () => {
 	it('GET /items/{id} 404s with the exact German message', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const res = await callRoute(itemGetHandler, {
+			const res = await callRoute(_itemGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: '999' }
@@ -47,7 +47,7 @@ describe('items API', () => {
 			await db
 				.insert(tracksTable)
 				.values({ itemId: album.id, position: 1, path: '/a', duration: 42 });
-			const res = await callRoute(itemGetHandler, {
+			const res = await callRoute(_itemGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(album.id) }

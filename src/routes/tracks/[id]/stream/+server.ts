@@ -28,18 +28,18 @@ async function streamHandler(
 	}
 }
 
-export async function streamGetHandler(
+export async function _streamGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
 	return streamHandler(db, event, false);
 }
-export async function streamHeadHandler(
+export async function _streamHeadHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
 	return streamHandler(db, event, true);
 }
 
-export const GET: RequestHandler = (event) => streamGetHandler(defaultDb, event);
-export const HEAD: RequestHandler = (event) => streamHeadHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _streamGetHandler(defaultDb, event);
+export const HEAD: RequestHandler = (event) => _streamHeadHandler(defaultDb, event);

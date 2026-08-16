@@ -5,7 +5,7 @@ import { removeBookmark } from '$lib/server/library/bookmarks';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function bookmarkDeleteHandler(
+export async function _bookmarkDeleteHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -19,4 +19,4 @@ export async function bookmarkDeleteHandler(
 		throw e;
 	}
 }
-export const DELETE: RequestHandler = (event) => bookmarkDeleteHandler(defaultDb, event);
+export const DELETE: RequestHandler = (event) => _bookmarkDeleteHandler(defaultDb, event);

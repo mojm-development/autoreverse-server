@@ -16,7 +16,7 @@ function serialize(p: { playbackSpeed: number; skipBack: number; skipForward: nu
 	return { playback_speed: p.playbackSpeed, skip_back: p.skipBack, skip_forward: p.skipForward };
 }
 
-export async function playbackGetHandler(
+export async function _playbackGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -29,7 +29,7 @@ export async function playbackGetHandler(
 	}
 }
 
-export async function playbackPutHandler(
+export async function _playbackPutHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'request'>
 ): Promise<Response> {
@@ -52,5 +52,5 @@ export async function playbackPutHandler(
 		throw e;
 	}
 }
-export const GET: RequestHandler = (event) => playbackGetHandler(defaultDb, event);
-export const PUT: RequestHandler = (event) => playbackPutHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _playbackGetHandler(defaultDb, event);
+export const PUT: RequestHandler = (event) => _playbackPutHandler(defaultDb, event);

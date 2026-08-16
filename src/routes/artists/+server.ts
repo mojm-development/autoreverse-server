@@ -5,7 +5,7 @@ import { artists } from '$lib/server/library/queries';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function artistsGetHandler(
+export async function _artistsGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -19,4 +19,4 @@ export async function artistsGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => artistsGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _artistsGetHandler(defaultDb, event);

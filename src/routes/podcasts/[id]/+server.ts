@@ -6,7 +6,7 @@ import { loadConfig } from '$lib/server/config';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function podcastDeleteHandler(
+export async function _podcastDeleteHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -25,4 +25,4 @@ export async function podcastDeleteHandler(
 	}
 }
 
-export const DELETE: RequestHandler = (event) => podcastDeleteHandler(defaultDb, event);
+export const DELETE: RequestHandler = (event) => _podcastDeleteHandler(defaultDb, event);

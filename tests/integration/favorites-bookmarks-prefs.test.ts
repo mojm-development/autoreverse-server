@@ -4,13 +4,13 @@ import { createUser } from '../../src/lib/server/auth/passwords';
 import { items as itemsTable } from '../../src/lib/server/db/schema';
 import { callRoute } from './_callRoute';
 import {
-	favoriteItemPostHandler,
-	favoriteItemDeleteHandler
+	_favoriteItemPostHandler,
+	_favoriteItemDeleteHandler
 } from '../../src/routes/favorites/items/[id]/+server';
-import { favoritesGetHandler } from '../../src/routes/favorites/+server';
-import { bookmarksPostHandler } from '../../src/routes/bookmarks/+server';
-import { bookmarkDeleteHandler } from '../../src/routes/bookmarks/[id]/+server';
-import { playbackPutHandler } from '../../src/routes/me/playback/+server';
+import { _favoritesGetHandler } from '../../src/routes/favorites/+server';
+import { _bookmarksPostHandler } from '../../src/routes/bookmarks/+server';
+import { _bookmarkDeleteHandler } from '../../src/routes/bookmarks/[id]/+server';
+import { _playbackPutHandler } from '../../src/routes/me/playback/+server';
 import { isItemFavorite, addItemFavorite } from '../../src/lib/server/library/favorites';
 import { countBookmarks, addBookmark } from '../../src/lib/server/library/bookmarks';
 
@@ -22,22 +22,22 @@ describe('favorites/bookmarks/preferences API', () => {
 				.insert(itemsTable)
 				.values({ kind: 'album', title: 'X', sortTitle: 'x' })
 				.returning();
-			await callRoute(favoriteItemPostHandler, {
+			await callRoute(_favoriteItemPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(row.id) }
 			});
-			await callRoute(favoriteItemPostHandler, {
+			await callRoute(_favoriteItemPostHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(row.id) }
 			}); // no throw
-			const listRes = await callRoute(favoritesGetHandler, {
+			const listRes = await callRoute(_favoritesGetHandler, {
 				db,
 				locals: { userId, token: null }
 			});
 			expect((await listRes.json()).items).toHaveLength(1);
-			await callRoute(favoriteItemDeleteHandler, {
+			await callRoute(_favoriteItemDeleteHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: '999999' }
@@ -52,13 +52,13 @@ describe('favorites/bookmarks/preferences API', () => {
 				.insert(itemsTable)
 				.values({ kind: 'book', title: 'X', sortTitle: 'x' })
 				.returning();
-			const bad = await callRoute(bookmarksPostHandler, {
+			const bad = await callRoute(_bookmarksPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { item_id: row.id, position: -1, title: 'x' }
 			});
 			expect(bad.status).toBe(422);
-			const good = await callRoute(bookmarksPostHandler, {
+			const good = await callRoute(_bookmarksPostHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { item_id: row.id, position: 12.5, title: 'Kapitel 3' }
@@ -70,7 +70,7 @@ describe('favorites/bookmarks/preferences API', () => {
 	it('DELETE /bookmarks/{id} 404s uniformly for missing and not-owned', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const res = await callRoute(bookmarkDeleteHandler, {
+			const res = await callRoute(_bookmarkDeleteHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: '999999' }
@@ -83,7 +83,7 @@ describe('favorites/bookmarks/preferences API', () => {
 	it('PUT /me/playback clamps and returns the stored (not requested) values', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const res = await callRoute(playbackPutHandler, {
+			const res = await callRoute(_playbackPutHandler, {
 				db,
 				locals: { userId, token: null },
 				body: { playback_speed: 1.25, skip_back: 30, skip_forward: 15 }

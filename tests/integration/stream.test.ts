@@ -6,7 +6,7 @@ import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
 import { callRoute } from './_callRoute';
-import { streamGetHandler, streamHeadHandler } from '../../src/routes/tracks/[id]/stream/+server';
+import { _streamGetHandler, _streamHeadHandler } from '../../src/routes/tracks/[id]/stream/+server';
 
 describe('GET /tracks/{id}/stream', () => {
 	it('serves 206 with the right byte range, headers, and exact byte content', async () => {
@@ -29,7 +29,7 @@ describe('GET /tracks/{id}/stream', () => {
 				.values({ itemId: album.id, position: 1, path, duration: 10 })
 				.returning();
 
-			const res = await callRoute(streamGetHandler, {
+			const res = await callRoute(_streamGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(trackRow.id) },
@@ -51,7 +51,7 @@ describe('GET /tracks/{id}/stream', () => {
 	it('404s with "Unbekannter Track" for a missing row', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const res = await callRoute(streamGetHandler, {
+			const res = await callRoute(_streamGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: '999' }
@@ -72,7 +72,7 @@ describe('GET /tracks/{id}/stream', () => {
 				.insert(tracksTable)
 				.values({ itemId: album.id, position: 1, path: '/nonexistent/x.mp3', duration: 10 })
 				.returning();
-			const res = await callRoute(streamGetHandler, {
+			const res = await callRoute(_streamGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(trackRow.id) }
@@ -97,7 +97,7 @@ describe('GET /tracks/{id}/stream', () => {
 				.values({ itemId: album.id, position: 1, path, duration: 10 })
 				.returning();
 
-			const res = await callRoute(streamHeadHandler, {
+			const res = await callRoute(_streamHeadHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(trackRow.id) },
@@ -125,7 +125,7 @@ describe('GET /tracks/{id}/stream', () => {
 				.values({ itemId: album.id, position: 1, path, duration: 10 })
 				.returning();
 
-			const res = await callRoute(streamHeadHandler, {
+			const res = await callRoute(_streamHeadHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(trackRow.id) }
@@ -152,7 +152,7 @@ describe('GET /tracks/{id}/stream', () => {
 				.values({ itemId: album.id, position: 1, path, duration: 10 })
 				.returning();
 
-			const res = await callRoute(streamGetHandler, {
+			const res = await callRoute(_streamGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(trackRow.id) },
@@ -179,7 +179,7 @@ describe('GET /tracks/{id}/stream', () => {
 				.values({ itemId: album.id, position: 1, path, duration: 10 })
 				.returning();
 
-			const res = await callRoute(streamHeadHandler, {
+			const res = await callRoute(_streamHeadHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(trackRow.id) },

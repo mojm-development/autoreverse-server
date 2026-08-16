@@ -7,7 +7,7 @@ import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function serverInfoGetHandler(
+export async function _serverInfoGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -30,4 +30,4 @@ export async function serverInfoGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => serverInfoGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _serverInfoGetHandler(defaultDb, event);

@@ -8,7 +8,7 @@ import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function usersGetHandler(
+export async function _usersGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -30,7 +30,7 @@ export async function usersGetHandler(
 	}
 }
 
-export async function usersPostHandler(
+export async function _usersPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'request'>
 ): Promise<Response> {
@@ -57,5 +57,5 @@ export async function usersPostHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => usersGetHandler(defaultDb, event);
-export const POST: RequestHandler = (event) => usersPostHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _usersGetHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _usersPostHandler(defaultDb, event);

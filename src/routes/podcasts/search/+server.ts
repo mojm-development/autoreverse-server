@@ -10,7 +10,7 @@ import {
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function podcastsSearchGetHandler(
+export async function _podcastsSearchGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
@@ -41,4 +41,4 @@ export async function podcastsSearchGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => podcastsSearchGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _podcastsSearchGetHandler(defaultDb, event);

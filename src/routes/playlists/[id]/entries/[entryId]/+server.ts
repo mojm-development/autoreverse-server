@@ -20,7 +20,7 @@ async function ownedEntry(db: DrizzleDb, userId: number, playlistId: number, ent
 	return { playlist, entry: entry ?? null };
 }
 
-export async function playlistEntryDeleteHandler(
+export async function _playlistEntryDeleteHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -42,7 +42,7 @@ export async function playlistEntryDeleteHandler(
 	}
 }
 
-export async function playlistEntryPutHandler(
+export async function _playlistEntryPutHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
@@ -70,5 +70,5 @@ export async function playlistEntryPutHandler(
 		throw e;
 	}
 }
-export const DELETE: RequestHandler = (event) => playlistEntryDeleteHandler(defaultDb, event);
-export const PUT: RequestHandler = (event) => playlistEntryPutHandler(defaultDb, event);
+export const DELETE: RequestHandler = (event) => _playlistEntryDeleteHandler(defaultDb, event);
+export const PUT: RequestHandler = (event) => _playlistEntryPutHandler(defaultDb, event);

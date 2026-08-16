@@ -5,7 +5,7 @@ import { refresh, FeedFetchError, InvalidFeedError } from '$lib/server/podcasts/
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function podcastRefreshPostHandler(
+export async function _podcastRefreshPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -27,4 +27,4 @@ export async function podcastRefreshPostHandler(
 	}
 }
 
-export const POST: RequestHandler = (event) => podcastRefreshPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _podcastRefreshPostHandler(defaultDb, event);

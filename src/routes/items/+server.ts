@@ -6,7 +6,7 @@ import { toItemSummary } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function itemsGetHandler(
+export async function _itemsGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
@@ -27,4 +27,4 @@ export async function itemsGetHandler(
 	}
 }
 
-export const GET: RequestHandler = (event) => itemsGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _itemsGetHandler(defaultDb, event);

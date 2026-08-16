@@ -6,7 +6,7 @@ import { runScan } from '$lib/server/scanner/run';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export function toWire(s: ScanState) {
+export function _toWire(s: ScanState) {
 	return {
 		running: s.running,
 		started_at: s.startedAt,
@@ -20,7 +20,7 @@ export function toWire(s: ScanState) {
 	};
 }
 
-export async function scanPostHandler(
+export async function _scanPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -34,11 +34,11 @@ export async function scanPostHandler(
 		scanState.finishedAt = null;
 		const snap = snapshot();
 		void runScan(); // fire-and-forget, mirrors FastAPI's BackgroundTasks (runs after the response is sent)
-		return json(toWire(snap), { status: 202 });
+		return json(_toWire(snap), { status: 202 });
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		throw e;
 	}
 }
 
-export const POST: RequestHandler = (event) => scanPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _scanPostHandler(defaultDb, event);

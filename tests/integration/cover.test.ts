@@ -6,7 +6,7 @@ import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { items as itemsTable } from '../../src/lib/server/db/schema';
 import { callRoute } from './_callRoute';
-import { coverGetHandler } from '../../src/routes/items/[id]/cover/+server';
+import { _coverGetHandler } from '../../src/routes/items/[id]/cover/+server';
 
 describe('cover streaming', () => {
 	let booksDir: string;
@@ -48,7 +48,7 @@ describe('cover streaming', () => {
 				.insert(itemsTable)
 				.values({ kind: 'album', title: 'X', sortTitle: 'x', coverPath })
 				.returning();
-			const res = await callRoute(coverGetHandler, {
+			const res = await callRoute(_coverGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(row.id) }
@@ -66,7 +66,7 @@ describe('cover streaming', () => {
 				.insert(itemsTable)
 				.values({ kind: 'album', title: 'X', sortTitle: 'x', coverPath: '/etc/passwd' })
 				.returning();
-			const res = await callRoute(coverGetHandler, {
+			const res = await callRoute(_coverGetHandler, {
 				db,
 				locals: { userId, token: null },
 				params: { id: String(row.id) }

@@ -12,7 +12,7 @@ type TrackResult = {
 	item: typeof ItemsType.$inferSelect;
 };
 
-export async function favoritesGetHandler(
+export async function _favoritesGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -38,4 +38,4 @@ export async function favoritesGetHandler(
 		throw e;
 	}
 }
-export const GET: RequestHandler = (event) => favoritesGetHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _favoritesGetHandler(defaultDb, event);

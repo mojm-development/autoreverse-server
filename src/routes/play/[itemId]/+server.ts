@@ -7,7 +7,7 @@ import { toTrackOut, toChapterOut } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function playPostHandler(
+export async function _playPostHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -34,4 +34,4 @@ export async function playPostHandler(
 		throw e;
 	}
 }
-export const POST: RequestHandler = (event) => playPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _playPostHandler(defaultDb, event);

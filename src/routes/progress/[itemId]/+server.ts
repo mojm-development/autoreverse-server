@@ -6,7 +6,7 @@ import { savePosition } from '$lib/server/library/playback';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function progressPutHandler(
+export async function _progressPutHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
@@ -22,4 +22,4 @@ export async function progressPutHandler(
 		throw e;
 	}
 }
-export const PUT: RequestHandler = (event) => progressPutHandler(defaultDb, event);
+export const PUT: RequestHandler = (event) => _progressPutHandler(defaultDb, event);

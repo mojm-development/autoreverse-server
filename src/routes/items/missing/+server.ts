@@ -6,7 +6,7 @@ import { scanState } from '$lib/server/admin/scanState';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export async function itemsMissingDeleteHandler(
+export async function _itemsMissingDeleteHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
@@ -21,4 +21,4 @@ export async function itemsMissingDeleteHandler(
 	}
 }
 
-export const DELETE: RequestHandler = (event) => itemsMissingDeleteHandler(defaultDb, event);
+export const DELETE: RequestHandler = (event) => _itemsMissingDeleteHandler(defaultDb, event);

@@ -17,7 +17,7 @@ async function ownedPlaylist(db: DrizzleDb, userId: number, id: number) {
 	return row ?? null;
 }
 
-export async function playlistGetHandler(
+export async function _playlistGetHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -63,7 +63,7 @@ export async function playlistGetHandler(
 	}
 }
 
-export async function playlistPatchHandler(
+export async function _playlistPatchHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params' | 'request'>
 ): Promise<Response> {
@@ -93,7 +93,7 @@ export async function playlistPatchHandler(
 	}
 }
 
-export async function playlistDeleteHandler(
+export async function _playlistDeleteHandler(
 	db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
@@ -108,6 +108,6 @@ export async function playlistDeleteHandler(
 		throw e;
 	}
 }
-export const GET: RequestHandler = (event) => playlistGetHandler(defaultDb, event);
-export const PATCH: RequestHandler = (event) => playlistPatchHandler(defaultDb, event);
-export const DELETE: RequestHandler = (event) => playlistDeleteHandler(defaultDb, event);
+export const GET: RequestHandler = (event) => _playlistGetHandler(defaultDb, event);
+export const PATCH: RequestHandler = (event) => _playlistPatchHandler(defaultDb, event);
+export const DELETE: RequestHandler = (event) => _playlistDeleteHandler(defaultDb, event);
