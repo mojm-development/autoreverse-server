@@ -33,7 +33,7 @@
 <nav class="sidebar" style="--a: var(--{accent})">
 	<div class="brand">
 		<span class="logo-ring"></span>
-		<span class="wordmark">Capstan</span>
+		<span class="wordmark">Autoreverse</span>
 	</div>
 	<a href="/library/search" class="search-shortcut">Alles durchsuchen</a>
 

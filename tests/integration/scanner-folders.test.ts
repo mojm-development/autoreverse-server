@@ -15,7 +15,7 @@ function makeAudio(path: string, tags: Record<string, string> = {}) {
 
 describe('scanBooks', () => {
 	it('derives author/series from Author/Series/Book folder depth', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
 		const bookDir = join(root, 'Andreas Eschbach', 'Solarstation', 'Buch 1');
 		mkdirSync(bookDir, { recursive: true });
 		makeAudio(join(bookDir, '01.mp3'), { title: 'Teil 1' });
@@ -29,7 +29,7 @@ describe('scanBooks', () => {
 	});
 
 	it('synthesizes one chapter per track when there is more than one track file', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
 		const bookDir = join(root, 'A', 'B');
 		mkdirSync(bookDir, { recursive: true });
 		makeAudio(join(bookDir, '01.mp3'), { title: 'Erster Teil' });
@@ -42,7 +42,7 @@ describe('scanBooks', () => {
 	});
 
 	it('marks a folder unchanged when the known {mtime,size} map matches exactly', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
 		const bookDir = join(root, 'A', 'B');
 		mkdirSync(bookDir, { recursive: true });
 		const filePath = join(bookDir, '01.mp3');
@@ -55,7 +55,7 @@ describe('scanBooks', () => {
 	});
 
 	it('skips a directory with zero audio files as an item, but still descends into it', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
 		mkdirSync(join(root, 'Empty'), { recursive: true });
 		const bookDir = join(root, 'Empty', 'HasAudio');
 		mkdirSync(bookDir, { recursive: true });
@@ -66,7 +66,7 @@ describe('scanBooks', () => {
 	});
 
 	it('detects when a file is removed from disk (regression: removed-file detection)', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
 		const bookDir = join(root, 'A', 'B');
 		mkdirSync(bookDir, { recursive: true });
 		const file1 = join(bookDir, '01.mp3');
@@ -91,7 +91,7 @@ describe('scanBooks', () => {
 	});
 
 	it('does not false-positive on sibling folders when scanning with global known map', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-books-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
 		const bookDir1 = join(root, 'A1', 'B1');
 		const bookDir2 = join(root, 'A2', 'B2');
 		mkdirSync(bookDir1, { recursive: true });
@@ -132,7 +132,7 @@ describe('scanBooks', () => {
 
 describe('scanMusic', () => {
 	it('never calls readChapters — chapters is always []', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-music-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-music-'));
 		const albumDir = join(root, 'Ansa Volt', 'Nordlicht');
 		mkdirSync(albumDir, { recursive: true });
 		makeAudio(join(albumDir, '01.mp3'), { album: 'Nordlicht', artist: 'Ansa Volt' });
@@ -141,7 +141,7 @@ describe('scanMusic', () => {
 	});
 
 	it('artist fallback chain: albumartist tag > artist tag of first track > folder name', async () => {
-		const root = mkdtempSync(join(tmpdir(), 'capstan-music-'));
+		const root = mkdtempSync(join(tmpdir(), 'autoreverse-music-'));
 		const albumDir = join(root, 'Folder Artist', 'Album');
 		mkdirSync(albumDir, { recursive: true });
 		makeAudio(join(albumDir, '01.mp3'), { artist: 'Track Artist' }); // no albumartist tag

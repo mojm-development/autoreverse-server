@@ -1,3 +1,5 @@
+name: autoreverse-server
+
 services:
   postgres:
     image: postgres:16
@@ -5,34 +7,34 @@ services:
     ports:
       - '5434:5432'
     environment:
-      POSTGRES_USER: capstan
-      POSTGRES_PASSWORD: capstan
-      POSTGRES_DB: capstan
+      POSTGRES_USER: autoreverse
+      POSTGRES_PASSWORD: autoreverse
+      POSTGRES_DB: autoreverse
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U capstan']
+      test: ['CMD-SHELL', 'pg_isready -U autoreverse']
       interval: 2s
       timeout: 3s
       retries: 10
 
-  capstan-next:
+  app:
     build: .
     ports:
       - '8180:3000'
     environment:
-      DATABASE_URL: postgresql://capstan:capstan@postgres:5432/capstan
-      CAPSTAN_DATA: /data
+      DATABASE_URL: postgresql://autoreverse:autoreverse@postgres:5432/autoreverse
+      AUTOREVERSE_DATA: /data
       # First-admin bootstrap, only used once against an empty `users` table — change these.
-      CAPSTAN_ADMIN_USER: admin
-      CAPSTAN_ADMIN_PASSWORD: change-me
+      AUTOREVERSE_ADMIN_USER: admin
+      AUTOREVERSE_ADMIN_PASSWORD: change-me
     volumes:
       # These bind mounts just make the paths available inside the container — the server
       # itself doesn't read them from env. After first login, type the in-container paths
       # below (/library/books, /library/music) into Settings → Bibliotheken to actually use them.
-      - ${CAPSTAN_BOOKS_HOST:-./dev-library/books}:/library/books:ro
-      - ${CAPSTAN_MUSIC_HOST:-./dev-library/music}:/library/music:ro
-      - capstan-data:/data
+      - ${AUTOREVERSE_BOOKS_HOST:-./dev-library/books}:/library/books:ro
+      - ${AUTOREVERSE_MUSIC_HOST:-./dev-library/music}:/library/music:ro
+      - autoreverse-data:/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,4 +46,4 @@ services:
 
 volumes:
   pgdata:
-  capstan-data:
+  autoreverse-data:

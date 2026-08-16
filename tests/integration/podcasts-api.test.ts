@@ -22,10 +22,10 @@ describe('podcasts API routes', () => {
 	const originalEnv = process.env;
 
 	beforeEach(() => {
-		booksDir = mkdtempSync(join(tmpdir(), 'capstan-books-'));
-		musicDir = mkdtempSync(join(tmpdir(), 'capstan-music-'));
-		dataDir = mkdtempSync(join(tmpdir(), 'capstan-data-'));
-		process.env.CAPSTAN_DATA = dataDir;
+		booksDir = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
+		musicDir = mkdtempSync(join(tmpdir(), 'autoreverse-music-'));
+		dataDir = mkdtempSync(join(tmpdir(), 'autoreverse-data-'));
+		process.env.AUTOREVERSE_DATA = dataDir;
 	});
 
 	afterEach(() => {

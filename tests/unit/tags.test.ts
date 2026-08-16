@@ -14,7 +14,7 @@ function makeMp3(path: string, tags: Record<string, string>) {
 
 describe('readTags', () => {
 	it('reads title/artist/album/track/year from an mp3', () => {
-		const dir = mkdtempSync(join(tmpdir(), 'capstan-tags-'));
+		const dir = mkdtempSync(join(tmpdir(), 'autoreverse-tags-'));
 		const path = join(dir, 'a.mp3');
 		makeMp3(path, {
 			title: 'Erste Bahn',
@@ -36,7 +36,7 @@ describe('readTags', () => {
 	});
 
 	it('returns an all-null unreadable result for a non-audio file, never throws', async () => {
-		const dir = mkdtempSync(join(tmpdir(), 'capstan-tags-'));
+		const dir = mkdtempSync(join(tmpdir(), 'autoreverse-tags-'));
 		const path = join(dir, 'not-audio.mp3');
 		writeFileSync(path, 'not actually audio');
 		const tags = await readTags(path);

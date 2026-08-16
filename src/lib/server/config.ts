@@ -6,11 +6,12 @@ export interface Config {
 }
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
-	const dataDir = env.CAPSTAN_DATA ?? './data';
+	const dataDir = env.AUTOREVERSE_DATA ?? './data';
 	return {
 		dataDir,
 		coverDir: `${dataDir}/covers`,
 		podcastsDir: `${dataDir}/podcasts`,
-		databaseUrl: env.DATABASE_URL ?? 'postgresql://capstan:capstan@localhost:5434/capstan'
+		databaseUrl:
+			env.DATABASE_URL ?? 'postgresql://autoreverse:autoreverse@localhost:5434/autoreverse'
 	};
 }

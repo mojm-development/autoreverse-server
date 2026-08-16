@@ -6,7 +6,9 @@
 
 <div class="login" style="--a: var(--book)">
 	<div class="branding">
-		<div class="brand"><span class="logo-ring"></span><span class="wordmark">Capstan</span></div>
+		<div class="brand">
+			<span class="logo-ring"></span><span class="wordmark">Autoreverse</span>
+		</div>
 		<div>
 			<h1>Ein Server. Alles zum Hören.</h1>
 			<p>
@@ -31,7 +33,7 @@
 				>
 			</div>
 		</div>
-		<span class="version mono">capstan 0.1.0 · {data.hostname}</span>
+		<span class="version mono">autoreverse 0.1.0 · {data.hostname}</span>
 	</div>
 	<div class="form-panel">
 		<form method="POST">

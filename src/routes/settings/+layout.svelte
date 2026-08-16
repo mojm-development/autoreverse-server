@@ -9,7 +9,7 @@
 		{ href: '/settings/playback', label: 'Wiedergabe', admin: false },
 		{ href: '/settings/podcasts', label: 'Podcast-Abos', admin: true },
 		{ href: '/settings/security', label: 'Sicherheit', admin: false },
-		{ href: '/settings/about', label: 'Über Capstan', admin: false }
+		{ href: '/settings/about', label: 'Über Autoreverse', admin: false }
 	] as const;
 </script>
 

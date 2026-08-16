@@ -12,7 +12,7 @@ describe('GET /tracks/{id}/stream', () => {
 	it('serves 206 with the right byte range, headers, and exact byte content', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-track-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-track-'));
 			const path = join(dir, 'a.mp3');
 			// Create file with known content: each byte i contains value i%256
 			const testContent = Buffer.alloc(1000);
@@ -85,7 +85,7 @@ describe('GET /tracks/{id}/stream', () => {
 	it('HEAD /tracks/{id}/stream returns 206 headers with no body', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-track-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-track-'));
 			const path = join(dir, 'a.mp3');
 			writeFileSync(path, Buffer.alloc(1000, 1));
 			const [album] = await db
@@ -113,7 +113,7 @@ describe('GET /tracks/{id}/stream', () => {
 	it('HEAD with no Range header returns 200 with no body', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-track-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-track-'));
 			const path = join(dir, 'a.mp3');
 			writeFileSync(path, Buffer.alloc(1000, 1));
 			const [album] = await db
@@ -140,7 +140,7 @@ describe('GET /tracks/{id}/stream', () => {
 	it('GET with unsatisfiable range returns 416 with content-range header', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-track-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-track-'));
 			const path = join(dir, 'a.mp3');
 			writeFileSync(path, Buffer.alloc(1000, 1));
 			const [album] = await db
@@ -167,7 +167,7 @@ describe('GET /tracks/{id}/stream', () => {
 	it('HEAD with unsatisfiable range returns 416 with content-range header and no body', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-track-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-track-'));
 			const path = join(dir, 'a.mp3');
 			writeFileSync(path, Buffer.alloc(1000, 1));
 			const [album] = await db

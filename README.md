@@ -1,20 +1,21 @@
-# capstan-next
+# Autoreverse Server
 
-A SvelteKit rewrite of [capstan](https://github.com/) — a self-hosted server for audiobooks,
-music and podcast subscriptions, with a native-client-compatible JSON API and a German-language
-web UI. Postgres-backed (via Drizzle ORM), deployed as a single Node process.
+Autoreverse — a self-hosted server for audiobooks, music and podcast subscriptions, with a
+native-client-compatible JSON API and a German-language web UI. Postgres-backed (via Drizzle
+ORM), deployed as a single Node process. Originally built as a SvelteKit rewrite of the Python
+app it replaces.
 
 ## Environment variables
 
-| Variable                 | Required            | Default                                               | Purpose                                                                                                                                                     |
-| ------------------------ | ------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | yes                 | `postgresql://capstan:capstan@localhost:5434/capstan` | Postgres connection string.                                                                                                                                 |
-| `CAPSTAN_DATA`           | no                  | `./data`                                              | Base directory for server-managed files (covers, downloaded podcast episodes). Subdirectories `covers/` and `podcasts/` are created under it automatically. |
-| `CAPSTAN_ADMIN_USER`     | only for first boot | —                                                     | Username for the first admin account, created automatically the first time the server starts against an **empty** `users` table.                            |
-| `CAPSTAN_ADMIN_PASSWORD` | only for first boot | —                                                     | Password for that first admin account.                                                                                                                      |
+| Variable                     | Required            | Default                                                           | Purpose                                                                                                                                                     |
+| ---------------------------- | ------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`               | yes                 | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                                                                                 |
+| `AUTOREVERSE_DATA`           | no                  | `./data`                                                          | Base directory for server-managed files (covers, downloaded podcast episodes). Subdirectories `covers/` and `podcasts/` are created under it automatically. |
+| `AUTOREVERSE_ADMIN_USER`     | only for first boot | —                                                                 | Username for the first admin account, created automatically the first time the server starts against an **empty** `users` table.                            |
+| `AUTOREVERSE_ADMIN_PASSWORD` | only for first boot | —                                                                 | Password for that first admin account.                                                                                                                      |
 
 **Library paths (`booksDir`/`musicDir`) are _not_ env vars.** Unlike the original Python app,
-capstan-next stores the audiobook/music library root paths in the database, configured at
+Autoreverse stores the audiobook/music library root paths in the database, configured at
 runtime from the web UI (Settings → Bibliotheken, admin-only). There is nothing to set for these
 at deploy time beyond making sure the paths you'll type into that UI are actually mounted/visible
 to the server process.
@@ -22,8 +23,8 @@ to the server process.
 ## First-admin bootstrap
 
 On every boot, the server checks whether the `users` table is empty. If it is **and**
-`CAPSTAN_ADMIN_USER`/`CAPSTAN_ADMIN_PASSWORD` are both set, it creates that user as the first
-admin. If the table is empty and those vars are unset, the server still starts, but logs a
+`AUTOREVERSE_ADMIN_USER`/`AUTOREVERSE_ADMIN_PASSWORD` are both set, it creates that user as the
+first admin. If the table is empty and those vars are unset, the server still starts, but logs a
 warning and nobody can log in until an admin is created some other way (there is no other
 bootstrap path — user creation is admin-only). Set both vars before the very first boot against a
 fresh database; they're safe to leave set afterwards (they're only read while the table is

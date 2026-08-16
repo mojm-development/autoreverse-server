@@ -7,7 +7,7 @@ import { readChapters } from '../../src/lib/server/scanner/chapters';
 
 describe('readChapters', () => {
 	it('returns [] for a file with no chapter atoms', async () => {
-		const dir = mkdtempSync(join(tmpdir(), 'capstan-chapters-'));
+		const dir = mkdtempSync(join(tmpdir(), 'autoreverse-chapters-'));
 		const path = join(dir, 'a.mp3');
 		execFileSync(
 			'ffmpeg',

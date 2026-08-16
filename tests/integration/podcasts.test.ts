@@ -94,7 +94,7 @@ describe('podcasts store', () => {
 				.insert(itemsTable)
 				.values({ kind: 'episode', parentId: podcast.id, title: 'E', sortTitle: 'e', guid: 'g1' })
 				.returning();
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
 			await expect(downloadEpisode(db, episode.id, dir)).rejects.toThrow(
 				EpisodeNotDownloadableError
 			);
@@ -120,7 +120,7 @@ describe('podcasts store', () => {
 					feedUrl: 'https://x/feed.xml' // a real feed URL, not a media URL — would corrupt tracks if used
 				})
 				.returning();
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
 			await expect(downloadEpisode(db, podcast.id, dir)).rejects.toThrow('not found');
 			const tracks = await db.select().from(tracksTable).where(eq(tracksTable.itemId, podcast.id));
 			expect(tracks).toHaveLength(0); // no spurious track attached to the podcast item
@@ -152,7 +152,7 @@ describe('podcasts store', () => {
 					feedUrl: 'https://x/ep.mp3'
 				})
 				.returning();
-			const dir = mkdtempSync(join(tmpdir(), 'capstan-podcasts-'));
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
 			const result = await downloadEpisode(db, episode.id, dir);
 			expect(result.trackId).toBeTruthy();
 			const [track] = await db.select().from(tracksTable).where(eq(tracksTable.itemId, episode.id));

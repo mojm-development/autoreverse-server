@@ -17,13 +17,13 @@ describe('cover streaming', () => {
 
 	beforeEach(() => {
 		// Create temp directories for the test
-		booksDir = mkdtempSync(join(tmpdir(), 'capstan-books-'));
-		musicDir = mkdtempSync(join(tmpdir(), 'capstan-music-'));
-		dataDir = mkdtempSync(join(tmpdir(), 'capstan-data-'));
+		booksDir = mkdtempSync(join(tmpdir(), 'autoreverse-books-'));
+		musicDir = mkdtempSync(join(tmpdir(), 'autoreverse-music-'));
+		dataDir = mkdtempSync(join(tmpdir(), 'autoreverse-data-'));
 		mkdirSync(join(dataDir, 'covers'), { recursive: true });
 
 		// Set env vars for loadConfig
-		process.env.CAPSTAN_DATA = dataDir;
+		process.env.AUTOREVERSE_DATA = dataDir;
 	});
 
 	afterEach(() => {

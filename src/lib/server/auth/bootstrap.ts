@@ -3,8 +3,8 @@ import { users } from '../db/schema';
 import { createUser } from './passwords';
 import type { DrizzleDb } from '../db';
 
-const ADMIN_USER_VAR = 'CAPSTAN_ADMIN_USER';
-const ADMIN_PASSWORD_VAR = 'CAPSTAN_ADMIN_PASSWORD';
+const ADMIN_USER_VAR = 'AUTOREVERSE_ADMIN_USER';
+const ADMIN_PASSWORD_VAR = 'AUTOREVERSE_ADMIN_PASSWORD';
 
 /** Creates the first admin from env vars, only if the users table is still empty. */
 export async function ensureFirstAdmin(

@@ -4,7 +4,7 @@ import { users } from '../db/schema';
 import type { DrizzleDb } from '../db';
 import { ApiError } from '../api/errors';
 
-export const SESSION_COOKIE = 'capstan_session';
+export const SESSION_COOKIE = 'autoreverse_session';
 
 export interface Locals {
 	userId: number | null;

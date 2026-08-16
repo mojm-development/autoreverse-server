@@ -1,4 +1,4 @@
-const KEY = 'capstan-theme';
+const KEY = 'autoreverse-theme';
 
 export function getTheme(): 'dark' | 'light' | null {
 	if (typeof localStorage === 'undefined') return null;

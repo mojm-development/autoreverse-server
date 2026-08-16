@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 
 // `npm run build && npm run preview` (the webServer command below) is a plain
 // Node process tree, not `vite dev` — nothing loads .env into it automatically.
-// src/lib/server/config.ts reads DATABASE_URL (and optionally CAPSTAN_DATA,
+// src/lib/server/config.ts reads DATABASE_URL (and optionally AUTOREVERSE_DATA,
 // which has a default) from process.env directly at module scope
 // (src/lib/server/db/index.ts), and SvelteKit's build-time route analysis
 // imports that module too, so the build step needs DATABASE_URL to be set.
