@@ -13,5 +13,16 @@ if (existsSync('.env')) process.loadEnvFile('.env');
 
 export default defineConfig({
 	webServer: { command: 'npm run build && npm run preview', port: 4173 },
-	testMatch: '**/*.e2e.{ts,js}'
+	testMatch: '**/*.e2e.{ts,js}',
+	projects: [
+		{ name: 'setup', testMatch: /auth\.setup\.ts/ },
+		{ name: 'no-auth', testMatch: ['**/demo/**/*.e2e.{ts,js}', '**/login.e2e.ts'] },
+		{
+			name: 'authenticated',
+			testMatch: '**/*.e2e.{ts,js}',
+			testIgnore: ['**/auth.setup.ts', '**/demo/**/*.e2e.{ts,js}', '**/login.e2e.ts'],
+			use: { storageState: 'playwright/.auth/user.json' },
+			dependencies: ['setup']
+		}
+	]
 });
