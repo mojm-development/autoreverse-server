@@ -3,12 +3,12 @@ import { defineConfig } from '@playwright/test';
 
 // `npm run build && npm run preview` (the webServer command below) is a plain
 // Node process tree, not `vite dev` — nothing loads .env into it automatically.
-// src/lib/server/config.ts reads CAPSTAN_BOOKS/CAPSTAN_MUSIC/DATABASE_URL from
-// process.env directly at module scope (src/lib/server/db/index.ts), and
-// SvelteKit's build-time route analysis imports that module too, so the build
-// step itself fails with "CAPSTAN_BOOKS is not set" without this. Playwright's
-// webServer.env defaults to this process's process.env, so loading .env here
-// (before defineConfig runs) is enough to pass the values through.
+// src/lib/server/config.ts reads DATABASE_URL (and optionally CAPSTAN_DATA,
+// which has a default) from process.env directly at module scope
+// (src/lib/server/db/index.ts), and SvelteKit's build-time route analysis
+// imports that module too, so the build step needs DATABASE_URL to be set.
+// Playwright's webServer.env defaults to this process's process.env, so
+// loading .env here (before defineConfig runs) is enough to pass it through.
 if (existsSync('.env')) process.loadEnvFile('.env');
 
 export default defineConfig({

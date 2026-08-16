@@ -3,6 +3,7 @@ import { scanMusic } from './music';
 import { knownFiles, storeItems, markMissing } from './store';
 import { scanState } from '../admin/scanState';
 import { loadConfig } from '../config';
+import { getLibraryPaths } from '../settings/libraryPaths';
 import { db } from '../db';
 
 /** Two fully separate scanBooks/storeItems and scanMusic/storeItems passes
@@ -11,6 +12,14 @@ import { db } from '../db';
  * library's items as missing. Matches _run_scan's own emphasis on this. */
 export async function runScan(): Promise<void> {
 	const config = loadConfig(process.env as Record<string, string | undefined>);
+	const paths = await getLibraryPaths(db);
+	if (!paths.booksDir || !paths.musicDir) {
+		scanState.lastError =
+			'Bibliothekspfade sind noch nicht konfiguriert (Einstellungen → Bibliotheken)';
+		scanState.running = false;
+		scanState.finishedAt = new Date().toISOString();
+		return;
+	}
 	scanState.startedAt = new Date().toISOString();
 	scanState.finishedAt = null;
 	scanState.cancelled = false;
@@ -19,8 +28,8 @@ export async function runScan(): Promise<void> {
 
 	try {
 		for (const [root, scan] of [
-			[config.booksDir, scanBooks],
-			[config.musicDir, scanMusic]
+			[paths.booksDir, scanBooks],
+			[paths.musicDir, scanMusic]
 		] as const) {
 			if (scanState.cancelRequested) {
 				scanState.cancelled = true;

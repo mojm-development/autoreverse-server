@@ -204,6 +204,13 @@ export const playlists = pgTable(
 	(t) => [index('playlist_user').on(t.userId)]
 );
 
+export const libraryConfig = pgTable('library_config', {
+	id: integer('id').primaryKey(),
+	booksDir: text('books_dir'),
+	musicDir: text('music_dir'),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+});
+
 export const playlistEntries = pgTable(
 	'playlist_entries',
 	{

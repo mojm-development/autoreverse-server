@@ -22,8 +22,6 @@ services:
       - '8180:3000'
     environment:
       DATABASE_URL: postgresql://capstan:capstan@postgres:5432/capstan
-      CAPSTAN_BOOKS: /library/books
-      CAPSTAN_MUSIC: /library/music
       CAPSTAN_DATA: /data
     volumes:
       - ${CAPSTAN_BOOKS_HOST:-./dev-library/books}:/library/books:ro

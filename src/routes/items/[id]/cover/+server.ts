@@ -5,6 +5,7 @@ import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
 import { item } from '$lib/server/library/queries';
 import { loadConfig } from '$lib/server/config';
+import { getLibraryPaths } from '$lib/server/settings/libraryPaths';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
@@ -32,7 +33,10 @@ export async function _coverGetHandler(
 		if (!row.coverPath) return apiError(404, 'Kein Cover');
 
 		const config = loadConfig(process.env as Record<string, string | undefined>);
-		const roots = [config.booksDir, config.musicDir, config.coverDir];
+		const paths = await getLibraryPaths(db);
+		const roots = [paths.booksDir, paths.musicDir, config.coverDir].filter(
+			(r): r is string => r !== null
+		);
 		if (!roots.some((root) => isInside(row.coverPath!, root))) return apiError(404, 'Kein Cover');
 
 		let stats;

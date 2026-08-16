@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { withTestDb } from '../fixtures';
 import { createUser } from '../../src/lib/server/auth/passwords';
 import { items as itemsTable } from '../../src/lib/server/db/schema';
+import { setLibraryPaths } from '../../src/lib/server/settings/libraryPaths';
 import { callRoute } from './_callRoute';
 import { _coverGetHandler } from '../../src/routes/items/[id]/cover/+server';
 
@@ -22,8 +23,6 @@ describe('cover streaming', () => {
 		mkdirSync(join(dataDir, 'covers'), { recursive: true });
 
 		// Set env vars for loadConfig
-		process.env.CAPSTAN_BOOKS = booksDir;
-		process.env.CAPSTAN_MUSIC = musicDir;
 		process.env.CAPSTAN_DATA = dataDir;
 	});
 
@@ -41,6 +40,7 @@ describe('cover streaming', () => {
 
 	it('serves an in-root cover with the right content-type and cache header', async () => {
 		await withTestDb(async (db) => {
+			await setLibraryPaths(db, { booksDir, musicDir });
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const coverPath = join(dataDir, 'covers', '1.png');
 			writeFileSync(coverPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
@@ -61,6 +61,7 @@ describe('cover streaming', () => {
 
 	it('refuses a cover_path outside the configured roots with 404 "Kein Cover"', async () => {
 		await withTestDb(async (db) => {
+			await setLibraryPaths(db, { booksDir, musicDir });
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const [row] = await db
 				.insert(itemsTable)

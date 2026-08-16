@@ -25,8 +25,6 @@ describe('podcasts API routes', () => {
 		booksDir = mkdtempSync(join(tmpdir(), 'capstan-books-'));
 		musicDir = mkdtempSync(join(tmpdir(), 'capstan-music-'));
 		dataDir = mkdtempSync(join(tmpdir(), 'capstan-data-'));
-		process.env.CAPSTAN_BOOKS = booksDir;
-		process.env.CAPSTAN_MUSIC = musicDir;
 		process.env.CAPSTAN_DATA = dataDir;
 	});
 
