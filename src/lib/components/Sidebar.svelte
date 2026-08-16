@@ -27,7 +27,7 @@
 	const initials = $derived(user.name.slice(0, 2).toUpperCase());
 </script>
 
-<nav style="--a: var(--{accent})">
+<nav class="sidebar" style="--a: var(--{accent})">
 	<div class="brand">
 		<span class="logo-ring"></span>
 		<span class="wordmark">Capstan</span>
