@@ -49,10 +49,13 @@
 	}
 	.create-form {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 		margin: 10px 0;
 	}
 	.create-form input {
+		flex: 1 1 140px;
+		min-width: 0;
 		height: 30px;
 		padding: 0 8px;
 		border-radius: 6px;
