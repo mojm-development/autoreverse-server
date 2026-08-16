@@ -328,8 +328,16 @@ export async function playlistOverview(db: DrizzleDb, userId: number) {
 		WHERE playlist.user_id = ${userId}
 		GROUP BY playlist.id ORDER BY lower(playlist.name)
 	`);
-	return (rows as unknown[]).map((r: unknown) => {
-		const row = r as Record<string, unknown>;
+	return (
+		rows as unknown as Array<{
+			id: number;
+			user_id: number;
+			name: string;
+			created_at: Date;
+			entry_count: number;
+			duration: number | string;
+		}>
+	).map((row) => {
 		return {
 			...row,
 			entryCount: row.entry_count,
