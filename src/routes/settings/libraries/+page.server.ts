@@ -1,18 +1,16 @@
 import { db } from '$lib/server/db';
 import { requireWebUser, requireWebAdmin } from '$lib/server/auth/session';
 import { getLibraryPaths, setLibraryPaths } from '$lib/server/settings/libraryPaths';
-import { listUsers, setAdmin } from '$lib/server/auth/directory';
-import { createUser } from '$lib/server/auth/passwords';
 import { countMissing, deleteMissing } from '$lib/server/library/queries';
 
+// User management (listing, creation, toggling admin) lives exclusively in
+// settings/users/+page.server.ts — this panel previously duplicated all of it
+// verbatim, including a dead `createUser` action never referenced by this
+// route's +page.svelte (M-14).
 export const load = async ({ locals }) => {
 	requireWebUser(locals);
-	const [paths, users, missing] = await Promise.all([
-		getLibraryPaths(db),
-		listUsers(db),
-		countMissing(db)
-	]);
-	return { paths, users, missing };
+	const [paths, missing] = await Promise.all([getLibraryPaths(db), countMissing(db)]);
+	return { paths, missing };
 };
 
 export const actions = {
@@ -29,23 +27,5 @@ export const actions = {
 		await requireWebAdmin(locals, db);
 		const removed = await deleteMissing(db);
 		return { success: true, removed };
-	},
-	createUser: async ({ request, locals }) => {
-		await requireWebAdmin(locals, db);
-		const data = await request.formData();
-		const name = String(data.get('name') ?? '');
-		const password = String(data.get('password') ?? '');
-		if (name.length < 1 || password.length < 8)
-			return { error: 'Name und Passwort (min. 8 Zeichen) erforderlich.' };
-		await createUser(db, name, password, false);
-		return { success: true };
-	},
-	toggleAdmin: async ({ request, locals }) => {
-		await requireWebAdmin(locals, db);
-		const data = await request.formData();
-		const userId = Number(data.get('userId'));
-		const isAdmin = data.get('isAdmin') === 'true';
-		await setAdmin(db, userId, isAdmin);
-		return { success: true };
 	}
 };

@@ -46,7 +46,12 @@ export default defineConfig({
 					name: 'server',
 					environment: 'node',
 					include: ['src/**/*.{test,spec}.{js,ts}', 'tests/**/*.{test,spec}.{js,ts}'],
-					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+					// withTestDb spins up a fresh PostgreSqlContainer + `drizzle-kit push`
+					// per test file; that routinely exceeds vitest's default 5s once
+					// several workers contend for the Docker daemon (I-6).
+					testTimeout: 60_000,
+					hookTimeout: 60_000
 				}
 			}
 		]

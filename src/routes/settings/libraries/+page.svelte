@@ -32,29 +32,8 @@
 	</div>
 {/if}
 
-<h2>Nutzer <span class="count mono">{data.users.length}</span></h2>
-<a href={resolve('/settings/users')}>Nutzer anlegen</a>
-<table>
-	<thead><tr><th>Konto</th><th>Rolle</th><th>Zuletzt gesehen</th><th></th></tr></thead>
-	<tbody>
-		{#each data.users as u (u.id)}
-			<tr>
-				<td>{u.name}</td>
-				<td>{u.isAdmin ? 'Verwalter' : 'Nutzer'}</td>
-				<td>{u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleDateString('de-DE') : '—'}</td>
-				<td>
-					<form method="POST" action="?/toggleAdmin">
-						<input type="hidden" name="userId" value={u.id} />
-						<input type="hidden" name="isAdmin" value={(!u.isAdmin).toString()} />
-						<button type="submit"
-							>{u.isAdmin ? 'Verwalter entfernen' : 'Zu Verwalter machen'}</button
-						>
-					</form>
-				</td>
-			</tr>
-		{/each}
-	</tbody>
-</table>
+<h2>Nutzer</h2>
+<a href={resolve('/settings/users')}>Nutzer verwalten</a>
 
 <style>
 	h1 {
@@ -97,26 +76,5 @@
 		display: flex;
 		align-items: center;
 		gap: 14px;
-	}
-	.count {
-		color: var(--faint);
-		font-size: 13px;
-	}
-	table {
-		width: 100%;
-		margin-top: 10px;
-		border-collapse: collapse;
-	}
-	th {
-		text-align: left;
-		color: var(--faint);
-		font-size: 11px;
-		text-transform: uppercase;
-		padding: 6px;
-	}
-	td {
-		padding: 8px 6px;
-		border-top: 1px solid var(--line);
-		font-size: 12.5px;
 	}
 </style>
