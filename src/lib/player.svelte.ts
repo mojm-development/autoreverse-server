@@ -85,6 +85,10 @@ export function createPlayerStore() {
 	 * create between `ontimeupdate` (audio → state) and a $effect that tries
 	 * to write that same time back (state → audio). */
 	function attachAudioElement(el: HTMLAudioElement) {
+		if (audioEl && audioEl !== el) {
+			audioEl.pause();
+			audioEl.removeAttribute('src');
+		}
 		audioEl = el;
 		audioEl.ontimeupdate = () => {
 			if (!current || !audioEl) return;
