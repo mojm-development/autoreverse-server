@@ -11,6 +11,7 @@ import { createUser } from '../../src/lib/server/auth/passwords';
 import {
 	continueListening,
 	progressMap,
+	itemDurations,
 	searchArtists,
 	playlistOverview
 } from '../../src/lib/server/library/queries';
@@ -81,6 +82,32 @@ describe('aggregate queries', () => {
 	it('progressMap returns {} for an empty id list without querying', async () => {
 		await withTestDb(async (db) => {
 			expect(await progressMap(db, 1, [])).toEqual({});
+		});
+	});
+
+	it('itemDurations sums track durations per item and omits items without tracks', async () => {
+		await withTestDb(async (db) => {
+			const [withTracks] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'A', sortTitle: 'a' })
+				.returning();
+			const [withoutTracks] = await db
+				.insert(itemsTable)
+				.values({ kind: 'album', title: 'B', sortTitle: 'b' })
+				.returning();
+			await db.insert(tracksTable).values([
+				{ itemId: withTracks.id, position: 1, path: '/a', duration: 100 },
+				{ itemId: withTracks.id, position: 2, path: '/b', duration: 50 }
+			]);
+			const map = await itemDurations(db, [withTracks.id, withoutTracks.id]);
+			expect(map[withTracks.id]).toBe(150);
+			expect(withoutTracks.id in map).toBe(false);
+		});
+	});
+
+	it('itemDurations returns {} for an empty id list without querying', async () => {
+		await withTestDb(async (db) => {
+			expect(await itemDurations(db, [])).toEqual({});
 		});
 	});
 

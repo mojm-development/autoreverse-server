@@ -251,6 +251,24 @@ export async function progressMap(db: DrizzleDb, userId: number, itemIds: number
 	return map;
 }
 
+export async function itemDurations(
+	db: DrizzleDb,
+	itemIds: number[]
+): Promise<Record<number, number>> {
+	if (itemIds.length === 0) return {};
+	const rows = await db
+		.select({
+			itemId: tracksTable.itemId,
+			duration: sql<number>`coalesce(sum(${tracksTable.duration}), 0)`
+		})
+		.from(tracksTable)
+		.where(inArray(tracksTable.itemId, itemIds))
+		.groupBy(tracksTable.itemId);
+	const map: Record<number, number> = {};
+	for (const row of rows) map[row.itemId] = row.duration;
+	return map;
+}
+
 export async function seriesSiblings(db: DrizzleDb, series: string) {
 	return db
 		.select()
