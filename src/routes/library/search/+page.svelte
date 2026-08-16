@@ -86,7 +86,7 @@
 			</section>
 		{/if}
 
-		{#if data.albums.length > 0}
+		{#if data.albums.length > 0 || data.tracks.length > 0}
 			<section>
 				<div class="section-head">
 					<span class="eyebrow">Alben &amp; Titel</span><span class="count mono"
