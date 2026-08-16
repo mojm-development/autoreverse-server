@@ -10,8 +10,9 @@ test('the password show/hide toggle actually toggles the input type', async ({ p
 	await page.goto('/login');
 	const password = page.getByLabel('Passwort');
 	await expect(password).toHaveAttribute('type', 'password');
-	await page.getByRole('button', { name: 'zeigen' }).click();
+	await page.getByRole('button', { name: 'Eingabe anzeigen' }).click();
 	await expect(password).toHaveAttribute('type', 'text');
+	await expect(page.getByRole('button', { name: 'Eingabe verbergen' })).toBeVisible();
 });
 
 test('no OpenID button is shown (no backend support exists)', async ({ page }) => {

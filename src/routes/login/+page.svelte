@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '$lib/components/Icon.svelte';
 	import type { ActionData, PageData } from './$types';
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 	let showPassword = $state(false);
@@ -52,9 +53,14 @@
 						autocomplete="current-password"
 						aria-label="Passwort"
 					/>
-					<button type="button" onclick={() => (showPassword = !showPassword)}
-						>{showPassword ? 'verbergen' : 'zeigen'}</button
+					<button
+						type="button"
+						class="icon-btn"
+						aria-label={showPassword ? 'Eingabe verbergen' : 'Eingabe anzeigen'}
+						onclick={() => (showPassword = !showPassword)}
 					>
+						<Icon name={showPassword ? 'eye-off' : 'eye'} />
+					</button>
 				</span>
 			</label>
 			{#if form?.message}<p role="alert">{form.message}</p>{/if}
@@ -128,24 +134,27 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.password-field {
+	label {
 		display: flex;
-		align-items: center;
+		flex-direction: column;
 		gap: 6px;
+		margin-bottom: 16px;
+	}
+	.password-field {
+		position: relative;
+		display: block;
 	}
 	.password-field input {
-		flex: 1;
+		width: 100%;
+		padding-right: 40px;
 	}
-	.password-field button {
-		flex-shrink: 0;
-		border: none;
-		background: none;
-		padding: 4px 2px;
-		font: 500 12px/1 var(--font-sans);
-		color: var(--dim);
-	}
-	.password-field button:hover {
-		color: var(--text);
+	.password-field .icon-btn {
+		position: absolute;
+		top: 50%;
+		right: 4px;
+		transform: translateY(-50%);
+		width: 28px;
+		height: 28px;
 	}
 	.warning {
 		margin-top: 30px;

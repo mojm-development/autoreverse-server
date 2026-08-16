@@ -272,4 +272,29 @@
 	>
 		<circle cx="12" cy="12" r="9.3" /><path d="M8 9.6v4.8M11 6.8v10.4M14 8.8v6.4M17 10.6v2.8" />
 	</symbol>
+	<symbol
+		id="icon-eye"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.6"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+		<circle cx="12" cy="12" r="3" />
+	</symbol>
+	<symbol
+		id="icon-eye-off"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.6"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path
+			d="M3.5 3.5l17 17M9.9 5.7c.68-.14 1.4-.2 2.1-.2 6 0 9.5 6.5 9.5 6.5a17.6 17.6 0 0 1-3.6 4.6M6.4 6.8A17.4 17.4 0 0 0 2.5 12S6 18.5 12 18.5c1.3 0 2.5-.24 3.6-.66M14.1 14.1a3 3 0 0 1-4.2-4.2"
+		/>
+	</symbol>
 </svg>
