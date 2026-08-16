@@ -31,7 +31,16 @@ export interface ScanState {
  * request. Node has no GIL-adjacent concern here (single-threaded event
  * loop), so a plain module-level object stands in for the Python
  * threading.Lock-guarded dataclass; mutations below are synchronous property
- * assignments, which is enough serialization on a single event loop. */
+ * assignments, which is enough serialization on a single event loop.
+ *
+ * CONCURRENCY CONSTRAINT FOR E2E TESTS: any e2e spec that triggers a real
+ * POST /scan (like tests/e2e/smoke.e2e.ts) must avoid running concurrently
+ * with another spec doing the same. This can be enforced via test ordering,
+ * `--workers=1` for such specs, or by not adding more real-scan specs without
+ * addressing this constraint. Simultaneous real scans have been empirically
+ * shown to race under high test-runner concurrency. The same applies to the
+ * library_config DB singleton (which scanState effectively guards via timing).
+ */
 export const scanState: ScanState = {
 	running: false,
 	startedAt: null,
