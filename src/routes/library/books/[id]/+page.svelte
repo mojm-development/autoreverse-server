@@ -17,7 +17,8 @@
 	);
 	const currentChapter = $derived(
 		data.chapters.find((c) => currentPosition >= c.start && currentPosition < c.end) ??
-			data.chapters[0]
+			data.chapters[data.chapters.length - 1] ??
+			null
 	);
 	const remaining = $derived(Math.max(0, totalDuration - currentPosition));
 	const percent = $derived(

@@ -319,12 +319,7 @@
 		margin-top: 18px;
 	}
 	.transport .pill {
-		height: 30px;
-		border-radius: var(--radius-pill);
-		border: 1px solid var(--line-strong);
-		background: transparent;
-		color: var(--dim);
-		font: 500 11px var(--font-sans);
+		font-size: 11px;
 	}
 	.skip {
 		width: 34px;

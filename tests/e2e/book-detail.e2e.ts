@@ -5,6 +5,7 @@ import {
 	items as itemsTable,
 	tracks as tracksTable,
 	progress as progressTable,
+	chapters as chaptersTable,
 	users
 } from '../../src/lib/server/db/schema';
 
@@ -86,4 +87,59 @@ test('"Von vorn" button restarts playback from position 0', async ({ page }) => 
 
 	// Wait for the MiniPlayerBar to appear and show time at 0:00
 	await expect(page.locator('.time').first()).toContainText('0:00');
+});
+
+test('hero chapter label shows the last chapter when progress is at/past the end', async ({
+	page
+}) => {
+	// Create a book with multiple chapters
+	const [book] = await db
+		.insert(itemsTable)
+		.values({
+			kind: 'book',
+			title: 'E2E-Fixture-Book-EndOfBook',
+			sortTitle: 'e2e-fixture-book-endofbook',
+			author: 'E2E Fixture Author',
+			narrator: 'A Narrator'
+		})
+		.returning();
+
+	const bookId = book.id;
+
+	// Insert a single track covering all chapters
+	await db
+		.insert(tracksTable)
+		.values([{ itemId: bookId, position: 1, path: `/fixtures/${bookId}/01.mp3`, duration: 3600 }]);
+
+	// Insert chapters: chapter 1 (0-1200), chapter 2 (1200-2400), chapter 3 (2400-3600)
+	const chapters = [
+		{ itemId: bookId, position: 1, title: 'Chapter 1: Beginning', start: 0, end: 1200 },
+		{ itemId: bookId, position: 2, title: 'Chapter 2: Middle', start: 1200, end: 2400 },
+		{ itemId: bookId, position: 3, title: 'Chapter 3: End', start: 2400, end: 3600 }
+	];
+	await db.insert(chaptersTable).values(chapters);
+
+	// Create progress positioned at/past the last chapter's end
+	const [userRow] = await db.select({ id: users.id }).from(users).where(eq(users.name, 'Oliver'));
+	if (userRow) {
+		await db
+			.insert(progressTable)
+			.values({
+				userId: userRow.id,
+				itemId: bookId,
+				position: 3600, // At the very end
+				finished: false
+			})
+			.onConflictDoUpdate({
+				target: [progressTable.userId, progressTable.itemId],
+				set: { position: 3600 }
+			});
+	}
+
+	// Navigate to the book detail page
+	await page.goto(`/library/books/${bookId}`);
+
+	// The hero's chapter-name label should show "Chapter 3: End", not "Chapter 1: Beginning"
+	const chapterNameLocator = page.locator('.progress-row .chapter-name');
+	await expect(chapterNameLocator).toContainText('Chapter 3: End');
 });
