@@ -3,6 +3,7 @@
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
+	import ChapterList from '$lib/components/ChapterList.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -110,18 +111,7 @@
 	</div>
 
 	{#if tab === 'chapters'}
-		<div class="table" role="table" aria-label="Kapitel">
-			{#each data.chapters as c, i (c.title + c.start)}
-				{@const playing = isPlayingThis && c === currentChapter}
-				{@const heard = !playing && currentPosition >= c.end}
-				<ListRow ariaCurrent={playing}>
-					<span class="index mono">{i + 1}</span>
-					<span class="title">{c.title}</span>
-					<span class="cell state">{playing ? 'läuft' : heard ? 'gehört' : ''}</span>
-					<span class="cell mono">{formatHMS(c.start)}</span>
-				</ListRow>
-			{/each}
-		</div>
+		<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} />
 	{:else if tab === 'bookmarks'}
 		<div class="table" role="table" aria-label="Lesezeichen">
 			{#each data.bookmarks as b (b.id)}
@@ -270,11 +260,6 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.index {
-		width: 20px;
-		flex: none;
-		color: var(--faint);
-	}
 	.title {
 		flex: 2;
 		min-width: 0;
@@ -283,12 +268,5 @@
 		flex: 1;
 		color: var(--dim);
 		font-size: 12px;
-	}
-	.state {
-		color: var(--a);
-		font-weight: 500;
-	}
-	:global([role='row'][aria-current='true']) {
-		background: color-mix(in oklab, var(--a) 12%, transparent);
 	}
 </style>

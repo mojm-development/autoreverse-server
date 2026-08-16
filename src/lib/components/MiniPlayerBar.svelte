@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getContext, onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from './Icon.svelte';
 
@@ -8,6 +9,7 @@
 	onMount(() => {
 		player.attachAudioElement(audioEl);
 	});
+	const isFullscreenPlayer = $derived(page.url.pathname.endsWith('/player'));
 	const current = $derived(player.current);
 	const track = $derived(current?.tracks[current.trackIndex]);
 	const totalDuration = $derived(current?.tracks.reduce((sum, t) => sum + t.duration, 0) ?? 0);
@@ -24,7 +26,7 @@
 	}
 </script>
 
-{#if current && track}
+{#if current && track && !isFullscreenPlayer}
 	<div class="bar">
 		<div class="transport">
 			<button aria-label="Zurück" onclick={() => player.skipBack(30)}
