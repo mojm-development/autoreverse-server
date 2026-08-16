@@ -58,3 +58,88 @@ a {
 	padding: 2px 5px;
 	border-radius: var(--radius-pill);
 }
+
+/* Form base — every text field/select/textarea in the app previously fell back to raw
+   browser UA styling since nothing here ever set a default (each form only styled its own
+   buttons, several didn't even do that). Element-level, so a component's own scoped
+   `<style>` overrides this whenever it needs to (Svelte's scoping selector always outranks
+   a bare tag selector), but every field now has a sane look with zero per-page work. */
+input,
+select,
+textarea {
+	font: inherit;
+	color: var(--text);
+	background: var(--panel);
+	border: 1px solid var(--line-strong);
+	border-radius: var(--radius-md);
+	padding: 9px 12px;
+	outline: none;
+}
+input::placeholder,
+textarea::placeholder {
+	color: var(--faint);
+}
+input:focus,
+select:focus,
+textarea:focus {
+	border-color: var(--a, var(--book));
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Buttons: `.primary`/`.secondary` were already the established naming convention (used
+   across 8 files) but only ever defined locally, redundantly, in 7 of them — and never at
+   all in login/+page.svelte, which is why it rendered unstyled. One definition here,
+   matching the shape those 7 files already converged on independently. */
+button {
+	font: inherit;
+	cursor: pointer;
+}
+button:disabled {
+	cursor: not-allowed;
+}
+
+.primary,
+.secondary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 32px;
+	padding: 0 16px;
+	border-radius: var(--radius-pill);
+	font: 500 12px/1 var(--font-sans);
+}
+.primary {
+	border: none;
+	background: var(--a, var(--book));
+	color: var(--bg);
+}
+.secondary {
+	border: 1px solid var(--line-strong);
+	background: transparent;
+	color: var(--dim);
+}
+.primary:disabled,
+.secondary:disabled {
+	opacity: 0.5;
+}
+
+/* Plain, unclassed <button type="submit"> (no explicit .primary/.secondary) — a handful of
+   secondary form actions (Aufräumen, Suchen, Anlegen, Abonnieren) never opted into either
+   class. Give them the .secondary look by default rather than raw UA styling. */
+button[type='submit']:not(.primary, .secondary) {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 32px;
+	padding: 0 16px;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--line-strong);
+	background: transparent;
+	color: var(--dim);
+	font: 500 12px/1 var(--font-sans);
+}
