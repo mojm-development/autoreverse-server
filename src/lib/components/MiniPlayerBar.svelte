@@ -1,9 +1,13 @@
 <script lang="ts">
-	import { getContext } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from './Icon.svelte';
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
+	let audioEl: HTMLAudioElement;
+	onMount(() => {
+		player.attachAudioElement(audioEl);
+	});
 	const current = $derived(player.current);
 	const track = $derived(current?.tracks[current.trackIndex]);
 	const totalDuration = $derived(current?.tracks.reduce((sum, t) => sum + t.duration, 0) ?? 0);
@@ -53,6 +57,8 @@
 		</div>
 	</div>
 {/if}
+
+<audio bind:this={audioEl} hidden></audio>
 
 <style>
 	.bar {
