@@ -23,7 +23,13 @@ services:
     environment:
       DATABASE_URL: postgresql://capstan:capstan@postgres:5432/capstan
       CAPSTAN_DATA: /data
+      # First-admin bootstrap, only used once against an empty `users` table — change these.
+      CAPSTAN_ADMIN_USER: admin
+      CAPSTAN_ADMIN_PASSWORD: change-me
     volumes:
+      # These bind mounts just make the paths available inside the container — the server
+      # itself doesn't read them from env. After first login, type the in-container paths
+      # below (/library/books, /library/music) into Settings → Bibliotheken to actually use them.
       - ${CAPSTAN_BOOKS_HOST:-./dev-library/books}:/library/books:ro
       - ${CAPSTAN_MUSIC_HOST:-./dev-library/music}:/library/music:ro
       - capstan-data:/data

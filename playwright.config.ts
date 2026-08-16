@@ -16,11 +16,11 @@ export default defineConfig({
 	testMatch: '**/*.e2e.{ts,js}',
 	projects: [
 		{ name: 'setup', testMatch: /auth\.setup\.ts/ },
-		{ name: 'no-auth', testMatch: ['**/demo/**/*.e2e.{ts,js}', '**/login.e2e.ts'] },
+		{ name: 'no-auth', testMatch: ['**/login.e2e.ts'] },
 		{
 			name: 'authenticated',
 			testMatch: '**/*.e2e.{ts,js}',
-			testIgnore: ['**/auth.setup.ts', '**/demo/**/*.e2e.{ts,js}', '**/login.e2e.ts'],
+			testIgnore: ['**/auth.setup.ts', '**/login.e2e.ts'],
 			use: { storageState: 'playwright/.auth/user.json' },
 			dependencies: ['setup']
 		}
