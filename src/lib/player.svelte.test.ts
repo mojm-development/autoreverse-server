@@ -105,4 +105,53 @@ describe('player store', () => {
 		expect(oldElement.pause).toHaveBeenCalled();
 		expect(oldElement.removeAttribute).toHaveBeenCalledWith('src');
 	});
+
+	it('reloadCurrentTrack() re-reads current.tracks[trackIndex] even when trackIndex is unchanged (shuffle case)', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					session_id: 's1',
+					start_position: 0,
+					tracks: [
+						{ id: 1, position: 1, title: 'T1', duration: 100 },
+						{ id: 2, position: 2, title: 'T2', duration: 100 }
+					],
+					chapters: []
+				})
+			})
+		);
+
+		const store = createPlayerStore();
+		await store.play(42);
+		expect(store.current?.trackIndex).toBe(0);
+
+		const fakeAudioElement = {
+			pause: vi.fn(),
+			removeAttribute: vi.fn(),
+			play: vi.fn(),
+			src: '',
+			currentTime: 0,
+			ontimeupdate: null as unknown,
+			onended: null as unknown
+		};
+		store.attachAudioElement(fakeAudioElement as unknown as HTMLAudioElement);
+		expect(fakeAudioElement.src).toBe('/tracks/1/stream');
+
+		// Simulate a shuffle: swap the two tracks in place. trackIndex stays 0,
+		// but the track that actually sits at index 0 has changed.
+		if (store.current) {
+			const tracks = store.current.tracks;
+			[tracks[0], tracks[1]] = [tracks[1], tracks[0]];
+		}
+		expect(store.current?.trackIndex).toBe(0); // index itself is unchanged
+
+		store.reloadCurrentTrack();
+
+		// Proves the reload actually re-read current.tracks[trackIndex]: the
+		// audio element must now point at track 2 (id 2), which is what a
+		// naive seek(0) — same trackIndex as before — would have failed to do.
+		expect(fakeAudioElement.src).toBe('/tracks/2/stream');
+	});
 });

@@ -157,6 +157,16 @@ export function createPlayerStore() {
 		if (current) seek(current.position + seconds);
 	}
 
+	/** Reloads the <audio> element for whatever track currently sits at
+	 * `current.trackIndex`, even if that index number hasn't changed — needed
+	 * when the *contents* of `current.tracks` were reordered externally (e.g.
+	 * a shuffle), which `seek()`'s index-comparison optimization can't detect
+	 * on its own since the index itself is unchanged. */
+	function reloadCurrentTrack() {
+		if (!current) return;
+		loadTrack(current.trackIndex, 0);
+	}
+
 	async function close() {
 		if (!current) return;
 		await flushProgress(false);
@@ -184,7 +194,8 @@ export function createPlayerStore() {
 		skipBack,
 		skipForward,
 		close,
-		attachAudioElement
+		attachAudioElement,
+		reloadCurrentTrack
 	};
 }
 
