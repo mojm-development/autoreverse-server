@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { requireWebUser } from '$lib/server/auth/session';
+import { requireWebUser, requireWebAdmin } from '$lib/server/auth/session';
 import { listUsers, setAdmin } from '$lib/server/auth/directory';
 import { createUser } from '$lib/server/auth/passwords';
 
@@ -9,7 +9,8 @@ export const load = async ({ locals }) => {
 };
 
 export const actions = {
-	createUser: async ({ request }) => {
+	createUser: async ({ request, locals }) => {
+		await requireWebAdmin(locals, db);
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '');
 		const password = String(data.get('password') ?? '');
@@ -18,7 +19,8 @@ export const actions = {
 		await createUser(db, name, password, false);
 		return { success: true };
 	},
-	toggleAdmin: async ({ request }) => {
+	toggleAdmin: async ({ request, locals }) => {
+		await requireWebAdmin(locals, db);
 		const data = await request.formData();
 		await setAdmin(db, Number(data.get('userId')), data.get('isAdmin') === 'true');
 		return { success: true };

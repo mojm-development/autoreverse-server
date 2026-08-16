@@ -1,5 +1,5 @@
 import { db } from '$lib/server/db';
-import { requireWebUser } from '$lib/server/auth/session';
+import { requireWebUser, requireWebAdmin } from '$lib/server/auth/session';
 import { getLibraryPaths, setLibraryPaths } from '$lib/server/settings/libraryPaths';
 import { listUsers, setAdmin } from '$lib/server/auth/directory';
 import { createUser } from '$lib/server/auth/passwords';
@@ -16,7 +16,8 @@ export const load = async ({ locals }) => {
 };
 
 export const actions = {
-	savePaths: async ({ request }) => {
+	savePaths: async ({ request, locals }) => {
+		await requireWebAdmin(locals, db);
 		const data = await request.formData();
 		const booksDir = String(data.get('booksDir') ?? '').trim();
 		const musicDir = String(data.get('musicDir') ?? '').trim();
@@ -24,11 +25,13 @@ export const actions = {
 		await setLibraryPaths(db, { booksDir, musicDir });
 		return { success: true };
 	},
-	cleanupMissing: async () => {
+	cleanupMissing: async ({ locals }) => {
+		await requireWebAdmin(locals, db);
 		const removed = await deleteMissing(db);
 		return { success: true, removed };
 	},
-	createUser: async ({ request }) => {
+	createUser: async ({ request, locals }) => {
+		await requireWebAdmin(locals, db);
 		const data = await request.formData();
 		const name = String(data.get('name') ?? '');
 		const password = String(data.get('password') ?? '');
@@ -37,7 +40,8 @@ export const actions = {
 		await createUser(db, name, password, false);
 		return { success: true };
 	},
-	toggleAdmin: async ({ request }) => {
+	toggleAdmin: async ({ request, locals }) => {
+		await requireWebAdmin(locals, db);
 		const data = await request.formData();
 		const userId = Number(data.get('userId'));
 		const isAdmin = data.get('isAdmin') === 'true';

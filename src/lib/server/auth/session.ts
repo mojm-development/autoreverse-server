@@ -31,6 +31,13 @@ export async function requireApiAdmin(locals: Locals, db: DrizzleDb): Promise<nu
 	return userId;
 }
 
+export async function requireWebAdmin(locals: Locals, db: DrizzleDb): Promise<number> {
+	const userId = requireWebUser(locals);
+	const [row] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId));
+	if (!row?.isAdmin) throw redirect(303, '/library');
+	return userId;
+}
+
 export function requireWebUser(locals: Locals): number {
 	if (locals.userId === null) throw redirect(303, '/login');
 	return locals.userId;

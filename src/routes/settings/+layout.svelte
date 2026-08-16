@@ -14,14 +14,14 @@
 </script>
 
 <div class="shell">
-	{#if data.user}
+	{#if data.user && data.counts}
 		<!-- `data.counts` is only optional in this route's generated PageData type because this
 			 layout's own +layout.server.ts (needed for the admin-only redirect) flattens the root
 			 layout's `{user, counts}` discriminated union via SvelteKit's Omit-based data merging —
-			 at runtime the root load always returns both together or neither, and the `{#if data.user}`
-			 guard above already establishes that, so the non-null assertion here reflects a real
-			 invariant, not an unchecked assumption. -->
-		<Sidebar accent="book" activeHref="/settings" user={data.user} counts={data.counts!} />
+			 at runtime the root load always returns both together or neither. Checking both here
+			 (rather than asserting `data.counts!`) resolves the same type error without trusting an
+			 assumption, and fails closed if that invariant is ever broken by a future root-layout edit. -->
+		<Sidebar accent="book" activeHref="/settings" user={data.user} counts={data.counts} />
 	{/if}
 	<div class="settings" style="--a: var(--book)">
 		<nav class="subnav">
