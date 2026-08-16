@@ -59,8 +59,6 @@
 			</label>
 			{#if form?.message}<p role="alert">{form.message}</p>{/if}
 			<button type="submit" class="primary">Anmelden</button>
-			<div class="divider"><span>oder</span></div>
-			<button type="button" class="secondary" disabled>Mit OpenID anmelden</button>
 			<div class="warning">
 				Diese Verbindung ist unverschlüsselt. Nur im eigenen Netz anmelden oder einen TLS-Proxy
 				davorsetzen.

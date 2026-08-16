@@ -14,7 +14,7 @@ test('the password show/hide toggle actually toggles the input type', async ({ p
 	await expect(password).toHaveAttribute('type', 'text');
 });
 
-test('OpenID button is present but disabled (no backend support)', async ({ page }) => {
+test('no OpenID button is shown (no backend support exists)', async ({ page }) => {
 	await page.goto('/login');
-	await expect(page.getByRole('button', { name: 'Mit OpenID anmelden' })).toBeDisabled();
+	await expect(page.getByRole('button', { name: 'Mit OpenID anmelden' })).toHaveCount(0);
 });
