@@ -214,6 +214,11 @@ export async function continueListening(db: DrizzleDb, userId: number, limit = 2
 		id: number;
 		title: string;
 		kind: string;
+		author: string | null;
+		artist: string | null;
+		series: string | null;
+		series_index: number | null;
+		cover_path: string | null;
 		position: number;
 		duration: number;
 	}>;
