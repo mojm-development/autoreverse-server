@@ -6,6 +6,7 @@ import { playlists, playlistEntries } from '$lib/server/db/schema';
 import { removeEntry, moveEntry } from '$lib/server/library/playlistEntries';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 async function ownedEntry(db: DrizzleDb, userId: number, playlistId: number, entryId: number) {
 	const [playlist] = await db
@@ -56,7 +57,7 @@ export async function _playlistEntryPutHandler(
 		);
 		if (!playlist) return apiError(404, 'Unbekannte Playlist');
 		if (!entry) return apiError(404, 'Unbekannter Eintrag');
-		const { position } = await event.request.json();
+		const { position } = await readJson<{ position: number }>(event.request);
 		const [{ count }] = await db
 			.select({ count: sql<number>`count(*)::int` })
 			.from(playlistEntries)

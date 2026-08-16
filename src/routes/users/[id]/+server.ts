@@ -6,6 +6,7 @@ import { setAdmin, LastAdminError } from '$lib/server/auth/directory';
 import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 export async function _usersPatchHandler(
 	db: DrizzleDb,
@@ -13,7 +14,7 @@ export async function _usersPatchHandler(
 ): Promise<Response> {
 	try {
 		await requireApiAdmin(event.locals, db);
-		const { is_admin } = await event.request.json();
+		const { is_admin } = await readJson<{ is_admin: boolean }>(event.request);
 		const userId = Number(event.params.id);
 		try {
 			const resultingIsAdmin = await setAdmin(db, userId, is_admin);

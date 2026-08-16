@@ -5,6 +5,7 @@ import { item } from '$lib/server/library/queries';
 import { savePosition } from '$lib/server/library/playback';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 export async function _progressPutHandler(
 	db: DrizzleDb,
@@ -14,7 +15,10 @@ export async function _progressPutHandler(
 		const userId = requireApiUser(event.locals);
 		const row = await item(db, Number(event.params.itemId));
 		if (!row) return apiError(404, 'Unbekanntes Item');
-		const { position, finished = false } = await event.request.json();
+		const { position, finished = false } = await readJson<{
+			position: number;
+			finished?: boolean;
+		}>(event.request);
 		await savePosition(db, userId, row.id, position, finished);
 		return new Response(null, { status: 204 });
 	} catch (e) {

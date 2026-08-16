@@ -11,6 +11,7 @@ import {
 } from '$lib/server/auth/preferences';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 function serialize(p: { playbackSpeed: number; skipBack: number; skipForward: number }) {
 	return { playback_speed: p.playbackSpeed, skip_back: p.skipBack, skip_forward: p.skipForward };
@@ -35,7 +36,15 @@ export async function _playbackPutHandler(
 ): Promise<Response> {
 	try {
 		const userId = requireApiUser(event.locals);
-		const { playback_speed, skip_back, skip_forward } = await event.request.json();
+		const {
+			// Matches the ground truth's Pydantic model: all three fields are
+			// optional and default when a partial body is sent (I-10).
+			playback_speed = 1.0,
+			skip_back = 30,
+			skip_forward = 15
+		} = await readJson<{ playback_speed?: number; skip_back?: number; skip_forward?: number }>(
+			event.request
+		);
 		for (const [value, min, max, name] of [
 			[playback_speed, SPEED_MIN, SPEED_MAX, 'playback_speed'],
 			[skip_back, SKIP_MIN, SKIP_MAX, 'skip_back'],

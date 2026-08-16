@@ -5,9 +5,11 @@ import { requireApiUser } from '$lib/server/auth/session';
 import { playlists, playlistEntries } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
+import { toIso } from '$lib/server/api/serialize';
 
 function serialize(p: { id: number; name: string; createdAt: Date; entryCount: number }) {
-	return { id: p.id, name: p.name, created_at: p.createdAt, entry_count: p.entryCount };
+	return { id: p.id, name: p.name, created_at: toIso(p.createdAt), entry_count: p.entryCount };
 }
 
 export async function _playlistsGetHandler(
@@ -41,7 +43,7 @@ export async function _playlistsPostHandler(
 ): Promise<Response> {
 	try {
 		const userId = requireApiUser(event.locals);
-		const { name } = await event.request.json();
+		const { name } = await readJson<{ name: string }>(event.request);
 		const [row] = await db.insert(playlists).values({ userId, name }).returning();
 		return json(serialize({ ...row, entryCount: 0 }));
 	} catch (e) {

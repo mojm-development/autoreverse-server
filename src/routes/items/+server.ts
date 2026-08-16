@@ -5,6 +5,7 @@ import { items } from '$lib/server/library/queries';
 import { toItemSummary } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { intParam } from '$lib/server/api/validate';
 
 export async function _itemsGetHandler(
 	db: DrizzleDb,
@@ -17,8 +18,8 @@ export async function _itemsGetHandler(
 		const q = url.searchParams.get('q') ?? undefined;
 		const missingParam = url.searchParams.get('missing');
 		const missing = missingParam === null ? undefined : missingParam === 'true';
-		const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 200)));
-		const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+		const limit = intParam(url, 'limit', { def: 200, min: 1, max: 500 });
+		const offset = intParam(url, 'offset', { def: 0, min: 0, max: Number.MAX_SAFE_INTEGER });
 		const rows = await items(db, { kind, q, missing, limit, offset, sort: 'title' });
 		return json({ items: rows.map(toItemSummary) });
 	} catch (e) {

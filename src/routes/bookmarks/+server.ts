@@ -11,6 +11,7 @@ import {
 } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 type Bookmark = typeof BookmarksType.$inferSelect;
 
@@ -50,7 +51,11 @@ export async function _bookmarksPostHandler(
 ): Promise<Response> {
 	try {
 		const userId = requireApiUser(event.locals);
-		const { item_id, position, title } = await event.request.json();
+		const { item_id, position, title } = await readJson<{
+			item_id?: unknown;
+			position?: unknown;
+			title?: unknown;
+		}>(event.request);
 		if (typeof item_id !== 'number' || !Number.isFinite(item_id))
 			return apiError(422, 'item_id muss eine Zahl sein');
 		if (typeof position !== 'number' || position < 0)

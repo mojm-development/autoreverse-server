@@ -4,6 +4,7 @@ import { requireApiUser } from '$lib/server/auth/session';
 import { continueListening } from '$lib/server/library/queries';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { intParam } from '$lib/server/api/validate';
 
 export async function _progressContinueGetHandler(
 	db: DrizzleDb,
@@ -11,7 +12,7 @@ export async function _progressContinueGetHandler(
 ): Promise<Response> {
 	try {
 		const userId = requireApiUser(event.locals);
-		const limit = Math.min(100, Math.max(1, Number(event.url.searchParams.get('limit') ?? 20)));
+		const limit = intParam(event.url, 'limit', { def: 20, min: 1, max: 100 });
 		const rows = await continueListening(db, userId, limit);
 		return json({
 			items: rows.map((r: { id: number; title: string; kind: string; position: number }) => ({

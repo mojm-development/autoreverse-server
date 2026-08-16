@@ -5,6 +5,7 @@ import { searchItems, searchTracks } from '$lib/server/library/queries';
 import { toItemSummary, toTrackSummary } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { intParam } from '$lib/server/api/validate';
 
 export async function _searchGetHandler(
 	db: DrizzleDb,
@@ -14,8 +15,7 @@ export async function _searchGetHandler(
 		requireApiUser(event.locals);
 		const q = event.url.searchParams.get('q') ?? '';
 		if (q.length < 1 || q.length > 200) return apiError(422, 'q muss 1–200 Zeichen haben');
-		const limitParam = Number(event.url.searchParams.get('limit') ?? 20);
-		const limit = Math.min(100, Math.max(1, limitParam));
+		const limit = intParam(event.url, 'limit', { def: 20, min: 1, max: 100 });
 
 		const [books, albums, podcasts, tracks] = await Promise.all([
 			searchItems(db, q, ['book'], limit),

@@ -9,6 +9,7 @@ import {
 } from '$lib/server/podcasts/directory';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { intParam } from '$lib/server/api/validate';
 
 export async function _podcastsSearchGetHandler(
 	db: DrizzleDb,
@@ -18,11 +19,9 @@ export async function _podcastsSearchGetHandler(
 		await requireApiAdmin(event.locals, db);
 		const q = event.url.searchParams.get('q') ?? '';
 		if (q.length < 1 || q.length > 200) throw new ApiError(422, 'q muss 1–200 Zeichen haben');
-		const limit = Math.min(
-			50,
-			Math.max(1, Number(event.url.searchParams.get('limit') ?? DEFAULT_LIMIT))
-		);
+		const limit = intParam(event.url, 'limit', { def: DEFAULT_LIMIT, min: 1, max: 50 });
 		const country = event.url.searchParams.get('country') ?? DEFAULT_COUNTRY;
+		if (country.length !== 2) throw new ApiError(422, 'country muss genau 2 Zeichen haben');
 		const results = await searchDirectory(q, { limit, country });
 		return json({
 			results: results.map((r) => ({

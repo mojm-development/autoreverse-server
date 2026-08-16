@@ -8,6 +8,7 @@ import { item, track } from '$lib/server/library/queries';
 import { toItemSummary, toTrackSummary } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 export async function _playlistEntriesPostHandler(
 	db: DrizzleDb,
@@ -20,7 +21,9 @@ export async function _playlistEntriesPostHandler(
 			.from(playlists)
 			.where(and(eq(playlists.id, Number(event.params.id)), eq(playlists.userId, userId)));
 		if (!playlist) return apiError(404, 'Unbekannte Playlist');
-		const { item_id, track_id } = await event.request.json();
+		const { item_id, track_id } = await readJson<{ item_id?: number; track_id?: number }>(
+			event.request
+		);
 		if ((item_id == null) === (track_id == null))
 			return apiError(422, 'Genau eines von item_id/track_id angeben');
 		if (item_id != null && !(await item(db, item_id))) return apiError(404, 'Unbekanntes Item');

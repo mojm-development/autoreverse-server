@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 export async function _usersGetHandler(
 	db: DrizzleDb,
@@ -36,7 +37,15 @@ export async function _usersPostHandler(
 ): Promise<Response> {
 	try {
 		await requireApiAdmin(event.locals, db);
-		const { name, password, is_admin = false } = await event.request.json();
+		const {
+			name,
+			password,
+			is_admin = false
+		} = await readJson<{
+			name: string;
+			password: string;
+			is_admin?: boolean;
+		}>(event.request);
 		if (typeof name !== 'string' || name.length < 1 || name.length > 100)
 			return apiError(422, 'name muss 1–100 Zeichen haben');
 		if (typeof password !== 'string' || password.length < 8 || password.length > 200)

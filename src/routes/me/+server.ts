@@ -1,14 +1,17 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
+import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
 import { users } from '$lib/server/db/schema';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
-export const GET: RequestHandler = async ({ locals }) => {
+export async function _meGetHandler(
+	db: DrizzleDb,
+	event: Pick<RequestEvent, 'locals'>
+): Promise<Response> {
 	try {
-		const userId = requireApiUser(locals);
+		const userId = requireApiUser(event.locals);
 		const [row] = await db
 			.select({ id: users.id, name: users.name, isAdmin: users.isAdmin })
 			.from(users)
@@ -21,4 +24,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		}
 		throw err;
 	}
-};
+}
+
+export const GET: RequestHandler = (event) => _meGetHandler(defaultDb, event);

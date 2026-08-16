@@ -4,6 +4,7 @@ import { requireApiUser } from '$lib/server/auth/session';
 import { closeSession } from '$lib/server/library/playback';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 export async function _sessionClosePostHandler(
 	db: DrizzleDb,
@@ -11,7 +12,7 @@ export async function _sessionClosePostHandler(
 ): Promise<Response> {
 	try {
 		const userId = requireApiUser(event.locals);
-		const { position } = await event.request.json();
+		const { position } = await readJson<{ position: number }>(event.request);
 		const session = await closeSession(db, userId, event.params.sessionId!, position);
 		if (!session) return apiError(404, 'Unbekannte Sitzung');
 		return new Response(null, { status: 204 });

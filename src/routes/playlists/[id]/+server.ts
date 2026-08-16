@@ -5,9 +5,10 @@ import { requireApiUser } from '$lib/server/auth/session';
 import { playlists, playlistEntries } from '$lib/server/db/schema';
 import { listEntries } from '$lib/server/library/playlistEntries';
 import { item, track } from '$lib/server/library/queries';
-import { toItemSummary, toTrackSummary } from '$lib/server/api/serialize';
+import { toItemSummary, toTrackSummary, toIso } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 async function ownedPlaylist(db: DrizzleDb, userId: number, id: number) {
 	const [row] = await db
@@ -54,7 +55,7 @@ export async function _playlistGetHandler(
 		return json({
 			id: playlist.id,
 			name: playlist.name,
-			created_at: playlist.createdAt,
+			created_at: toIso(playlist.createdAt),
 			entries: serializedEntries
 		});
 	} catch (e) {
@@ -71,7 +72,7 @@ export async function _playlistPatchHandler(
 		const userId = requireApiUser(event.locals);
 		const playlist = await ownedPlaylist(db, userId, Number(event.params.id));
 		if (!playlist) return apiError(404, 'Unbekannte Playlist');
-		const { name } = await event.request.json();
+		const { name } = await readJson<{ name: string }>(event.request);
 		const [row] = await db
 			.update(playlists)
 			.set({ name })
@@ -84,7 +85,7 @@ export async function _playlistPatchHandler(
 		return json({
 			id: row.id,
 			name: row.name,
-			created_at: row.createdAt,
+			created_at: toIso(row.createdAt),
 			entry_count: count
 		});
 	} catch (e) {

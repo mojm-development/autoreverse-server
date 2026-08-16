@@ -4,6 +4,7 @@ import { requireApiAdmin } from '$lib/server/auth/session';
 import { subscribe, FeedFetchError, InvalidFeedError } from '$lib/server/podcasts/store';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
+import { readJson } from '$lib/server/api/validate';
 
 export async function _podcastsPostHandler(
 	db: DrizzleDb,
@@ -11,14 +12,14 @@ export async function _podcastsPostHandler(
 ): Promise<Response> {
 	try {
 		await requireApiAdmin(event.locals, db);
-		const { feed_url } = await event.request.json();
+		const { feed_url } = await readJson<{ feed_url: string }>(event.request);
 		const podcast = await subscribe(db, feed_url);
 		return json({
 			id: podcast.id,
 			title: podcast.title,
 			feed_url: podcast.feedUrl,
-			new_episodes: 0,
-			updated_episodes: 0
+			new_episodes: podcast.newEpisodes,
+			updated_episodes: podcast.updatedEpisodes
 		});
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
