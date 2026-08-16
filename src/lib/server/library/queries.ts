@@ -288,7 +288,30 @@ export async function podcastOverview(db: DrizzleDb, userId: number) {
 		WHERE podcast.kind = 'podcast'
 		GROUP BY podcast.id ORDER BY lower(podcast.sort_title)
 	`);
-	return rows;
+	return rows as unknown as Array<{
+		id: number;
+		parent_id: number | null;
+		kind: string;
+		source_path: string | null;
+		title: string;
+		sort_title: string;
+		cover_path: string | null;
+		artist: string | null;
+		album_artist: string | null;
+		year: number | null;
+		author: string | null;
+		narrator: string | null;
+		series: string | null;
+		series_index: number | null;
+		feed_url: string | null;
+		last_checked: Date | null;
+		published_at: Date | null;
+		added_at: Date;
+		missing_since: Date | null;
+		guid: string | null;
+		episode_count: number;
+		unheard_count: number;
+	}>;
 }
 
 export async function playlistOverview(db: DrizzleDb, userId: number) {

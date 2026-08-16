@@ -24,3 +24,23 @@ setup('authenticate', async ({ page }) => {
 	await expect(page).toHaveURL('/library');
 	await page.context().storageState({ path: AUTH_FILE });
 });
+
+export const NONADMIN_TEST_USER = 'NonAdmin';
+export const NONADMIN_TEST_PASSWORD = 'hunter2hunter2';
+const NONADMIN_AUTH_FILE = 'playwright/.auth/nonadmin.json';
+
+setup('authenticate as non-admin', async ({ page }) => {
+	const [existing] = await db
+		.select({ id: users.id })
+		.from(users)
+		.where(eq(users.name, NONADMIN_TEST_USER));
+	if (!existing) {
+		await createUser(db, NONADMIN_TEST_USER, NONADMIN_TEST_PASSWORD, false);
+	}
+	await page.goto('/login');
+	await page.getByLabel('Name', { exact: false }).fill(NONADMIN_TEST_USER);
+	await page.getByLabel('Passwort').fill(NONADMIN_TEST_PASSWORD);
+	await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+	await expect(page).toHaveURL('/library');
+	await page.context().storageState({ path: NONADMIN_AUTH_FILE });
+});
