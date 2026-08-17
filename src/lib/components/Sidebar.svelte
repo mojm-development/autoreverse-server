@@ -73,6 +73,9 @@
 			<span class="role mono">{user.isAdmin ? 'Verwalter' : 'Nutzer'}</span>
 		</span>
 		<ThemeToggle />
+		<a href="/settings" class="settings-link" aria-label="Einstellungen">
+			<Icon name="settings" />
+		</a>
 		<form method="POST" action="/logout" class="logout-form">
 			<button type="submit" class="logout-button" aria-label="Abmelden">
 				<Icon name="logout" />
@@ -154,7 +157,7 @@
 		margin-top: auto;
 		display: flex;
 		align-items: center;
-		gap: 9px;
+		gap: 7px;
 		padding: 9px 10px;
 		border-radius: 8px;
 		border: 1px solid var(--line);
@@ -174,6 +177,13 @@
 		flex-direction: column;
 		line-height: 1.25;
 		overflow: hidden;
+		min-width: 0;
+	}
+	.name,
+	.role {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.name {
 		font: 500 12px var(--font-sans);
@@ -185,6 +195,7 @@
 	.logout-form {
 		display: contents;
 	}
+	.settings-link,
 	.logout-button {
 		flex: none;
 		width: 26px;
@@ -196,6 +207,7 @@
 		background: transparent;
 		color: var(--dim);
 	}
+	.settings-link:hover,
 	.logout-button:hover {
 		color: var(--text);
 		background: var(--panel);

@@ -1,16 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import { SETTINGS_SECTIONS } from '$lib/settingsSections';
 	let { data, children } = $props();
-	const items = [
-		{ href: '/settings/libraries', label: 'Bibliotheken', admin: true },
-		{ href: '/settings/scan', label: 'Scan', admin: true },
-		{ href: '/settings/users', label: 'Nutzer', admin: true },
-		{ href: '/settings/playback', label: 'Wiedergabe', admin: false },
-		{ href: '/settings/podcasts', label: 'Podcast-Abos', admin: true },
-		{ href: '/settings/security', label: 'Sicherheit', admin: false },
-		{ href: '/settings/about', label: 'Über Autoreverse', admin: false }
-	] as const;
 </script>
 
 <div class="shell">
@@ -25,7 +17,8 @@
 	{/if}
 	<div class="settings" style="--a: var(--book)">
 		<nav class="subnav">
-			{#each items as it (it.href)}
+			<a href={resolve('/settings')}>Übersicht</a>
+			{#each SETTINGS_SECTIONS as it (it.href)}
 				{#if !it.admin || data.user?.isAdmin}
 					<a href={resolve(it.href)}>{it.label}</a>
 				{/if}

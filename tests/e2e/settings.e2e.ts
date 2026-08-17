@@ -7,6 +7,30 @@ test.describe('as a non-admin', () => {
 		await page.goto('/settings/libraries');
 		await expect(page).toHaveURL('/library');
 	});
+
+	test('the overview offers a non-admin only the sections they may open', async ({ page }) => {
+		await page.goto('/settings');
+		const overview = page.getByTestId('settings-overview');
+		await expect(overview.getByRole('link', { name: 'Wiedergabe' })).toBeVisible();
+		// Linking here would only bounce off the +layout.server.ts redirect.
+		await expect(overview.getByRole('link', { name: 'Bibliotheken' })).toHaveCount(0);
+	});
+});
+
+test('/settings itself renders an overview linking into every section', async ({ page }) => {
+	await page.goto('/settings');
+	await expect(page.getByRole('heading', { name: 'Einstellungen' })).toBeVisible();
+	// Scoped to the card grid — the surrounding subnav carries the same labels.
+	const overview = page.getByTestId('settings-overview');
+	await expect(overview.getByRole('link')).toHaveCount(7);
+	await overview.getByRole('link', { name: 'Bibliotheken' }).click();
+	await expect(page).toHaveURL('/settings/libraries');
+});
+
+test('the sidebar reaches the settings section from a library page', async ({ page }) => {
+	await page.goto('/library/albums');
+	await page.getByRole('link', { name: 'Einstellungen' }).click();
+	await expect(page).toHaveURL('/settings');
 });
 
 test('Wiedergabe and Sicherheit are reachable by every user', async ({ page }) => {
@@ -67,7 +91,7 @@ test('the scan status card polls and reflects real backend state', async ({ page
 	// This asserts the rendered text CHANGED from the DOM baseline, rather
 	// than a specific fixed message: `scanState` (src/lib/server/admin/
 	// scanState.ts) is a single in-process singleton shared by the whole
-	// `pnpm preview` server — every e2e spec's requests hit the same process.
+	// `bun run preview` server — every e2e spec's requests hit the same process.
 	// tests/e2e/smoke.e2e.ts (Task 41) legitimately triggers its own real
 	// scans (with real results, not the fixed "not configured" error) as part
 	// of the same shared singleton, and Playwright's default cross-file
