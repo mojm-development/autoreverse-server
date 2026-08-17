@@ -33,36 +33,38 @@ still empty).
 ## Developing
 
 ```sh
-pnpm install
-pnpm db:start           # docker compose up -d postgres (local Postgres)
-pnpm db:push            # sync the Drizzle schema to that database
-pnpm dev                # start the dev server
+bun install
+bun run db:start         # docker compose up -d postgres (local Postgres)
+bun run db:push          # sync the Drizzle schema to that database
+bun run dev              # start the dev server
 ```
 
 ## Building
 
 ```sh
-pnpm build
-pnpm preview             # serve the production build locally
+bun run build
+bun run preview          # serve the production build locally
 ```
 
-`pnpm build` and any `pnpm db:*` command need `DATABASE_URL` set (see `.env.example`);
+`bun run build` and any `bun run db:*` command need `DATABASE_URL` set (see `.env.example`);
 `adapter-node`'s output is a plain Node server, so nothing loads `.env` for you outside `vite
-dev` — export the variables or use a process manager that does.
+dev` — export the variables or use a process manager that does. Note that `bun run` does _not_
+close that gap: bun only auto-loads `.env` for processes it runs itself, and these scripts'
+binaries (`vite`, `drizzle-kit`, `node build`) run under Node.
 
 ## Database
 
 ```sh
-pnpm db:push             # dev schema sync, no migration file
-pnpm db:generate         # create a migration from schema.ts changes
-pnpm db:migrate          # apply migrations
-pnpm db:studio           # Drizzle Studio
+bun run db:push          # dev schema sync, no migration file
+bun run db:generate      # create a migration from schema.ts changes
+bun run db:migrate       # apply migrations
+bun run db:studio        # Drizzle Studio
 ```
 
 ## Tests
 
 ```sh
-pnpm test:unit -- --run  # vitest, single run (needs Docker for the testcontainer-backed suites)
-pnpm test:e2e             # playwright install + playwright test (needs docker compose up -d postgres)
-pnpm test                 # both of the above
+bun run test:unit --run  # vitest, single run (needs Docker for the testcontainer-backed suites)
+bun run test:e2e         # playwright install + playwright test (needs docker compose up -d postgres)
+bun run test             # both of the above
 ```

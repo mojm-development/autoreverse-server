@@ -13,7 +13,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:unit": "vitest",
-		"test": "npm run test:unit -- --run && npm run test:e2e",
+		"test": "bun run test:unit --run && bun run test:e2e",
 		"test:e2e": "playwright install && playwright test",
 		"db:start": "docker compose up",
 		"db:push": "drizzle-kit push",
@@ -21,6 +21,12 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio"
 	},
+	"trustedDependencies": [
+		"cpu-features",
+		"esbuild",
+		"protobufjs",
+		"ssh2"
+	],
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.60.0",

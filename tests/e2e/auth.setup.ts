@@ -10,7 +10,7 @@ const AUTH_FILE = 'playwright/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
 	// Idempotent: the shared dev Postgres used by e2e runs may already have
-	// users from earlier manual `pnpm dev`/review sessions — don't assume a
+	// users from earlier manual `bun dev`/review sessions — don't assume a
 	// clean DB, don't assume `ensureFirstAdmin` fired with this exact name.
 	const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.name, TEST_USER));
 	if (!existing) {

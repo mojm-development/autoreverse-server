@@ -12,7 +12,7 @@ export async function withTestDb<T>(
 	).start();
 	const url = container.getConnectionUri();
 	try {
-		execSync('pnpm drizzle-kit push --force', {
+		execSync('bunx drizzle-kit push --force', {
 			env: { ...process.env, DATABASE_URL: url },
 			stdio: 'inherit'
 		});

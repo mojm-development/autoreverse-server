@@ -1,11 +1,11 @@
-FROM node:22-slim AS build
+FROM oven/bun:1 AS build
 WORKDIR /app
-RUN corepack enable
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts
 COPY . .
-RUN pnpm build
-RUN pnpm prune --prod
+RUN bun run build
+# Prod-only node_modules for the runtime stage (adapter-node's output runs on Node).
+RUN rm -rf node_modules && bun install --frozen-lockfile --production --ignore-scripts
 
 FROM node:22-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
