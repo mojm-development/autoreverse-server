@@ -13,7 +13,8 @@ import {
 	progressMap,
 	itemDurations,
 	searchArtists,
-	playlistOverview
+	playlistOverview,
+	podcastOverview
 } from '../../src/lib/server/library/queries';
 
 describe('aggregate queries', () => {
@@ -150,6 +151,86 @@ describe('aggregate queries', () => {
 			const [overview] = await playlistOverview(db, userId);
 			expect(overview.entryCount).toBe(2);
 			expect(overview.duration).toBe(250);
+		});
+	});
+
+	it('podcastOverview counts as unheard only episodes published since the subscription', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'podcast',
+					title: 'Maschinenraum',
+					sortTitle: 'maschinenraum',
+					feedUrl: 'https://x/feed.xml',
+					addedAt: new Date('2026-03-01T00:00:00Z')
+				})
+				.returning();
+			await db.insert(itemsTable).values([
+				// Back catalogue: in the feed, but not news to this subscriber.
+				{
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'Alt',
+					sortTitle: 'alt',
+					guid: 'old',
+					publishedAt: new Date('2026-02-01T00:00:00Z')
+				},
+				{
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'Neu',
+					sortTitle: 'neu',
+					guid: 'new',
+					publishedAt: new Date('2026-03-05T00:00:00Z')
+				},
+				// No publication date at all — cannot be newer than the subscription.
+				{
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'Undatiert',
+					sortTitle: 'undatiert',
+					guid: 'undated'
+				}
+			]);
+
+			const [row] = await podcastOverview(db, userId);
+			expect(row.episode_count).toBe(3);
+			expect(row.unheard_count).toBe(1);
+		});
+	});
+
+	it('podcastOverview stops counting an episode once it is finished', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'podcast',
+					title: 'Maschinenraum',
+					sortTitle: 'maschinenraum',
+					feedUrl: 'https://x/feed.xml',
+					addedAt: new Date('2026-03-01T00:00:00Z')
+				})
+				.returning();
+			const [episode] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'Neu',
+					sortTitle: 'neu',
+					guid: 'new',
+					publishedAt: new Date('2026-03-05T00:00:00Z')
+				})
+				.returning();
+			await db
+				.insert(progressTable)
+				.values({ userId, itemId: episode.id, position: 999, finished: true });
+
+			const [row] = await podcastOverview(db, userId);
+			expect(row.unheard_count).toBe(0);
 		});
 	});
 }, 60_000);

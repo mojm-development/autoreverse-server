@@ -2,6 +2,7 @@ import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiAdmin } from '$lib/server/auth/session';
 import { refresh, FeedFetchError, InvalidFeedError } from '$lib/server/podcasts/store';
+import { loadConfig } from '$lib/server/config';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
@@ -11,7 +12,9 @@ export async function _podcastRefreshPostHandler(
 ): Promise<Response> {
 	try {
 		await requireApiAdmin(event.locals, db);
-		const podcast = await refresh(db, Number(event.params.id));
+		const { coverDir } = loadConfig(process.env as Record<string, string | undefined>);
+		// Backfills artwork for podcasts subscribed before covers were stored.
+		const podcast = await refresh(db, Number(event.params.id), { coversDir: coverDir });
 		return json({
 			id: podcast.id,
 			title: podcast.title,

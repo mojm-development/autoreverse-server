@@ -24,3 +24,6 @@ vite.config.ts.timestamp-*
 # Playwright
 test-results
 playwright/.auth/
+
+# Runtime data (AUTOREVERSE_DATA): covers, downloaded episodes
+/data

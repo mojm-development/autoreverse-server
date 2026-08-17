@@ -2,11 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { parseFeed } from '../../src/lib/server/podcasts/feed';
 
 const SAMPLE_RSS = `<?xml version="1.0"?>
-<rss version="2.0"><channel>
+<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0"><channel>
 <title>Maschinenraum</title>
+<description>&lt;p&gt;Ein Podcast   über  Technik&lt;/p&gt;</description>
+<itunes:image href="https://example.com/cover (2).jpg"/>
 <item>
   <title>&lt;b&gt;Der lange Weg&lt;/b&gt; zum Netz</title>
   <guid>ep-118</guid>
+  <description>Wie das Netz entstand</description>
+  <itunes:duration>1:02:03</itunes:duration>
   <pubDate>Mon, 01 Jan 2026 10:00:00 GMT</pubDate>
   <enclosure url="https://example.com/118.mp3" type="audio/mpeg" length="123"/>
 </item>
@@ -50,5 +54,40 @@ describe('parseFeed', () => {
 		);
 		const parsed = await parseFeed(emptyTitleRss);
 		expect(parsed.episodes[0].title).toBe('Ohne Titel');
+	});
+
+	it('reads the channel description, HTML-stripped and whitespace-collapsed', async () => {
+		const parsed = await parseFeed(SAMPLE_RSS);
+		expect(parsed.description).toBe('Ein Podcast über Technik');
+	});
+
+	it('prefers <itunes:image> for the feed artwork', async () => {
+		const parsed = await parseFeed(SAMPLE_RSS);
+		expect(parsed.imageUrl).toBe('https://example.com/cover (2).jpg');
+	});
+
+	it('falls back to null for description and artwork when the feed has neither', async () => {
+		const bare = `<?xml version="1.0"?><rss version="2.0"><channel><title>Leer</title></channel></rss>`;
+		const parsed = await parseFeed(bare);
+		expect(parsed.description).toBeNull();
+		expect(parsed.imageUrl).toBeNull();
+	});
+
+	it('normalises <itunes:duration> H:MM:SS to seconds', async () => {
+		const parsed = await parseFeed(SAMPLE_RSS);
+		expect(parsed.episodes[0].durationSeconds).toBe(3723);
+	});
+
+	it('accepts a plain-seconds <itunes:duration> and rejects a malformed one', async () => {
+		const seconds = SAMPLE_RSS.replace('<itunes:duration>1:02:03', '<itunes:duration>930');
+		expect((await parseFeed(seconds)).episodes[0].durationSeconds).toBe(930);
+		const bogus = SAMPLE_RSS.replace('<itunes:duration>1:02:03', '<itunes:duration>eine Stunde');
+		expect((await parseFeed(bogus)).episodes[0].durationSeconds).toBeNull();
+	});
+
+	it('reads an episode description, null when absent', async () => {
+		const parsed = await parseFeed(SAMPLE_RSS);
+		expect(parsed.episodes[0].description).toBe('Wie das Netz entstand');
+		expect(parsed.episodes[1].description).toBeNull();
 	});
 });

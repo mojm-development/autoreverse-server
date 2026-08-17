@@ -3,6 +3,7 @@
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
+	import PodcastRail from '$lib/components/PodcastRail.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -63,25 +64,7 @@
 </script>
 
 <div class="layout" style="--a: var(--podcast)">
-	<div class="rail">
-		<div class="rail-head"><span class="eyebrow">Abos · {data.podcasts.length}</span></div>
-		{#each data.podcasts as podcast (podcast.id)}
-			<!-- eslint-disable svelte/no-navigation-without-resolve -->
-			<a
-				class="entry"
-				href="/library/podcasts/{podcast.id}"
-				aria-current={podcast.id === data.podcast.id}
-			>
-				<span
-					class="cover"
-					style={podcast.cover_path ? `background-image: url(/items/${podcast.id}/cover)` : ''}
-				></span>
-				<span class="name">{podcast.title}</span>
-				<span class="episode-count mono">{podcast.episode_count}</span>
-				{#if podcast.unheard_count > 0}<span class="badge">{podcast.unheard_count}</span>{/if}
-			</a>
-			<!-- eslint-enable svelte/no-navigation-without-resolve -->
-		{/each}
+	<PodcastRail podcasts={data.podcasts} activeId={data.podcast.id}>
 		{#if data.user?.isAdmin}
 			<form
 				class="add-feed"
@@ -94,7 +77,7 @@
 				<button type="submit">Abonnieren</button>
 			</form>
 		{/if}
-	</div>
+	</PodcastRail>
 
 	<div class="content">
 		<div class="hero">
@@ -163,57 +146,6 @@
 	.layout {
 		display: flex;
 		min-height: 100%;
-	}
-	.rail {
-		width: 274px;
-		flex: none;
-		padding: 20px 14px;
-		border-right: 1px solid var(--line);
-	}
-	.rail-head {
-		margin-bottom: 12px;
-	}
-	.entry {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 7px 8px;
-		border-radius: 8px;
-		color: inherit;
-	}
-	.entry:hover,
-	.entry[aria-current='true'] {
-		background: var(--panel);
-	}
-	.cover {
-		width: 32px;
-		height: 32px;
-		flex: none;
-		border-radius: 6px;
-		background: var(--tile);
-		background-size: cover;
-		background-position: center;
-	}
-	.name {
-		flex: 1;
-		min-width: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		font-size: 12.5px;
-	}
-	.episode-count {
-		color: var(--faint);
-		font-size: 10px;
-	}
-	.badge {
-		display: inline-flex;
-		align-items: center;
-		font: 600 10px var(--font-mono);
-		color: var(--bg);
-		background: var(--a);
-		padding: 2px 5px;
-		border-radius: 99px;
 	}
 	.add-feed {
 		margin-top: 14px;

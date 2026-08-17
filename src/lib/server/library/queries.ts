@@ -281,7 +281,13 @@ export async function podcastOverview(db: DrizzleDb, userId: number) {
 	const rows = await db.execute(sql`
 		SELECT podcast.*,
 		       count(episode.id)::int AS episode_count,
-		       count(episode.id) FILTER (WHERE progress.item_id IS NULL OR progress.finished = false)::int AS unheard_count
+		       -- Only episodes published since the subscription: a feed with a
+		       -- 400-episode back catalogue would otherwise report all 400 as
+		       -- "unheard" the second it is subscribed, which says nothing.
+		       count(episode.id) FILTER (
+		           WHERE (progress.item_id IS NULL OR progress.finished = false)
+		             AND episode.published_at >= podcast.added_at
+		       )::int AS unheard_count
 		FROM items AS podcast
 		LEFT JOIN items AS episode ON episode.parent_id = podcast.id
 		LEFT JOIN progress ON progress.item_id = episode.id AND progress.user_id = ${userId}

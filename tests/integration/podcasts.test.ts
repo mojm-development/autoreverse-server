@@ -37,6 +37,50 @@ describe('podcasts store', () => {
 		});
 	});
 
+	it('subscribe stores the feed artwork under the covers dir and points cover_path at it', async () => {
+		const FEED_WITH_ART = FEED.replace(
+			'<channel><title>Maschinenraum</title>',
+			'<channel><title>Maschinenraum</title><itunes:image href="https://x/art.png"/>'
+		).replace(
+			'<rss version="2.0">',
+			'<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">'
+		);
+		// A Uint8Array built from a literal owns its ArrayBuffer; Buffer.from(...).buffer
+		// would hand out Node's shared pool, whose leading bytes are not the PNG magic.
+		const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockImplementation(async (input: unknown) => {
+				const url = String(input);
+				if (url.endsWith('art.png')) return { ok: true, arrayBuffer: async () => png.buffer };
+				return { ok: true, text: async () => FEED_WITH_ART };
+			})
+		);
+		const coversDir = mkdtempSync(join(tmpdir(), 'covers-'));
+		await withTestDb(async (db) => {
+			const podcast = await subscribe(db, 'https://x/feed.xml', { coversDir });
+			expect(podcast.coverPath).toBe(join(coversDir, `${podcast.id}.png`));
+			const [row] = await db.select().from(itemsTable).where(eq(itemsTable.id, podcast.id));
+			expect(row.coverPath).toBe(podcast.coverPath);
+		});
+	});
+
+	it('subscribe still succeeds when the artwork cannot be fetched', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockImplementation(async (input: unknown) => {
+				if (String(input).endsWith('art.png')) throw new Error('network down');
+				return { ok: true, text: async () => FEED };
+			})
+		);
+		const coversDir = mkdtempSync(join(tmpdir(), 'covers-'));
+		await withTestDb(async (db) => {
+			const podcast = await subscribe(db, 'https://x/feed.xml', { coversDir });
+			expect(podcast.id).toBeGreaterThan(0);
+			expect(podcast.coverPath).toBeNull();
+		});
+	});
+
 	it('subscribe rejects with InvalidFeedError when the fetched body is not parseable RSS/Atom', async () => {
 		vi.stubGlobal(
 			'fetch',

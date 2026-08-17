@@ -1,4 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+	import { replaceState } from '$app/navigation';
+	import { page } from '$app/state';
+
 	type Result = {
 		name: string;
 		author: string | null;
@@ -7,21 +12,56 @@
 		episode_count: number | null;
 	};
 
-	let { onSubscribed }: { onSubscribed: () => void } = $props();
+	let { onSubscribed, initialQuery = '' }: { onSubscribed: () => void; initialQuery?: string } =
+		$props();
 
+	// Starts empty and is filled on mount: reading the prop during init would
+	// capture only its first value (svelte state_referenced_locally), and the
+	// query is a one-time seed anyway.
 	let query = $state('');
 	let results = $state<Result[]>([]);
 	let loading = $state(false);
 	let subscribing = $state<string | null>(null);
+	// feed_url -> new podcast id, so a subscribed row turns into a link to it
+	// instead of throwing the user out of their search results.
+	let subscribed = $state<Record<string, number>>({});
 	let error = $state('');
 	let searched = $state(false);
+
+	// url() must be quoted: podcast artwork filenames routinely contain
+	// parentheses and spaces, which silently break an unquoted CSS url().
+	function coverStyle(url: string | null): string {
+		if (!url) return '';
+		const safe = url.replaceAll('\\', '%5C').replaceAll('"', '%22');
+		return `background-image: url("${safe}")`;
+	}
+
+	// Restores the result list when the page is entered with ?q= already set —
+	// returning from a preview, a reload, or someone else's link.
+	onMount(() => {
+		if (!initialQuery.trim()) return;
+		query = initialQuery;
+		void search();
+	});
+
+	/** Mirrors the current query into ?q= without re-running load(): the search
+	 *  itself is a client-side fetch, so a full navigation would be wasted work. */
+	function syncUrl() {
+		if (!browser) return;
+		const url = new URL(page.url);
+		if (query.trim()) url.searchParams.set('q', query);
+		else url.searchParams.delete('q');
+		replaceState(url, page.state);
+	}
 
 	async function search() {
 		if (!query.trim()) {
 			results = [];
 			searched = false;
+			syncUrl();
 			return;
 		}
+		syncUrl();
 		loading = true;
 		error = '';
 		try {
@@ -50,14 +90,14 @@
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ feed_url: feedUrl })
 			});
+			const body = await res.json().catch(() => ({}));
 			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
 				error = body.detail ?? 'Abonnieren fehlgeschlagen.';
 				return;
 			}
-			query = '';
-			results = [];
-			searched = false;
+			// Query and results stay exactly as they were — subscribing to one
+			// show is no reason to lose the list you were working through.
+			subscribed = { ...subscribed, [feedUrl]: body.id };
 			onSubscribed();
 		} finally {
 			subscribing = null;
@@ -85,20 +125,35 @@
 		<ul class="results">
 			{#each results as r (r.feed_url)}
 				<li>
-					<span class="cover" style={r.artwork_url ? `background-image:url(${r.artwork_url})` : ''}
-					></span>
-					<span class="meta">
-						<span class="name">{r.name}</span>
-						{#if r.author}<span class="author">{r.author}</span>{/if}
-					</span>
-					<button
-						type="button"
-						class="secondary small"
-						disabled={subscribing === r.feed_url}
-						onclick={() => subscribe(r.feed_url)}
+					<a
+						class="open"
+						href="/library/podcasts/preview?feed={encodeURIComponent(
+							r.feed_url
+						)}&q={encodeURIComponent(query)}"
 					>
-						{subscribing === r.feed_url ? '…' : 'Abonnieren'}
-					</button>
+						<span class="cover" style={coverStyle(r.artwork_url)}></span>
+						<span class="meta">
+							<span class="name">{r.name}</span>
+							{#if r.author}<span class="author">{r.author}</span>{/if}
+							{#if r.episode_count !== null}
+								<span class="episodes mono">{r.episode_count} Folgen</span>
+							{/if}
+						</span>
+					</a>
+					{#if subscribed[r.feed_url]}
+						<a class="secondary small subscribed" href="/library/podcasts/{subscribed[r.feed_url]}">
+							Abonniert ✓
+						</a>
+					{:else}
+						<button
+							type="button"
+							class="secondary small"
+							disabled={subscribing === r.feed_url}
+							onclick={() => subscribe(r.feed_url)}
+						>
+							{subscribing === r.feed_url ? '…' : 'Abonnieren'}
+						</button>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -115,7 +170,9 @@
 	}
 	.search-form {
 		display: flex;
-		gap: 6px;
+		gap: 8px;
+		max-width: 460px;
+		font-size: 14px;
 	}
 	.search-form input {
 		flex: 1;
@@ -133,43 +190,64 @@
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		max-height: 280px;
-		overflow-y: auto;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+		gap: 10px;
 	}
 	.results li {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 4px;
-		border-radius: var(--radius-sm);
+		gap: 12px;
+		padding: 10px;
+		border-radius: var(--radius-md, 8px);
+		border: 1px solid transparent;
 	}
 	.results li:hover {
 		background: var(--panel);
+		border-color: var(--line);
 	}
 	.cover {
-		width: 32px;
-		height: 32px;
+		width: 104px;
+		height: 104px;
 		flex: none;
-		border-radius: 6px;
+		border-radius: 10px;
 		background: var(--tile) center/cover;
+	}
+	.open {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		color: inherit;
 	}
 	.meta {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
+		gap: 3px;
 	}
 	.name {
-		font-size: 12px;
+		font: 500 17px/1.35 var(--font-sans);
+		/* Three lines rather than one hard-truncated line: podcast titles are long
+		   and the first few words are rarely enough to tell two shows apart.
+		   Three lines of this size still fit beside the 104px cover. */
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		overflow: hidden;
+	}
+	.author {
+		font-size: 14px;
+		color: var(--dim);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.author {
-		font-size: 10.5px;
+	.episodes {
+		font-size: 12.5px;
 		color: var(--faint);
 		white-space: nowrap;
 		overflow: hidden;
@@ -177,8 +255,13 @@
 	}
 	.secondary.small {
 		flex: none;
-		height: 26px;
-		padding: 0 10px;
-		font-size: 11px;
+		height: 36px;
+		padding: 0 18px;
+		font-size: 14px;
+	}
+	.subscribed {
+		display: inline-flex;
+		align-items: center;
+		white-space: nowrap;
 	}
 </style>

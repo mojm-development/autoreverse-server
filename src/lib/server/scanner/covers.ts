@@ -58,10 +58,21 @@ export async function extractEmbedded(
 	}
 	if (!picture) return null;
 
+	return writeCoverBytes(coversDir, itemId, picture);
+}
+
+/** Writes cover bytes to `{coversDir}/{itemId}.{ext}`, extension sniffed from the
+ * magic bytes, atomically via a `.part` temp file + rename. Shared by embedded-art
+ * extraction and podcast feed artwork. */
+export async function writeCoverBytes(
+	coversDir: string,
+	itemId: number,
+	data: Buffer
+): Promise<string> {
 	await mkdir(coversDir, { recursive: true });
-	const destination = join(coversDir, `${itemId}${sniffSuffix(picture)}`);
+	const destination = join(coversDir, `${itemId}${sniffSuffix(data)}`);
 	const temp = `${destination}.part`;
-	await writeFile(temp, picture);
+	await writeFile(temp, data);
 	await rename(temp, destination);
 	return destination;
 }

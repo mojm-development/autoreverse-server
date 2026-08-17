@@ -1,6 +1,7 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable } from '../db/schema';
 import { parseFeed } from './feed';
+import { writeCoverBytes } from '../scanner/covers';
 import { relative, resolve } from 'node:path';
 import { unlink } from 'node:fs/promises';
 import type { DrizzleDb } from '../db';
@@ -58,7 +59,43 @@ async function syncEpisodes(
 	return { newEpisodes, updatedEpisodes };
 }
 
-export async function subscribe(db: DrizzleDb, feedUrl: string) {
+/** Fetches and parses a feed without writing anything — backs the subscribe preview,
+ *  which shows what a feed contains before the user commits to it. */
+export async function previewFeed(feedUrl: string) {
+	const raw = await fetchFeedText(feedUrl);
+	try {
+		return await parseFeed(raw);
+	} catch (e: unknown) {
+		throw new InvalidFeedError(e instanceof Error ? e.message : String(e));
+	}
+}
+
+const MAX_COVER_BYTES = 5_000_000;
+
+/** Downloads the feed artwork into the covers directory and points the podcast row
+ *  at it. Best-effort: artwork is decoration, so nothing here may fail a subscribe. */
+async function storeFeedCover(
+	db: DrizzleDb,
+	podcastId: number,
+	imageUrl: string,
+	coversDir: string
+): Promise<string | null> {
+	try {
+		const url = new URL(imageUrl);
+		if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+		const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+		if (!response.ok) return null;
+		const bytes = Buffer.from(await response.arrayBuffer());
+		if (bytes.length === 0 || bytes.length > MAX_COVER_BYTES) return null;
+		const path = await writeCoverBytes(coversDir, podcastId, bytes);
+		await db.update(itemsTable).set({ coverPath: path }).where(eq(itemsTable.id, podcastId));
+		return path;
+	} catch {
+		return null;
+	}
+}
+
+export async function subscribe(db: DrizzleDb, feedUrl: string, opts: { coversDir?: string } = {}) {
 	const raw = await fetchFeedText(feedUrl);
 	let parsed: Awaited<ReturnType<typeof parseFeed>>;
 	try {
@@ -88,10 +125,14 @@ export async function subscribe(db: DrizzleDb, feedUrl: string) {
 	}
 	const { newEpisodes, updatedEpisodes } = await syncEpisodes(db, podcast.id, parsed.episodes);
 	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
-	return { ...podcast, newEpisodes, updatedEpisodes };
+	let coverPath = podcast.coverPath;
+	if (opts.coversDir && !coverPath && parsed.imageUrl) {
+		coverPath = await storeFeedCover(db, podcast.id, parsed.imageUrl, opts.coversDir);
+	}
+	return { ...podcast, coverPath, newEpisodes, updatedEpisodes };
 }
 
-export async function refresh(db: DrizzleDb, podcastId: number) {
+export async function refresh(db: DrizzleDb, podcastId: number, opts: { coversDir?: string } = {}) {
 	// kind-scoped: without this, POST /podcasts/{a-book-id}/refresh would read a
 	// non-podcast item's (null) feedUrl — the same bug class Task 25 already
 	// fixed for downloadEpisode (see download.ts).
@@ -109,7 +150,11 @@ export async function refresh(db: DrizzleDb, podcastId: number) {
 	}
 	const { newEpisodes, updatedEpisodes } = await syncEpisodes(db, podcast.id, parsed.episodes);
 	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
-	return { ...podcast, newEpisodes, updatedEpisodes };
+	let coverPath = podcast.coverPath;
+	if (opts.coversDir && !coverPath && parsed.imageUrl) {
+		coverPath = await storeFeedCover(db, podcast.id, parsed.imageUrl, opts.coversDir);
+	}
+	return { ...podcast, coverPath, newEpisodes, updatedEpisodes };
 }
 
 function isInside(path: string, root: string): boolean {

@@ -1,34 +1,28 @@
 <script lang="ts">
 	import PodcastSearch from '$lib/components/PodcastSearch.svelte';
+	import PodcastRail from '$lib/components/PodcastRail.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 </script>
 
 <div class="layout" style="--a: var(--podcast)">
-	<div class="rail">
-		<div class="rail-head">
-			<span class="eyebrow">Abos · {data.podcasts.length}</span>
-		</div>
-		{#each data.podcasts as podcast (podcast.id)}
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-			<a class="entry" href="/library/podcasts/{podcast.id}">
-				<span
-					class="cover"
-					style={podcast.cover_path ? `background-image: url(/items/${podcast.id}/cover)` : ''}
-				></span>
-				<span class="name">{podcast.title}</span>
-				<span class="episode-count mono">{podcast.episode_count}</span>
-				{#if podcast.unheard_count > 0}<span class="badge">{podcast.unheard_count}</span>{/if}
-			</a>
-		{/each}
-		{#if data.user?.isAdmin}
-			<div class="add-feed">
-				<PodcastSearch onSubscribed={() => location.reload()} />
-			</div>
-		{/if}
-	</div>
+	<PodcastRail podcasts={data.podcasts} />
 	<div class="content">
-		<p class="empty">Wähle einen Podcast aus der Liste.</p>
+		{#if data.podcasts.length > 0}
+			<p class="empty">Wähle einen Podcast aus der Liste.</p>
+		{:else}
+			<p class="empty">Noch keine Podcast-Abos.</p>
+		{/if}
+		{#if data.user?.isAdmin}
+			<!-- The search lives out here, not in the 274px rail: its results are
+				 cover + title + author + button per row, which needs room to be
+				 readable at all. -->
+			<section class="add-feed">
+				<h2>Podcast abonnieren</h2>
+				<PodcastSearch initialQuery={data.query} onSubscribed={() => invalidateAll()} />
+			</section>
+		{/if}
 	</div>
 </div>
 
@@ -37,64 +31,19 @@
 		display: flex;
 		min-height: 100%;
 	}
-	.rail {
-		width: 274px;
-		flex: none;
-		padding: 20px 14px;
-		border-right: 1px solid var(--line);
-	}
-	.rail-head {
-		margin-bottom: 12px;
-	}
-	.entry {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 7px 8px;
-		border-radius: 8px;
-		color: inherit;
-	}
-	.entry:hover {
-		background: var(--panel);
-	}
-	.cover {
-		width: 32px;
-		height: 32px;
-		flex: none;
-		border-radius: 6px;
-		background: var(--tile);
-		background-size: cover;
-		background-position: center;
-	}
-	.name {
-		flex: 1;
-		min-width: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		font-size: 12.5px;
-	}
-	.episode-count {
-		color: var(--faint);
-		font-size: 10px;
-	}
-	.badge {
-		display: inline-flex;
-		align-items: center;
-		font: 600 10px var(--font-mono);
-		color: var(--bg);
-		background: var(--a);
-		padding: 2px 5px;
-		border-radius: 99px;
-	}
 	.add-feed {
-		margin-top: 14px;
-		padding: 10px;
-		border: 1px dashed var(--line-strong);
-		border-radius: 8px;
+		margin-top: 28px;
+		padding-top: 20px;
+		border-top: 1px solid var(--line);
+		max-width: 1100px;
+	}
+	.add-feed h2 {
+		font: 600 15px var(--font-sans);
+		margin-bottom: 12px;
 	}
 	.content {
 		flex: 1;
+		min-width: 0;
 		padding: 24px 32px;
 	}
 	.empty {
