@@ -1,17 +1,7 @@
 <script lang="ts">
+	import PodcastSearch from '$lib/components/PodcastSearch.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
-	let feedUrl = $state('');
-
-	async function subscribe() {
-		await fetch('/podcasts', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ feed_url: feedUrl })
-		});
-		feedUrl = '';
-		location.reload();
-	}
 </script>
 
 <div class="layout" style="--a: var(--podcast)">
@@ -32,16 +22,9 @@
 			</a>
 		{/each}
 		{#if data.user?.isAdmin}
-			<form
-				class="add-feed"
-				onsubmit={(e) => {
-					e.preventDefault();
-					subscribe();
-				}}
-			>
-				<input type="url" bind:value={feedUrl} placeholder="Feed-URL hinzufügen" required />
-				<button type="submit">Abonnieren</button>
-			</form>
+			<div class="add-feed">
+				<PodcastSearch onSubscribed={() => location.reload()} />
+			</div>
 		{/if}
 	</div>
 	<div class="content">
@@ -109,26 +92,6 @@
 		padding: 10px;
 		border: 1px dashed var(--line-strong);
 		border-radius: 8px;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-	.add-feed input {
-		height: 30px;
-		padding: 0 8px;
-		border-radius: 6px;
-		background: var(--panel);
-		border: 1px solid var(--line);
-		color: var(--text);
-		font-size: 12px;
-	}
-	.add-feed button {
-		height: 28px;
-		border-radius: 6px;
-		border: none;
-		background: var(--a);
-		color: var(--bg);
-		font: 500 12px var(--font-sans);
 	}
 	.content {
 		flex: 1;
