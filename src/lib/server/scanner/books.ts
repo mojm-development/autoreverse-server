@@ -25,17 +25,12 @@ export interface ScannedItem {
 	albumArtist?: string | null;
 	series?: string | null;
 	year?: number | null;
-	seriesIndex: null; // never derived — matches the Python scanner exactly (DB column exists, never written)
+	seriesIndex: null;
 	tracks: ScannedTrack[];
 	chapters: Chapter[];
 	unchanged: boolean;
 }
 
-/** Enumerates every directory under root (including root itself), using a
- * manual recursive readdir (Node's fs has no os.walk equivalent) — matches
- * the Python scanner's deliberate choice of os.walk over glob/rglob for
- * permission fidelity; Node's readdir/stat pairing has the same property
- * (a stat failure on one entry doesn't abort the sibling scan). */
 export async function allDirectories(root: string): Promise<string[]> {
 	const found: string[] = [root];
 	async function walk(dir: string) {
@@ -70,9 +65,6 @@ async function audioFilesIn(dir: string): Promise<string[]> {
 		.sort();
 }
 
-/** One folder that could not be scanned or stored, with the reason. Collected
- * instead of thrown: a single unreadable album must not cost the operator the
- * other several thousand. */
 export interface ScanFailure {
 	path: string;
 	message: string;
@@ -86,13 +78,6 @@ function reason(e: unknown): string {
 	return e instanceof Error ? e.message : String(e);
 }
 
-/** Why a library root cannot be scanned, or null if it can be.
- *
- * allDirectories and audioFilesIn both swallow readdir failures so that one
- * bad subfolder doesn't abort its siblings. Applied to the root itself that
- * turns "the mount is gone" into "the library is empty" — indistinguishable
- * from a genuinely empty library, and the caller must tell them apart before
- * markMissing empties the database on the strength of it. */
 export async function libraryRootProblem(root: string): Promise<string | null> {
 	let stats;
 	try {
@@ -116,16 +101,6 @@ export interface RawTrack {
 	size: number;
 }
 
-/** Orders a folder's files and numbers them 1..n.
- *
- * The number stored is the folder's own ordering, NOT the file's track tag.
- * Track tags repeat constantly — loose singles each tagged track 1, a
- * two-disc album living in one folder, a folder mixing tagged and untagged
- * files — and UNIQUE(item_id, position) turns every repeat into a failed
- * insert that aborts the whole scan pass. Ordering still follows disc then
- * track, so the sequence a listener sees is unchanged; only the number
- * behind it is ours. Nothing renders it: queries.ts uses position purely
- * to ORDER BY. */
 export function orderTracks(raw: RawTrack[], fileOrder: string[]): ScannedTrack[] {
 	const fallback = (path: string) => fileOrder.indexOf(path) + 1;
 	const sorted = [...raw].sort(
@@ -163,7 +138,7 @@ export async function scanFolder(
 	const dirPrefix = `${dir}${sep}`;
 	const knownPathsInFolder = Object.keys(known).filter((k) => {
 		if (!k.startsWith(dirPrefix)) return false;
-		return !k.slice(dirPrefix.length).includes(sep); // direct child only, matches audioFilesIn's own non-recursive semantics
+		return !k.slice(dirPrefix.length).includes(sep);
 	});
 	const unchanged =
 		knownForFolder &&
@@ -245,11 +220,6 @@ export async function scanFolder(
 	};
 }
 
-/** Walks root and scans every folder in it, isolating failures per folder.
- * scanFolder touches the filesystem and the tag reader at every step, so a
- * single unreadable file used to abort the entire pass — the caller got an
- * exception and no items at all, however many folders had already scanned
- * cleanly. */
 export async function scanTree(
 	root: string,
 	kind: 'book' | 'album',

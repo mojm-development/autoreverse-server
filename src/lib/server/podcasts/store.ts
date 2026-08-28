@@ -50,7 +50,7 @@ async function syncEpisodes(
 				title: episode.title,
 				sortTitle: episode.title.toLowerCase(),
 				guid: episode.guid,
-				feedUrl: episode.mediaUrl, // repurposed on episode rows to hold the media/enclosure URL, not a feed address
+				feedUrl: episode.mediaUrl,
 				publishedAt: episode.publishedAt
 			});
 			newEpisodes += 1;
@@ -59,8 +59,6 @@ async function syncEpisodes(
 	return { newEpisodes, updatedEpisodes };
 }
 
-/** Fetches and parses a feed without writing anything — backs the subscribe preview,
- *  which shows what a feed contains before the user commits to it. */
 export async function previewFeed(feedUrl: string) {
 	const raw = await fetchFeedText(feedUrl);
 	try {
@@ -72,8 +70,6 @@ export async function previewFeed(feedUrl: string) {
 
 const MAX_COVER_BYTES = 5_000_000;
 
-/** Downloads the feed artwork into the covers directory and points the podcast row
- *  at it. Best-effort: artwork is decoration, so nothing here may fail a subscribe. */
 async function storeFeedCover(
 	db: DrizzleDb,
 	podcastId: number,
@@ -133,9 +129,6 @@ export async function subscribe(db: DrizzleDb, feedUrl: string, opts: { coversDi
 }
 
 export async function refresh(db: DrizzleDb, podcastId: number, opts: { coversDir?: string } = {}) {
-	// kind-scoped: without this, POST /podcasts/{a-book-id}/refresh would read a
-	// non-podcast item's (null) feedUrl — the same bug class Task 25 already
-	// fixed for downloadEpisode (see download.ts).
 	const [podcast] = await db
 		.select()
 		.from(itemsTable)
@@ -163,14 +156,11 @@ function isInside(path: string, root: string): boolean {
 }
 
 export async function unsubscribe(db: DrizzleDb, podcastId: number, podcastsDir: string) {
-	// Episode count is independent of download state — most episodes never get downloaded,
-	// so this can't be derived from trackedPaths below (which only covers downloaded ones).
 	const episodeRows = await db
 		.select({ id: itemsTable.id })
 		.from(itemsTable)
 		.where(and(eq(itemsTable.parentId, podcastId), eq(itemsTable.kind, 'episode')));
 
-	// Capture track paths BEFORE the delete — nothing to read them from after.
 	const trackedPaths = await db
 		.select({ path: tracksTable.path })
 		.from(tracksTable)
@@ -194,7 +184,7 @@ export async function unsubscribe(db: DrizzleDb, podcastId: number, podcastsDir:
 			await unlink(path);
 			filesDeleted += 1;
 		} catch {
-			filesKept += 1; // swallowed — the subscription is gone regardless of file cleanup
+			filesKept += 1;
 		}
 	}
 	return { episodes: episodeRows.length, filesDeleted, filesKept };

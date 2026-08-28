@@ -5,15 +5,6 @@ import type { LoginThrottle } from './throttle';
 import type { Semaphore } from './semaphore';
 import type { DrizzleDb } from '../db';
 
-/**
- * Exact port of capstan/src/capstan/api/auth.py::perform_login. Ordering is
- * load-bearing: semaphore acquired non-blocking FIRST (before touching the
- * throttle at all — acquiring throttle-first would record a failed attempt
- * even for requests only rejected due to concurrency pressure), throttle
- * checked+recorded INSIDE the semaphore-held section and BEFORE the argon2
- * call (closes the check-then-record race), semaphore released in `finally`
- * around the whole throttle+authenticate block on every exit path.
- */
 export async function performLogin(
 	db: DrizzleDb,
 	throttle: LoginThrottle,

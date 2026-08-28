@@ -4,8 +4,6 @@ import { readdir, writeFile, rename, mkdir } from 'node:fs/promises';
 const NAMES = ['cover', 'folder', 'front', 'album', 'albumart'];
 const SUFFIXES = ['.jpg', '.jpeg', '.png', '.webp'];
 
-/** File-in-folder cover, checked before any embedded artwork — direct port
- * of scanner/covers.py::find_cover_file's nested name-then-suffix priority. */
 export async function findCoverFile(dir: string): Promise<string | null> {
 	let entries: { name: string; isFile: () => boolean }[];
 	try {
@@ -39,9 +37,6 @@ function sniffSuffix(data: Buffer): string {
 	return '.bin';
 }
 
-/** Extracts embedded artwork (FLAC picture / ID3 APIC / MP4 covr) from a
- * track and writes it to `{coversDir}/{itemId}.{ext}`, atomically via a
- * `.part` temp file + rename — direct port of scanner/covers.py::extract_embedded. */
 export async function extractEmbedded(
 	trackPath: string,
 	coversDir: string,
@@ -61,9 +56,6 @@ export async function extractEmbedded(
 	return writeCoverBytes(coversDir, itemId, picture);
 }
 
-/** Writes cover bytes to `{coversDir}/{itemId}.{ext}`, extension sniffed from the
- * magic bytes, atomically via a `.part` temp file + rename. Shared by embedded-art
- * extraction and podcast feed artwork. */
 export async function writeCoverBytes(
 	coversDir: string,
 	itemId: number,

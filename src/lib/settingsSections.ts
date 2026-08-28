@@ -1,10 +1,3 @@
-/**
- * The settings sections, shared by the settings subnav (+layout.svelte) and the
- * /settings overview page — one list so the two can't drift apart when a section
- * is added, renamed or re-gated. `admin` mirrors ADMIN_ONLY in +layout.server.ts,
- * which is what actually enforces the restriction; this flag only decides whether
- * a link is rendered at all.
- */
 export const SETTINGS_SECTIONS = [
 	{
 		href: '/settings/libraries',

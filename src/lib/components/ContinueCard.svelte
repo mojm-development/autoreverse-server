@@ -17,8 +17,6 @@
 		href: string;
 	} = $props();
 
-	// $derived (not a plain const) so `accent` tracks live updates to the
-	// `kind` prop rather than capturing only its initial value.
 	const accent = $derived(kind === 'episode' ? 'podcast' : kind);
 </script>
 

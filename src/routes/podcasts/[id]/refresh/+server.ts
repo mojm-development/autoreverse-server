@@ -13,7 +13,6 @@ export async function _podcastRefreshPostHandler(
 	try {
 		await requireApiAdmin(event.locals, db);
 		const { coverDir } = loadConfig(process.env as Record<string, string | undefined>);
-		// Backfills artwork for podcasts subscribed before covers were stored.
 		const podcast = await refresh(db, Number(event.params.id), { coversDir: coverDir });
 		return json({
 			id: podcast.id,

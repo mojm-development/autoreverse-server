@@ -5,8 +5,6 @@
 	let showLog = $state(false);
 	let interval: ReturnType<typeof setInterval> | null = null;
 
-	// A scan moves in seconds, so 4s is too coarse to watch and too eager to
-	// keep up once nothing is happening. Poll briskly only while one runs.
 	const RUNNING_MS = 1000;
 	const IDLE_MS = 5000;
 	let period = $state(IDLE_MS);
@@ -59,8 +57,6 @@
 	const report = $derived(status?.last_report as Counts | null);
 	const progress = $derived(status?.progress as Progress | null);
 
-	// Null total means the phase is still counting its work — the bar goes
-	// indeterminate rather than sitting at a dishonest 0 %.
 	const determinate = $derived(Boolean(progress?.total));
 	const percent = $derived(
 		progress?.total
@@ -70,17 +66,10 @@
 	const phaseLabel = $derived(
 		progress?.phase === 'storing' ? 'Wird gespeichert' : 'Ordner werden gelesen'
 	);
-	// Just the last segment: the full path is in the log, and the point here is
-	// only which of the two libraries is being worked on.
 	const rootLabel = $derived(
 		progress?.root ? progress.root.replace(/\/+$/, '').split('/').pop() : null
 	);
-	// While running the live counts win; afterwards the finished report stands.
-	// progress is null for the moment between the POST and runScan filling it in;
-	// falling back to the previous report keeps the row from flickering out.
 	const counts = $derived<Counts | null>(running ? (progress ?? report) : report);
-	// Assembled here rather than from markup fragments: separators between
-	// optional parts produce stray whitespace text nodes in the template.
 	const statLine = $derived(
 		[
 			phaseLabel,
@@ -163,8 +152,6 @@
 		border-radius: inherit;
 		transition: width 240ms ease-out;
 	}
-	/* Work of unknown length: a fixed slice sweeping the track, so the bar says
-	   "busy" instead of implying a fraction nobody has counted yet. */
 	.bar.indeterminate .fill {
 		width: 35%;
 		transition: none;

@@ -1,11 +1,5 @@
 import { ApiError } from './errors';
 
-/**
- * Parses a JSON request body, throwing a Ruling-8 `ApiError(422, ...)` on
- * malformed/empty bodies instead of letting `SyntaxError` bubble up as an
- * unhandled 500. Use in place of a bare `await request.json()` in every
- * route handler.
- */
 export async function readJson<T = unknown>(request: Request): Promise<T> {
 	try {
 		return (await request.json()) as T;
@@ -14,10 +8,6 @@ export async function readJson<T = unknown>(request: Request): Promise<T> {
 	}
 }
 
-/**
- * Reads an integer query param, applying the ground truth's `Query(ge=…, le=…)`
- * semantics: missing -> default, out-of-range/non-numeric -> 422 (not a silent clamp).
- */
 export function intParam(
 	url: URL,
 	name: string,

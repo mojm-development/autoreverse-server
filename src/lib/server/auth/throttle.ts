@@ -1,12 +1,9 @@
-// Direct port of capstan/src/capstan/users/throttle.py's LoginThrottle.
-// Sliding window per key (lowercased username), in-memory, single-process —
-// same tradeoff as the Python original (documented there, not revisited here).
 const LIMIT = 10;
 const WINDOW_SECONDS = 300;
 const MAX_KEYS = 10_000;
 
 export class LoginThrottle {
-	private failures = new Map<string, number[]>(); // insertion order == Map iteration order, mirrors OrderedDict
+	private failures = new Map<string, number[]>();
 	private readonly limit: number;
 	private readonly windowSeconds: number;
 	private readonly maxKeys: number;
@@ -44,15 +41,14 @@ export class LoginThrottle {
 		const isNewKey = !this.failures.has(key);
 		if (isNewKey && this.failures.size >= this.maxKeys) {
 			this.evictExpired();
-			if (this.failures.size >= this.maxKeys) return; // fail-open: attempt not recorded
+			if (this.failures.size >= this.maxKeys) return;
 		}
 		const timestamps = this.failures.get(key) ?? [];
 		timestamps.push(timestamp);
-		this.failures.delete(key); // re-insert to move to end (Map preserves insertion order)
+		this.failures.delete(key);
 		this.failures.set(key, timestamps);
 	}
 
-	/** Returns null if allowed (and records this attempt); otherwise remaining lockout seconds. */
 	checkAndRecordAttempt(key: string): number | null {
 		const timestamps = this.prune(key);
 		if (timestamps.length >= this.limit) {

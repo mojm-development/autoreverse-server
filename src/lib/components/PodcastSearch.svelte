@@ -15,37 +15,26 @@
 	let { onSubscribed, initialQuery = '' }: { onSubscribed: () => void; initialQuery?: string } =
 		$props();
 
-	// Starts empty and is filled on mount: reading the prop during init would
-	// capture only its first value (svelte state_referenced_locally), and the
-	// query is a one-time seed anyway.
 	let query = $state('');
 	let results = $state<Result[]>([]);
 	let loading = $state(false);
 	let subscribing = $state<string | null>(null);
-	// feed_url -> new podcast id, so a subscribed row turns into a link to it
-	// instead of throwing the user out of their search results.
 	let subscribed = $state<Record<string, number>>({});
 	let error = $state('');
 	let searched = $state(false);
 
-	// url() must be quoted: podcast artwork filenames routinely contain
-	// parentheses and spaces, which silently break an unquoted CSS url().
 	function coverStyle(url: string | null): string {
 		if (!url) return '';
 		const safe = url.replaceAll('\\', '%5C').replaceAll('"', '%22');
 		return `background-image: url("${safe}")`;
 	}
 
-	// Restores the result list when the page is entered with ?q= already set —
-	// returning from a preview, a reload, or someone else's link.
 	onMount(() => {
 		if (!initialQuery.trim()) return;
 		query = initialQuery;
 		void search();
 	});
 
-	/** Mirrors the current query into ?q= without re-running load(): the search
-	 *  itself is a client-side fetch, so a full navigation would be wasted work. */
 	function syncUrl() {
 		if (!browser) return;
 		const url = new URL(page.url);
@@ -95,8 +84,6 @@
 				error = body.detail ?? 'Abonnieren fehlgeschlagen.';
 				return;
 			}
-			// Query and results stay exactly as they were — subscribing to one
-			// show is no reason to lose the list you were working through.
 			subscribed = { ...subscribed, [feedUrl]: body.id };
 			onSubscribed();
 		} finally {
@@ -230,9 +217,6 @@
 	}
 	.name {
 		font: 500 17px/1.35 var(--font-sans);
-		/* Three lines rather than one hard-truncated line: podcast titles are long
-		   and the first few words are rarely enough to tell two shows apart.
-		   Three lines of this size still fit beside the 104px cover. */
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 3;

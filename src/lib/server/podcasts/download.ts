@@ -24,7 +24,7 @@ export async function downloadEpisode(
 		.from(itemsTable)
 		.where(and(eq(itemsTable.id, episodeId), eq(itemsTable.kind, 'episode')));
 	if (!episode) throw new Error('not found');
-	const mediaUrl = episode.feedUrl; // repurposed field on episode rows
+	const mediaUrl = episode.feedUrl;
 	if (!mediaUrl) throw new EpisodeNotDownloadableError('Keine Audiodatei in diesem Feed-Eintrag');
 
 	const destination = destinationFor(podcastsDir, episodeId, mediaUrl);

@@ -12,8 +12,6 @@ import {
 	InvalidFeedError
 } from '$lib/server/podcasts/store';
 
-/** Only http(s) — the feed URL arrives from a query string, and previewFeed()
- *  passes it straight to fetch(), so file:/data: URLs must not get that far. */
 function validFeedUrl(raw: string | null): string {
 	if (!raw) throw error(400, 'Keine Feed-Adresse angegeben');
 	let parsed: URL;
@@ -38,8 +36,6 @@ async function subscribedId(feedUrl: string): Promise<number | null> {
 export const load = async ({ locals, url }) => {
 	const userId = await requireWebAdmin(locals, db);
 	const feedUrl = validFeedUrl(url.searchParams.get('feed'));
-	// Carried through from the search so "Zurück zur Suche" returns to the same
-	// result list instead of an empty search box.
 	const query = url.searchParams.get('q') ?? '';
 	const [podcasts, existingId] = await Promise.all([
 		podcastOverview(db, userId),
@@ -60,8 +56,6 @@ export const load = async ({ locals, url }) => {
 				description: feed.description,
 				imageUrl: feed.imageUrl,
 				episodeCount: feed.episodes.length,
-				// The whole feed can run to thousands of items; the preview only has
-				// to answer "is this the show I meant?".
 				episodes: feed.episodes.slice(0, 30)
 			},
 			loadError: null
@@ -100,8 +94,6 @@ export const actions = {
 				return fail(422, { error: 'Der Feed konnte nicht gelesen werden.' });
 			throw e;
 		}
-		// Outside the catch: redirect() signals by throwing, and swallowing it
-		// here would turn a successful subscribe into a 500.
 		redirect(303, `/library/podcasts/${podcastId}`);
 	}
 };

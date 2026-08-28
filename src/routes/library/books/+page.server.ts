@@ -13,9 +13,6 @@ import {
 
 function sortFrom(url: URL): SortKey {
 	const requested = url.searchParams.get('sort');
-	// Default is 'series', not 'title': an audiobook library is a set of
-	// numbered instalments, and alphabetical order splits a series apart the
-	// moment two of its folders carry differently-prefixed album tags.
 	return (BOOK_SORTS as readonly string[]).includes(requested ?? '')
 		? (requested as SortKey)
 		: 'series';
@@ -50,8 +47,6 @@ export const load = async ({ locals, url }) => {
 		durations,
 		progress,
 		sort,
-		// The series drill-down has its own fixed ordering (series_index, then
-		// instalment number), so the selector would be a lie there.
 		sortable: series === undefined,
 		sortOptions: BOOK_SORTS.map((key) => ({ key, label: SORT_LABELS[key] }))
 	};

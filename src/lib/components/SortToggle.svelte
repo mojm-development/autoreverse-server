@@ -1,8 +1,4 @@
 <script lang="ts">
-	// Sibling of ViewToggle, and lives here for the same reason: the caller
-	// builds its hrefs with resolve() inside a helper, which
-	// svelte/no-navigation-without-resolve cannot see through — the
-	// src/lib/components exemption in eslint.config.js covers that.
 	let {
 		current,
 		options

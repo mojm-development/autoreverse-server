@@ -29,12 +29,4 @@ export async function _progressPutHandler(
 	}
 }
 export const PUT: RequestHandler = (event) => _progressPutHandler(defaultDb, event);
-// `navigator.sendBeacon` (used by the beforeunload handler in
-// src/routes/+layout.svelte to flush progress on tab/page close) can only
-// ever issue a POST request — there is no way to make it send PUT. Without
-// this alias, that beacon silently 404s on every real navigation-away (fire-
-// and-forget, so nothing ever surfaced the failure) and in-progress position
-// was never actually persisted on reload/tab-close. Caught by the Task 41
-// end-to-end smoke test (tests/e2e/smoke.e2e.ts), which is exactly the class
-// of bug that test exists to catch.
 export const POST: RequestHandler = (event) => _progressPutHandler(defaultDb, event);

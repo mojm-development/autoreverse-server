@@ -16,10 +16,6 @@ const EPISODE_NO = episodeNumber(itemsTable.title);
 const SORTS: Record<string, ReturnType<typeof sql>> = {
 	title: sql`${NATURAL_TITLE}`,
 	added: sql`${itemsTable.addedAt} DESC, ${NATURAL_TITLE}`,
-	// Author, then series, then instalment number: the grouping an audiobook
-	// library actually has. Falling through to the natural title keeps items
-	// with no detectable number in a stable, sensible place rather than
-	// bunching every NULL together in insertion order.
 	series: sql`lower(${itemsTable.author}) NULLS LAST, lower(${itemsTable.series}) NULLS LAST, ${EPISODE_NO} NULLS LAST, ${NATURAL_TITLE}`
 };
 export const SORT_LABELS: Record<string, string> = {
@@ -290,8 +286,6 @@ export async function seriesSiblings(db: DrizzleDb, series: string) {
 		.from(itemsTable)
 		.where(and(eq(itemsTable.kind, 'book'), eq(itemsTable.series, series)))
 		.orderBy(
-			// series_index first so a future scanner that does populate it wins;
-			// today it is always NULL and the derived number carries the order.
 			sql`${itemsTable.seriesIndex} NULLS LAST`,
 			sql`${EPISODE_NO} NULLS LAST`,
 			NATURAL_TITLE

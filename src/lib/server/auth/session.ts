@@ -11,7 +11,6 @@ export interface Locals {
 	token: string | null;
 }
 
-/** Bearer header first (API clients), else the session cookie (web UI) — one resolver for both. */
 export function tokenFromRequest(request: Request, cookieToken: string | null): string | null {
 	const authorization = request.headers.get('authorization') ?? '';
 	const [scheme, value] = authorization.split(' ');

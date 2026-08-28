@@ -23,8 +23,6 @@ export async function listUsers(db: DrizzleDb) {
 export async function setAdmin(db: DrizzleDb, userId: number, isAdmin: boolean): Promise<boolean> {
 	return db.transaction(async (tx) => {
 		if (!isAdmin) {
-			// Lock every admin row before counting — prevents two concurrent
-			// demotions from both seeing "2 admins" and both proceeding.
 			const admins = await tx.execute(sql`SELECT id FROM users WHERE is_admin FOR UPDATE`);
 			const adminIds = (admins as unknown as Array<{ id: number }>).map((r) => r.id);
 			if (adminIds.length <= 1 && adminIds.includes(userId)) throw new LastAdminError();

@@ -10,7 +10,6 @@
 	const player = createPlayerStore();
 	setContext(PLAYER_CONTEXT_KEY, player);
 
-	// Flush progress when the tab closes — sendBeacon doesn't need a response.
 	if (typeof window !== 'undefined') {
 		window.addEventListener('beforeunload', () => {
 			const current = player.current;

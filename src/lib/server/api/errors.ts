@@ -1,6 +1,3 @@
-/**
- * Custom error class for API errors that carry metadata like Retry-After values.
- */
 export class ApiError extends Error {
 	constructor(
 		public readonly status: number,

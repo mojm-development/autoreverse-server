@@ -33,7 +33,7 @@ export async function _scanPostHandler(
 		scanState.progress = null;
 		scanState.finishedAt = null;
 		const snap = snapshot();
-		void runScan(); // fire-and-forget, mirrors FastAPI's BackgroundTasks (runs after the response is sent)
+		void runScan();
 		return json(_toWire(snap), { status: 202 });
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);

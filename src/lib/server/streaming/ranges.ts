@@ -24,11 +24,6 @@ export function mediaType(path: string): string {
 	return MEDIA_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream';
 }
 
-/** Parses `Range: bytes=<start>-<end>`. Single range only (ignores anything
- * after a comma). Returns null for a missing or unparseable header (caller
- * should then serve the whole file with 200). Throws RangeNotSatisfiable for
- * a range whose start is at/beyond size, or whose end precedes its start, or
- * a non-positive suffix length. */
 export function parseRange(
 	header: string | null,
 	size: number
@@ -110,10 +105,6 @@ async function readWhole(path: string): Promise<ReadableStream<Uint8Array>> {
 	});
 }
 
-/** Exact port of streaming/ranges.py::range_response. `head=true` returns
- * identical headers/status with no body and — critically — never opens the
- * file, matching the perf reasoning in the Python docstring (a HEAD probe
- * must not pay to read the file just to have the body discarded). */
 export async function rangeResponse(
 	path: string,
 	rangeHeader: string | null,
@@ -144,8 +135,6 @@ export async function rangeResponse(
 	}
 
 	if (span === null) {
-		// Header present but not understood — RFC 9110 permits ignoring it and
-		// serving the whole file with 200 (self-built, not delegated).
 		const headers = {
 			'content-type': contentType,
 			'content-length': String(size),

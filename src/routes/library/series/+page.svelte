@@ -7,9 +7,6 @@
 	<h1>Serien <span class="count mono">{data.series.length}</span></h1>
 	<div class="grid">
 		{#each data.series as s (s.series)}
-			<!-- Dynamic query-param href built from a loop variable; resolve() needs a
-				statically-known route id, same rationale as the src/lib/components exemption
-				in eslint.config.js. -->
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a class="tile" href="/library/books?series={encodeURIComponent(s.series ?? '')}">
 				<span class="name">{s.series}</span>

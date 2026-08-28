@@ -28,7 +28,7 @@ export async function _favoriteItemDeleteHandler(
 	try {
 		const userId = requireApiUser(event.locals);
 		await removeItemFavorite(db, userId, Number(event.params.id));
-		return new Response(null, { status: 204 }); // idempotent, no 404 even if never favorited
+		return new Response(null, { status: 204 });
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		throw e;

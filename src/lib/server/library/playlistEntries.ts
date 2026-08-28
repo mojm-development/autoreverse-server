@@ -2,8 +2,6 @@ import { and, asc, eq, gt, gte, lt, lte, sql } from 'drizzle-orm';
 import { playlistEntries } from '../db/schema';
 import type { DrizzleDb } from '../db';
 
-/** Locks the parent playlist row to serialize concurrent mutations —
- * every append/remove/move does this first, inside its own transaction. */
 async function lockPlaylist(tx: DrizzleDb, playlistId: number) {
 	await tx.execute(sql`SELECT id FROM playlists WHERE id = ${playlistId} FOR UPDATE`);
 }
@@ -41,8 +39,6 @@ export async function removeEntry(
 	await db.transaction(async (tx) => {
 		await lockPlaylist(tx as unknown as DrizzleDb, playlistId);
 		await tx.delete(playlistEntries).where(eq(playlistEntries.id, entryId));
-		// Shift positions down in ascending order to avoid constraint violation
-		// (smallest position first, each row moves into slot vacated by previous)
 		const toShift = await tx
 			.select({ id: playlistEntries.id, position: playlistEntries.position })
 			.from(playlistEntries)
@@ -59,10 +55,6 @@ export async function removeEntry(
 	});
 }
 
-/** Exact port of library/playlists.py::move_entry — stage the moved row at a
- * sentinel position (-1, outside the valid 1..n range) before shifting the
- * range between old and new position, so no intermediate UPDATE can collide
- * with UNIQUE (playlist_id, position). */
 export async function moveEntry(
 	db: DrizzleDb,
 	playlistId: number,
@@ -75,7 +67,6 @@ export async function moveEntry(
 		await lockPlaylist(tx as unknown as DrizzleDb, playlistId);
 		await tx.update(playlistEntries).set({ position: -1 }).where(eq(playlistEntries.id, entryId));
 		if (newPosition < oldPosition) {
-			// Moving earlier: increment positions [newPosition, oldPosition) in descending order to avoid constraint violation
 			const entriesToShift = await tx
 				.select()
 				.from(playlistEntries)
@@ -94,7 +85,6 @@ export async function moveEntry(
 					.where(eq(playlistEntries.id, entry.id));
 			}
 		} else {
-			// Moving later: decrement positions (oldPosition, newPosition] in ascending order to avoid constraint violation
 			const entriesToShift = await tx
 				.select()
 				.from(playlistEntries)

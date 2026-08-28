@@ -3,10 +3,6 @@ import { requireWebUser, requireWebAdmin } from '$lib/server/auth/session';
 import { getLibraryPaths, setLibraryPaths } from '$lib/server/settings/libraryPaths';
 import { countMissing, deleteMissing } from '$lib/server/library/queries';
 
-// User management (listing, creation, toggling admin) lives exclusively in
-// settings/users/+page.server.ts — this panel previously duplicated all of it
-// verbatim, including a dead `createUser` action never referenced by this
-// route's +page.svelte (M-14).
 export const load = async ({ locals }) => {
 	requireWebUser(locals);
 	const [paths, missing] = await Promise.all([getLibraryPaths(db), countMissing(db)]);

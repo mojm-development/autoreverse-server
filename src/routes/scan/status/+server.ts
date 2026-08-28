@@ -11,7 +11,7 @@ export async function _scanStatusGetHandler(
 	event: Pick<RequestEvent, 'locals'>
 ): Promise<Response> {
 	try {
-		await requireApiAdmin(event.locals, db); // last_error may contain filesystem paths — Admin-only, same as POST /scan
+		await requireApiAdmin(event.locals, db);
 		return json(_toWire(snapshot()));
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);

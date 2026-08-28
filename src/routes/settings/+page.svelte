@@ -3,8 +3,6 @@
 	import { SETTINGS_SECTIONS } from '$lib/settingsSections';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
-	// Same gate as the subnav in +layout.svelte: admin-only sections are hidden
-	// from non-admins here too, so the overview never links into a redirect.
 	const sections = $derived(SETTINGS_SECTIONS.filter((s) => !s.admin || data.user?.isAdmin));
 </script>
 

@@ -11,7 +11,7 @@
 	function accent(kind: string): string {
 		if (kind === 'book') return 'book';
 		if (kind === 'album') return 'music';
-		return 'podcast'; // podcast, episode
+		return 'podcast';
 	}
 
 	function formatDuration(seconds: number): string {
@@ -106,8 +106,6 @@
 					</ListRow>
 				{/each}
 				{#each data.tracks as track (track.id)}
-					<!-- By id, not by index: a search hit knows which track it is but
-						not where it sits in its item's running order. -->
 					<ListRow
 						label="{track.title} abspielen"
 						onclick={() => player.playTrackById(track.item_id, track.id)}

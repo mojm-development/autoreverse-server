@@ -7,9 +7,6 @@ import { ensureFirstAdmin } from '$lib/server/auth/bootstrap';
 import { db } from '$lib/server/db';
 
 export const init: ServerInit = async () => {
-	// Opt-in, not default: dev databases synced via `db:push` have no migration
-	// history, so running the migration journal against them would fail. The
-	// Docker image sets this — a pulled image must work against a fresh Postgres.
 	if (env.AUTOREVERSE_AUTO_MIGRATE) {
 		await migrate(db, { migrationsFolder: 'drizzle' });
 	}
@@ -29,12 +26,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-// Ruling 8's `{detail: ...}` shape must hold on every path, including ones no
-// route handler ever catches (uncaught exceptions, framework-level errors) —
-// otherwise those fall back to SvelteKit's default `{"message": ...}` body
-// with no `detail` at all. `message` is kept alongside it (App.Error requires
-// it) — it's what the default HTML error page renders for page-load errors —
-// but every JSON API response now carries `detail` too, which is what C-2 cares about.
 export const handleError: HandleServerError = () => {
 	return { message: 'Interner Serverfehler', detail: 'Interner Serverfehler' };
 };

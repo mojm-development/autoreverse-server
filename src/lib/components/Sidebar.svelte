@@ -1,7 +1,4 @@
 <script lang="ts">
-	// Note: the brief's Step 4 code imports CoverTile here but never renders
-	// it — dropped as an unused-import lint error (@typescript-eslint/no-unused-vars).
-	// Nothing else in this file changed from the brief's given code.
 	import ThemeToggle from './ThemeToggle.svelte';
 	import Icon from './Icon.svelte';
 
@@ -23,10 +20,6 @@
 		};
 	} = $props();
 
-	// $derived (not a plain const) so `initials` tracks live updates to the
-	// `user` prop rather than capturing only its initial value — the only
-	// deviation from the brief's given Step 4 code, needed to clear a
-	// svelte-check state_referenced_locally warning.
 	const initials = $derived(user.name.slice(0, 2).toUpperCase());
 </script>
 
@@ -91,11 +84,6 @@
 		flex-direction: column;
 		padding: 20px 12px 12px;
 		box-sizing: border-box;
-		/* As a grid item the sidebar stretched to the row height, which on a long
-		   page (1750 albums) is the whole document — so `.account`'s margin-top:auto
-		   parked the settings/logout block thousands of pixels below the fold.
-		   Pinning it to one viewport height makes "auto" mean the bottom of the
-		   screen again, and sticky keeps it there while the list scrolls. */
 		position: sticky;
 		top: 0;
 		height: 100vh;
@@ -227,9 +215,6 @@
 			width: 100%;
 			flex-direction: row;
 			position: fixed;
-			/* Undo the desktop `top: 0`: with top, bottom and height all set,
-			   fixed positioning is over-constrained and drops `bottom`, which
-			   would strand the tab bar at the top of the screen. */
 			top: auto;
 			bottom: 0;
 			height: 56px;
@@ -238,7 +223,5 @@
 			border-right: none;
 			border-top: 1px solid var(--line);
 		}
-		/* Collapses to a bottom tab bar — same CSS-only breakpoint technique
-		   as the existing app's _nav.html, no separate mobile markup/component. */
 	}
 </style>

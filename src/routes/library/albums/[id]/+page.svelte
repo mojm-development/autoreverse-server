@@ -7,10 +7,6 @@
 	let { data }: { data: PageData } = $props();
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
-	// Svelte 5 "writable $derived": recomputes from data.isFavorite whenever
-	// `data` changes identity (e.g. client-side navigation to a different
-	// album), while still allowing local optimistic overrides from
-	// toggleFavorite() in between recomputations.
 	let isFavorite = $derived(data.isFavorite);
 
 	const totalDuration = $derived(data.tracks.reduce((sum, t) => sum + t.duration, 0));
@@ -22,7 +18,7 @@
 
 	async function toggleFavorite() {
 		const next = !isFavorite;
-		isFavorite = next; // optimistic
+		isFavorite = next;
 		await fetch(`/favorites/items/${data.album.id}`, { method: next ? 'POST' : 'DELETE' });
 	}
 
@@ -35,7 +31,7 @@
 			const j = Math.floor(Math.random() * (i + 1));
 			[tracks[i], tracks[j]] = [tracks[j], tracks[i]];
 		}
-		player.reloadCurrentTrack(); // reloads the <audio> element for the now-shuffled first track
+		player.reloadCurrentTrack();
 	}
 </script>
 
@@ -93,8 +89,6 @@
 				</span>
 				<span class="title">{track.title ?? `Titel ${i + 1}`}</span>
 				<span class="cell">{data.album.artist ?? '—'}</span>
-				<!-- `above` lifts the heart past the row activator; without it the
-					activator covers it and clicking the heart would start the track. -->
 				<span class="cell fav above">
 					<button
 						class="icon-btn small"

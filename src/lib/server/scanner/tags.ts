@@ -24,15 +24,12 @@ const UNREADABLE: TrackTags = {
 	readable: false
 };
 
-/** Direct port of scanner/tags.py::read_tags — music-metadata's `common`
- * block plays the same role as mutagen's `easy=True` unified tag interface. */
 export async function readTags(path: string): Promise<TrackTags> {
 	try {
 		const meta = await parseFile(path, { duration: true });
 		const common = meta.common;
 		const duration = meta.format.duration ?? 0;
 
-		// Validate that we have actual audio metadata
 		if (!meta.format.codec || duration === 0) {
 			return { ...UNREADABLE };
 		}

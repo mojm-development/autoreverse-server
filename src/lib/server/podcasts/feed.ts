@@ -6,10 +6,7 @@ export interface ParsedEpisode {
 	title: string;
 	publishedAt: Date | null;
 	mediaUrl: string | null;
-	/** Plain-text episode summary, HTML stripped. Null when the feed carries none. */
 	description: string | null;
-	/** <itunes:duration> normalised to seconds — the tag holds either plain
-	 *  seconds or H:MM:SS / MM:SS, and both spellings occur in the wild. */
 	durationSeconds: number | null;
 }
 export interface ParsedFeed {
@@ -51,7 +48,6 @@ function cleanTitle(raw: string | undefined): string {
 	return decoded || 'Ohne Titel';
 }
 
-/** Strips markup and collapses whitespace; feeds put full HTML in <description>. */
 function cleanText(raw: string | undefined): string | null {
 	if (!raw) return null;
 	const stripped = raw.replace(/<[^>]+>/g, ' ');
@@ -85,7 +81,6 @@ function guidFor(item: RSSItem, index: number): string {
 
 const parser = new Parser({ customFields: { item: [['enclosure', 'enclosure']] } });
 
-/** Async because rss-parser has no synchronous XML-parsing API (unlike Python's feedparser.parse). */
 export async function parseFeed(xml: string): Promise<ParsedFeed> {
 	const parsed = await parser.parseString(xml);
 	const episodes = (parsed.items ?? []).map((item: RSSItem, index: number) => ({

@@ -15,9 +15,6 @@
 			<p class="empty">Noch keine Podcast-Abos.</p>
 		{/if}
 		{#if data.user?.isAdmin}
-			<!-- The search lives out here, not in the 274px rail: its results are
-				 cover + title + author + button per row, which needs room to be
-				 readable at all. -->
 			<section class="add-feed">
 				<h2>Podcast abonnieren</h2>
 				<PodcastSearch initialQuery={data.query} onSubscribed={() => invalidateAll()} />

@@ -31,12 +31,9 @@
 
 	<div class="pills">
 		<span class="pill active">Alle</span>
-		<!-- /library/favorites doesn't exist as a route yet (lands in Task 42); resolve() needs a
-			statically-known route id, same rationale as the src/lib/components exemption in eslint.config.js. -->
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a class="pill" href="/library/favorites">Favoriten</a>
 		<a class="pill" href={resolve('/library/albums?sort=added')}>Zuletzt dazu</a>
-		<!-- /library/artists doesn't exist as a route yet (lands in Task 42); same rationale as above. -->
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a class="pill" href="/library/artists">Interpreten</a>
 	</div>
@@ -54,9 +51,6 @@
 	{#if data.view === 'grid'}
 		<div class="grid-6">
 			{#each data.albums as album (album.id)}
-				<!-- /library/albums/[id] doesn't exist as a route yet (lands in a later task);
-					resolve() needs a statically-known route id, same rationale as the
-					src/lib/components exemption in eslint.config.js. -->
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 				<a href="/library/albums/{album.id}" class="tile-link">
 					<CoverTile
@@ -134,10 +128,6 @@
 	}
 	.grid-6 {
 		display: grid;
-		/* auto-fill against a px minimum, not repeat(6, 1fr): a fixed column
-		   count leaves half the row empty on a wide screen, and `1fr` is
-		   minmax(auto, 1fr) — the auto floor let a long title widen the track
-		   instead of being ellipsed. */
 		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 		gap: 22px 16px;
 	}

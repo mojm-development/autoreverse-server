@@ -13,23 +13,17 @@
 	--track: rgb(255 255 255 / 0.14);
 	--track-tick: rgb(255 255 255 / 0.3);
 
-	/* Content-type accents — fixed across both themes. */
 	--music: #e05a4e;
 	--book: #2fb08c;
 	--podcast: #9b6ff0;
 
-	/* Type */
 	--font-sans: 'Helvetica Neue', Helvetica, system-ui, sans-serif;
 	--font-mono: ui-monospace, Menlo, monospace;
 
-	/* Layout. The fixed MiniPlayerBar has to line up with the sidebar it sits
-	   next to, and it lives in the root layout with no way to measure it —
-	   so the shells and the bar share these instead of each hardcoding 236px. */
 	--sidebar-width: 236px;
 	--player-bar-height: 78px;
 	--mobile-nav-height: 56px;
 
-	/* Radius scale, most-used values from the design export */
 	--radius-pill: 99px;
 	--radius-md: 8px;
 	--radius-lg: 12px;
@@ -38,11 +32,6 @@
 	color-scheme: dark;
 }
 
-/* ponytail: the design export never defines light values (only a theme
-   toggle placeholder) — this palette is our own derivation, following the
-   same bg/text-inversion + fixed-accent approach the existing capstan app's
-   style.css already uses successfully. Revisit if the design later ships
-   real light tokens. */
 :root[data-theme='light'] {
 	--bg: #f7f7f8;
 	--text: #14141a;

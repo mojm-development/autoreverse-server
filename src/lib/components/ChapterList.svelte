@@ -10,9 +10,6 @@
 		chapters: { title: string; start: number; end: number }[];
 		currentPosition: number;
 		isPlayingThis: boolean;
-		/** Required rather than optional: a chapter list nobody can jump from is
-		 * a decorative table, and omitting it should be a type error, not a
-		 * silently dead list. */
 		onSelect: (start: number) => void;
 	} = $props();
 

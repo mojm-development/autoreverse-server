@@ -12,7 +12,7 @@ export async function _bookmarkDeleteHandler(
 	try {
 		const userId = requireApiUser(event.locals);
 		const deleted = await removeBookmark(db, userId, Number(event.params.id));
-		if (!deleted) return apiError(404, 'Unbekanntes Lesezeichen'); // uniform: not-found AND not-owned
+		if (!deleted) return apiError(404, 'Unbekanntes Lesezeichen');
 		return new Response(null, { status: 204 });
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);

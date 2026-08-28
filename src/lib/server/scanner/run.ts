@@ -6,10 +6,6 @@ import { loadConfig } from '../config';
 import { getLibraryPaths } from '../settings/libraryPaths';
 import { db } from '../db';
 
-/** Two fully separate scanBooks/storeItems and scanMusic/storeItems passes
- * with DISTINCT root arguments — deliberately never merged. `root` gates
- * markMissing's scope; merging or swapping roots would mark the other
- * library's items as missing. Matches _run_scan's own emphasis on this. */
 export async function runScan(): Promise<void> {
 	const config = loadConfig(process.env as Record<string, string | undefined>);
 	const paths = await getLibraryPaths(db);
@@ -24,9 +20,6 @@ export async function runScan(): Promise<void> {
 	scanState.finishedAt = null;
 	scanState.cancelled = false;
 	scanState.lastError = null;
-	// Was never cleared, so each run added its counts to the previous run's and
-	// the numbers only ever grew. The per-root accumulation below relies on the
-	// null, and `skipped` was already absolute — the report contradicted itself.
 	scanState.lastReport = null;
 	const skipped: string[] = [];
 	const failures: ScanFailure[] = [];
@@ -42,11 +35,6 @@ export async function runScan(): Promise<void> {
 				scanState.cancelled = true;
 				break;
 			}
-			// Before anything else: an unreadable root must never reach markMissing.
-			// A library whose mount vanished scans as zero items, which is exactly
-			// what a genuinely emptied library looks like — and markMissing would
-			// dutifully flag every book in it as gone. Refusing to scan the root at
-			// all is the only safe reading of "I cannot see it".
 			const problem = await libraryRootProblem(root);
 			if (problem) {
 				rootErrors.push(`${root}: ${problem}`);
@@ -54,13 +42,8 @@ export async function runScan(): Promise<void> {
 			}
 
 			const known = await knownFiles(db);
-			// Per-root, then merged: `failures` spans both passes, and re-deriving
-			// the skip list from it would hand the music pass the books' failures.
 			const rootFailures: ScanFailure[] = [];
 
-			// Counts carry across both roots so they only ever climb; processed and
-			// total restart per phase, which is what `root` and `phase` are there to
-			// explain to whoever is watching the bar.
 			const progress: ScanProgress = {
 				phase: 'scanning',
 				root,
@@ -97,8 +80,6 @@ export async function runScan(): Promise<void> {
 				}
 			);
 			failures.push(...rootFailures);
-			// A folder that failed keeps its existing rows: it was not observed to be
-			// absent, only impossible to read.
 			skipped.push(...rootFailures.map((f) => f.path));
 			const found = new Set(scanned.map((s) => s.sourcePath));
 			const missing = await markMissing(db, root, found, skipped);
@@ -115,7 +96,7 @@ export async function runScan(): Promise<void> {
 	} finally {
 		scanState.running = false;
 		scanState.finishedAt = new Date().toISOString();
-		scanState.progress = null; // the bar gives way to the finished report
+		scanState.progress = null;
 		scanState.lastSkipped = failures.map((f) => `${f.path}: ${f.message}`);
 	}
 }

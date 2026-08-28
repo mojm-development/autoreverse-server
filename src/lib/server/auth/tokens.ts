@@ -4,12 +4,11 @@ import { authTokens } from '../db/schema';
 import type { DrizzleDb } from '../db';
 
 export async function issueToken(db: DrizzleDb, userId: number): Promise<string> {
-	const value = randomBytes(32).toString('base64url'); // 43 chars, matches secrets.token_urlsafe(32) shape
+	const value = randomBytes(32).toString('base64url');
 	await db.insert(authTokens).values({ value, userId });
 	return value;
 }
 
-/** Resolves a token to a user id, refreshing last_seen_at at most once per hour. */
 export async function userForToken(db: DrizzleDb, token: string): Promise<number | null> {
 	const [row] = await db
 		.select({

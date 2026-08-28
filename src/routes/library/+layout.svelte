@@ -44,9 +44,6 @@
 	}
 	main {
 		min-width: 0;
-		/* Unconditional: the bar is fixed, so on a short page this padding sits
-		   inside the shell's 100vh and costs nothing, and on a long one it is
-		   what keeps the last row clear of the bar. */
 		padding-bottom: var(--player-bar-height);
 	}
 	@media (max-width: 700px) {

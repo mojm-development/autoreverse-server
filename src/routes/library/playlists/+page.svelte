@@ -11,10 +11,6 @@
 <div class="content" style="--a: var(--music)">
 	<header><h1>Playlists</h1></header>
 
-	<!-- ponytail: "Automatisch"/"Geteilt" have no backend concept at all (one
-	     playlist kind, user-owned, no sharing/smart rules) — omitted entirely
-	     rather than rendered as dead UI, matching the genre/narrator/format
-	     omission precedent from Tasks 33-35. -->
 	<div class="pills">
 		<span class="pill active">Eigene</span>
 	</div>

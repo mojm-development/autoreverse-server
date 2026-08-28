@@ -1,4 +1,3 @@
-<!-- Rendered once, in src/routes/+layout.svelte (Task 29). Do not import this more than once — duplicate ids break `<use href="#icon-x">` resolution. -->
 <svg style="display:none" aria-hidden="true">
 	<symbol
 		id="icon-home"

@@ -37,8 +37,6 @@ export async function _playbackPutHandler(
 	try {
 		const userId = requireApiUser(event.locals);
 		const {
-			// Matches the ground truth's Pydantic model: all three fields are
-			// optional and default when a partial body is sent (I-10).
 			playback_speed = 1.0,
 			skip_back = 30,
 			skip_forward = 15

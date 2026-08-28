@@ -7,9 +7,6 @@
 	<h1>Interpreten <span class="count mono">{data.artists.length}</span></h1>
 	<div class="grid">
 		{#each data.artists as a (a.name)}
-			<!-- Dynamic query-param href built from a loop variable; resolve() needs a
-				statically-known route id, same rationale as the src/lib/components exemption
-				in eslint.config.js. -->
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a class="tile" href="/library/albums?artist={encodeURIComponent(a.name ?? '')}">
 				<span class="name">{a.name}</span>

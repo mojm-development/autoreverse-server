@@ -67,7 +67,6 @@
 
 	<div class="toolbar">
 		<form method="GET" class="search-form">
-			<!-- Without this the chosen sort is dropped the moment someone searches. -->
 			<input type="hidden" name="sort" value={data.sort} />
 			<input type="search" name="q" value={data.q} placeholder="Bibliothek durchsuchen" />
 		</form>

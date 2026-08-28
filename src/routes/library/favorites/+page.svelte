@@ -17,9 +17,6 @@
 		<h2>Titel &amp; Alben</h2>
 		<div class="grid-6">
 			{#each data.items as item (item.id)}
-				<!-- Dynamic href built from a loop variable via hrefFor(); resolve() needs a
-					statically-known route id, same rationale as the src/lib/components
-					exemption in eslint.config.js. -->
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 				<a href={hrefFor(item.kind, item.id)}>
 					<CoverTile

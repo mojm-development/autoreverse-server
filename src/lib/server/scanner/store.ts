@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises';
 import { and, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import {
 	items as itemsTable,
@@ -19,6 +20,15 @@ export async function knownFiles(db: DrizzleDb): Promise<Record<string, [number,
 	return result;
 }
 
+async function fileExists(path: string): Promise<boolean> {
+	try {
+		await stat(path);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 async function resolveCover(
 	db: DrizzleDb,
 	itemId: number,
@@ -27,13 +37,8 @@ async function resolveCover(
 	coversDir: string,
 	currentCoverPath: string | null
 ) {
-	if (currentCoverPath) {
-		try {
-			await (await import('node:fs/promises')).stat(currentCoverPath);
-			return currentCoverPath; // already resolved and still on disk — skip re-computation
-		} catch {
-			/* fall through and re-resolve */
-		}
+	if (currentCoverPath && (await fileExists(currentCoverPath))) {
+		return currentCoverPath;
 	}
 	const folderCover = await findCoverFile(dir);
 	if (folderCover) return folderCover;
@@ -57,13 +62,7 @@ export async function storeItems(
 ): Promise<{ new: number; updated: number; unchanged: number; skipped: number }> {
 	const report = { new: 0, updated: 0, unchanged: 0, skipped: 0 };
 	for (const [i, entry] of scanned.entries()) {
-		// Per folder, not per pass. Each entry is its own transaction already, so
-		// a failure here has nothing half-written to leave behind — but an
-		// exception escaping the loop used to abandon every folder after it too.
 		try {
-			// The transaction reports what it did; the counters move only once it
-			// has committed. Incrementing inside would credit work that a later
-			// statement in the same transaction rolls back.
 			const outcome = await db.transaction(async (tx): Promise<Outcome> => {
 				const [existing] = await tx
 					.select()
@@ -125,9 +124,6 @@ export async function storeItems(
 					outcome = 'new';
 				}
 
-				// Remove tracks gone from this folder BEFORE upserting the rest, to
-				// avoid a transient UNIQUE(item_id, position) collision during
-				// renumbering (same ordering as store.py::_upsert_item_with_tracks).
 				const currentPaths = entry.tracks.map((t) => t.path);
 				if (currentPaths.length > 0) {
 					await tx
@@ -137,16 +133,6 @@ export async function storeItems(
 					await tx.delete(tracksTable).where(eq(tracksTable.itemId, itemId));
 				}
 
-				// Push every surviving track out of positive-position space before
-				// assigning final positions below. Without this, a same-item
-				// position swap among tracks that all still exist (e.g. an ID3 tag
-				// fix flips two track numbers -- no file added/removed, so the
-				// delete step above frees nothing) can hit a transient
-				// UNIQUE(item_id, position) collision, since Postgres gives no
-				// row-processing-order guarantee across the per-row upserts below.
-				// A track's own id is globally unique, so negating it as a
-				// sentinel position can never collide with a real 1-based target
-				// position or another track's sentinel.
 				await tx
 					.update(tracksTable)
 					.set({ position: sql`-${tracksTable.id}` })
@@ -216,12 +202,6 @@ export async function storeItems(
 	return report;
 }
 
-/** Path-PREFIX (not LIKE) comparison, trailing slash included so `/x/lib`
- * doesn't match `/x/library/...` — direct port of the `substr(...)  = prefix`
- * logic in store.py::_mark_missing. Only touches rows with missing_since
- * IS NULL (already-missing rows are never re-touched — this is the fix for
- * the old 50%-threshold bug where re-marked items polluted their own
- * denominator on a second run). */
 export async function markMissing(
 	db: DrizzleDb,
 	root: string,

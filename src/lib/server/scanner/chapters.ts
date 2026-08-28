@@ -9,11 +9,6 @@ export interface Chapter {
 	end: number;
 }
 
-/** ffprobe only — mutagen/music-metadata don't read the m4b `chpl` atom.
- * Direct port of scanner/chapters.py: 30s timeout, [] on ANY failure
- * (missing binary, non-zero exit, timeout, bad JSON, or a single malformed
- * chapter entry — one bad entry discards the whole file's chapters, not
- * just that entry, matching the Python behavior exactly). */
 export async function readChapters(path: string): Promise<Chapter[]> {
 	let stdout: string;
 	try {

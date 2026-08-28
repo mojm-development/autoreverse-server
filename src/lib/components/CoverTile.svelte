@@ -32,10 +32,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		/* Grid and flex items default to min-width:auto, i.e. they refuse to
-		   shrink below their min-content width. With a nowrap title that
-		   min-content is the full title, so one long album name widened its
-		   whole grid track and pushed the row past the viewport. */
 		min-width: 0;
 	}
 	figcaption {
@@ -43,9 +39,6 @@
 	}
 	img,
 	.placeholder {
-		/* Fluid: the cover fills the column the grid hands it, so tile size is a
-		   property of the grid, not of this component. `size` survives as the
-		   intrinsic width/height hint that reserves the square before load. */
 		width: 100%;
 		height: auto;
 		aspect-ratio: 1 / 1;

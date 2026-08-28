@@ -78,8 +78,6 @@
 	.name {
 		font-size: 13.5px;
 		line-height: 1.3;
-		/* Two lines before eliding — the rail is narrow and most podcast names
-		   are longer than one line at this width. */
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;

@@ -18,7 +18,7 @@ export async function _podcastDeleteHandler(
 			episodes: report.episodes,
 			files_deleted: report.filesDeleted,
 			files_kept: report.filesKept
-		}); // 200, not 204
+		});
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
 		if (e instanceof Error && e.message === 'not found')

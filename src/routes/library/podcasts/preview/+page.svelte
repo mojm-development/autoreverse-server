@@ -10,8 +10,6 @@
 			: resolve('/library/podcasts')
 	);
 
-	// url() must be quoted: podcast artwork filenames routinely contain
-	// parentheses and spaces, which silently break an unquoted CSS url().
 	function coverStyle(url: string | null): string {
 		if (!url) return '';
 		const safe = url.replaceAll('\\', '%5C').replaceAll('"', '%22');
@@ -37,7 +35,6 @@
 	<PodcastRail podcasts={data.podcasts} />
 
 	<div class="content">
-		<!-- backHref is built from resolve() above; the rule only recognises a literal call site. -->
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a class="back" href={backHref}>← Zurück zur Suche</a>
 

@@ -16,15 +16,12 @@ a {
 	text-decoration: none;
 }
 
-/* Eyebrow labels — mono, uppercase, letter-spacing .1–.16em, used for
-   sidebar section headers, content-type badges, column headers. */
 .eyebrow {
 	font: 600 9.5px/1 var(--font-mono);
 	letter-spacing: 0.12em;
 	text-transform: uppercase;
 }
 
-/* Mono numerics — durations, counts, timestamps. */
 .mono {
 	font-family: var(--font-mono);
 }
@@ -59,11 +56,6 @@ a {
 	border-radius: var(--radius-pill);
 }
 
-/* Form base — every text field/select/textarea in the app previously fell back to raw
-   browser UA styling since nothing here ever set a default (each form only styled its own
-   buttons, several didn't even do that). Element-level, so a component's own scoped
-   `<style>` overrides this whenever it needs to (Svelte's scoping selector always outranks
-   a bare tag selector), but every field now has a sane look with zero per-page work. */
 input,
 select,
 textarea {
@@ -79,10 +71,6 @@ input::placeholder,
 textarea::placeholder {
 	color: var(--faint);
 }
-/* Chrome/Safari render a native (always OS-blue) clear button on type="search" inputs
-   regardless of any other styling applied. One page already knew to hide it locally
-   (SearchInput.svelte); the other hand-rolled search bar didn't, so it leaked through.
-   Global, so no future type="search" field has to remember this. */
 input[type='search']::-webkit-search-cancel-button {
 	display: none;
 }
@@ -98,9 +86,6 @@ textarea:disabled {
 	cursor: not-allowed;
 }
 
-/* Range sliders — the one place the base input rule above is wrong (a bordered panel box
-   around a native slider looks broken), so give it its own reset + a track/thumb matching
-   the accent color instead of the raw OS-blue default. */
 input[type='range'] {
 	appearance: none;
 	-webkit-appearance: none;
@@ -136,10 +121,6 @@ input[type='range']:disabled {
 	cursor: not-allowed;
 }
 
-/* Buttons: `.primary`/`.secondary` were already the established naming convention (used
-   across 8 files) but only ever defined locally, redundantly, in 7 of them — and never at
-   all in login/+page.svelte, which is why it rendered unstyled. One definition here,
-   matching the shape those 7 files already converged on independently. */
 button {
 	font: inherit;
 	cursor: pointer;
@@ -173,16 +154,6 @@ button:disabled {
 	opacity: 0.5;
 }
 
-/* Plain, unclassed <button> (no explicit .primary/.secondary/.icon-btn) — a handful of
-   secondary form actions (Aufräumen, Suchen, Anlegen, Abonnieren) never opted into any
-   class, and the original version of this rule only matched a literal type="submit"
-   attribute, which several of them never wrote out (relying on the implicit default
-   instead) — so they stayed unstyled too. Match every type now; icon-only buttons opt out
-   via .icon-btn below rather than being excluded here, since a plain type/attribute
-   selector can't tell an icon button from a text one. */
-/* .bare is excluded because those buttons are layout elements that happen to
-   need keyboard activation — a clickable row, a full-row hit target — not
-   controls that should render as a pill. */
 button:not(.primary, .secondary, .icon-btn, .bare) {
 	display: inline-flex;
 	align-items: center;
@@ -196,11 +167,6 @@ button:not(.primary, .secondary, .icon-btn, .bare) {
 	font: 500 12px/1 var(--font-sans);
 }
 
-/* Icon-only buttons (transport controls, chapter nav, etc.) — a ghost circular hit target,
-   not the text-pill treatment above. Was already an established naming convention (one
-   file already used it, locally) but never defined anywhere globally, and several bare
-   icon buttons elsewhere (mini-player skip controls, fullscreen-player chapter nav) used
-   no class at all and rendered as raw native buttons around a lone icon. */
 .icon-btn {
 	display: inline-flex;
 	align-items: center;
@@ -221,9 +187,6 @@ button:not(.primary, .secondary, .icon-btn, .bare) {
 	opacity: 0.5;
 }
 
-/* Strips both the pill styling above and the user agent's own button chrome,
-   for buttons used as clickable layout. Component styles still win over this
-   (a scoped `.foo` is `.foo.svelte-hash`, so it outranks a single class). */
 .bare {
 	appearance: none;
 	border: none;

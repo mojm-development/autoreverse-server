@@ -66,8 +66,6 @@
 	<section>
 		<div class="section-head">
 			<h2>Neu im Bestand</h2>
-			<!-- /library/albums doesn't exist as a route yet (lands in a later task); resolve() needs a
-				statically-known route id, same rationale as the src/lib/components exemption in eslint.config.js. -->
 			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 			<a href="/library/albums?sort=added">Alle ansehen</a>
 		</div>
