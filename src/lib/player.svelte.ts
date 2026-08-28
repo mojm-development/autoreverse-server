@@ -196,6 +196,11 @@ export function createPlayerStore() {
 		if (current) seek(current.position + seconds);
 	}
 
+	function seekInTrack(offset: number) {
+		if (!current) return;
+		seek(trackStart(current.tracks, current.trackIndex) + offset);
+	}
+
 	function trackOffset(): number {
 		if (!current) return 0;
 		return current.position - trackStart(current.tracks, current.trackIndex);
@@ -252,6 +257,7 @@ export function createPlayerStore() {
 		skipForward,
 		nextTrack,
 		previousTrack,
+		seekInTrack,
 		trackOffset,
 		close,
 		attachAudioElement,

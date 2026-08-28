@@ -3,6 +3,7 @@
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ChapterList from '$lib/components/ChapterList.svelte';
+	import Scrubber from '$lib/components/Scrubber.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -39,7 +40,7 @@
 	);
 	const barElapsed = $derived(byTrack && isPlayingThis ? player.trackOffset() : currentPosition);
 	const barTotal = $derived(byTrack ? (currentTrack?.duration ?? 0) : totalDuration);
-	const percent = $derived(barTotal > 0 ? (barElapsed / barTotal) * 100 : 0);
+	const ticks = $derived(byTrack ? [] : data.chapters.map((c) => c.start));
 	const atFirstTrack = $derived(isPlayingThis && player.current!.trackIndex === 0);
 	const atLastTrack = $derived(
 		isPlayingThis && player.current!.trackIndex >= player.current!.tracks.length - 1
@@ -135,16 +136,15 @@
 					· {data.item.narrator}{/if}
 			</p>
 
-			<div class="scrubber">
-				{#if !byTrack}
-					{#each data.chapters as c (c.title + c.start)}
-						<span
-							class="tick"
-							style="left: {totalDuration > 0 ? (c.start / totalDuration) * 100 : 0}%"
-						></span>
-					{/each}
-				{/if}
-				<div class="fill" style="width: {percent}%"></div>
+			<div class="scrubber-wrap">
+				<Scrubber
+					value={barElapsed}
+					max={barTotal}
+					{ticks}
+					label={byTrack ? 'Position im Titel' : 'Position im Hörbuch'}
+					format={formatHMS}
+					onSeek={(seconds) => (byTrack ? player.seekInTrack(seconds) : player.seek(seconds))}
+				/>
 			</div>
 			<div class="times mono">
 				<span>{formatHMS(barElapsed)}</span>
@@ -359,26 +359,10 @@
 		margin: 0;
 		font-size: 12px;
 	}
-	.scrubber {
-		position: relative;
-		width: 100%;
-		height: 6px;
-		border-radius: 99px;
-		background: var(--track);
+	.scrubber-wrap {
 		margin-top: 14px;
-	}
-	.fill {
-		position: absolute;
-		inset: 0 auto 0 0;
-		background: var(--a);
-		border-radius: 99px;
-	}
-	.tick {
-		position: absolute;
-		top: -2px;
-		width: 1px;
-		height: 10px;
-		background: var(--track-tick);
+		--scrubber-height: 6px;
+		--scrubber-thumb: 12px;
 	}
 	.transport {
 		display: flex;

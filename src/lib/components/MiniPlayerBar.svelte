@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from './Icon.svelte';
+	import Scrubber from './Scrubber.svelte';
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 	let audioEl: HTMLAudioElement;
@@ -19,7 +20,6 @@
 			? (track?.duration ?? 0)
 			: (current?.tracks.reduce((sum, t) => sum + t.duration, 0) ?? 0)
 	);
-	const percent = $derived(total > 0 ? (elapsed / total) * 100 : 0);
 	const atFirstTrack = $derived(current?.trackIndex === 0);
 	const atLastTrack = $derived(
 		current !== null && current !== undefined && current.trackIndex >= current.tracks.length - 1
@@ -91,10 +91,13 @@
 				<span class="title">{track.title}</span>
 				<span class="time mono">{formatTime(elapsed)} / {formatTime(total)}</span>
 			</div>
-			<div class="scrubber">
-				<div class="fill" style="width: {percent}%"></div>
-				<div class="thumb" style="left: {percent}%"></div>
-			</div>
+			<Scrubber
+				value={elapsed}
+				max={total}
+				label={byTrack ? 'Position im Titel' : 'Position'}
+				format={formatTime}
+				onSeek={(seconds) => (byTrack ? player.seekInTrack(seconds) : player.seek(seconds))}
+			/>
 		</div>
 		<div class="extra">
 			<span class="pill mono"
@@ -176,27 +179,6 @@
 		margin-left: auto;
 		font-size: 10.5px;
 		color: var(--faint);
-	}
-	.scrubber {
-		position: relative;
-		height: 4px;
-		border-radius: 99px;
-		background: var(--track);
-	}
-	.fill {
-		position: absolute;
-		inset: 0 auto 0 0;
-		background: var(--a, var(--book));
-		border-radius: 99px;
-	}
-	.thumb {
-		position: absolute;
-		top: -3px;
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background: var(--text);
-		margin-left: -5px;
 	}
 
 	@media (max-width: 700px) {

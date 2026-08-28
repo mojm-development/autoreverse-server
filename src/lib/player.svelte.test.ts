@@ -315,4 +315,22 @@ describe('player store', () => {
 		await store.play(42);
 		expect(store.current?.hasCover).toBe(false);
 	});
+	it('seekInTrack() is relative to the current track, not the whole item', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		store.nextTrack();
+		store.seekInTrack(40);
+		expect(store.current?.position).toBe(140);
+		expect(store.trackOffset()).toBe(40);
+		expect(store.current?.trackIndex).toBe(1);
+	});
+
+	it('seekInTrack() on the first track matches an absolute seek', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		store.seekInTrack(25);
+		expect(store.current?.position).toBe(25);
+	});
 });
