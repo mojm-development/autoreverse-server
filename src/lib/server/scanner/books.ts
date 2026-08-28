@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises';
 import { join, extname, basename, relative, sep } from 'node:path';
-import { readTags } from './tags';
+import { readTags, type TrackTags } from './tags';
 import { readChapters, type Chapter } from './chapters';
 
 export const AUDIO = new Set(['.mp3', '.m4a', '.m4b', '.flac', '.ogg', '.opus', '.wav', '.aac']);
@@ -69,6 +69,42 @@ async function audioFilesIn(dir: string): Promise<string[]> {
 		.sort();
 }
 
+export interface RawTrack {
+	path: string;
+	tags: TrackTags;
+	mtime: number;
+	size: number;
+}
+
+/** Orders a folder's files and numbers them 1..n.
+ *
+ * The number stored is the folder's own ordering, NOT the file's track tag.
+ * Track tags repeat constantly — loose singles each tagged track 1, a
+ * two-disc album living in one folder, a folder mixing tagged and untagged
+ * files — and UNIQUE(item_id, position) turns every repeat into a failed
+ * insert that aborts the whole scan pass. Ordering still follows disc then
+ * track, so the sequence a listener sees is unchanged; only the number
+ * behind it is ours. Nothing renders it: queries.ts uses position purely
+ * to ORDER BY. */
+export function orderTracks(raw: RawTrack[], fileOrder: string[]): ScannedTrack[] {
+	const fallback = (path: string) => fileOrder.indexOf(path) + 1;
+	const sorted = [...raw].sort(
+		(a, b) =>
+			(a.tags.disc ?? 0) - (b.tags.disc ?? 0) ||
+			(a.tags.track ?? fallback(a.path)) - (b.tags.track ?? fallback(b.path)) ||
+			fallback(a.path) - fallback(b.path)
+	);
+	return sorted.map((t, i) => ({
+		path: t.path,
+		position: i + 1,
+		title: t.tags.title ?? basename(t.path, extname(t.path)),
+		disc: t.tags.disc,
+		duration: t.tags.duration,
+		mtime: t.mtime,
+		size: t.size
+	}));
+}
+
 export async function scanFolder(
 	root: string,
 	dir: string,
@@ -124,21 +160,7 @@ export async function scanFolder(
 		mtime: stats.get(path)![0],
 		size: stats.get(path)![1]
 	}));
-	rawTracks.sort(
-		(a, b) =>
-			(a.tags.disc ?? 0) - (b.tags.disc ?? 0) ||
-			(a.tags.track ?? files.indexOf(a.path) + 1) - (b.tags.track ?? files.indexOf(b.path) + 1)
-	);
-
-	const tracks: ScannedTrack[] = rawTracks.map((t, i) => ({
-		path: t.path,
-		position: t.tags.track ?? i + 1,
-		title: t.tags.title ?? basename(t.path, extname(t.path)),
-		disc: t.tags.disc,
-		duration: t.tags.duration,
-		mtime: t.mtime,
-		size: t.size
-	}));
+	const tracks = orderTracks(rawTracks, files);
 
 	const firstTags = rawTracks[0].tags;
 	const title = firstTags.album || basename(dir);
