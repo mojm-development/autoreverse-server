@@ -112,6 +112,9 @@ services:
       # Settings → Bibliotheken to actually use them.
       - /srv/media/audiobooks:/library/books:ro
       - /srv/media/music:/library/music:ro
+      # Downloaded podcast episodes, reachable from the host. Writable, unlike the
+      # two mounts above. Drop this line to keep them inside the volume.
+      - /srv/media/podcasts:/data/podcasts
       - autoreverse-data:/data
     depends_on:
       postgres:
@@ -136,6 +139,9 @@ cd autoreverse-server
 # Point these at your own media; both are mounted read-only.
 export AUTOREVERSE_BOOKS_HOST=/srv/media/audiobooks
 export AUTOREVERSE_MUSIC_HOST=/srv/media/music
+
+# Optional: where downloaded podcast episodes should land on the host.
+export AUTOREVERSE_PODCASTS_HOST=/srv/media/podcasts
 
 docker compose up -d
 ```
@@ -193,6 +199,25 @@ environment:
 
 Prefer `ORIGIN` where you can. The header variant trusts whatever sends those headers, so it is
 only safe if nothing but your proxy can reach the container.
+
+### Getting at downloaded podcast episodes
+
+Episodes downloaded through the UI are written to `$AUTOREVERSE_DATA/podcasts`, which lives inside
+the container's data volume by default — fine for playback, awkward if you also want the files on
+your NAS. Mount that one directory through to the host to change that:
+
+```yaml
+volumes:
+  - /srv/media/podcasts:/data/podcasts # writable, unlike the library mounts
+```
+
+Two things to know before you do. The mount must be **writable** — the library mounts are `:ro`,
+this one cannot be. And the files are named after their episode id, not their title: `/data/podcasts/42.mp3`,
+not `Some Show - Episode 42.mp3`. They are the server's own storage that you are looking in on,
+not an export.
+
+Cached cover art (`$AUTOREVERSE_DATA/covers`) stays in the volume; it is derived data and is
+rebuilt on the next scan if you lose it.
 
 ### Library paths are not environment variables
 

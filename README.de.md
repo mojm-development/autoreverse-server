@@ -137,6 +137,9 @@ cd autoreverse-server
 export AUTOREVERSE_BOOKS_HOST=/srv/media/hoerbuecher
 export AUTOREVERSE_MUSIC_HOST=/srv/media/musik
 
+# Optional: wohin heruntergeladene Podcast-Episoden auf dem Host sollen.
+export AUTOREVERSE_PODCASTS_HOST=/srv/media/podcasts
+
 docker compose up -d
 ```
 
@@ -196,6 +199,26 @@ environment:
 
 Nimm im Zweifel `ORIGIN`. Die Header-Variante vertraut jedem, der diese Header schickt — sie ist
 nur dann sicher, wenn niemand außer deinem Proxy an den Container herankommt.
+
+### Heruntergeladene Podcast-Episoden von außen erreichen
+
+Über die Oberfläche heruntergeladene Episoden landen in `$AUTOREVERSE_DATA/podcasts` und damit
+standardmäßig im Daten-Volume des Containers — zum Abspielen genügt das, unpraktisch wird es, wenn
+du die Dateien auch auf dem NAS haben willst. Dafür reichst du genau dieses Verzeichnis nach außen
+durch:
+
+```yaml
+volumes:
+  - /srv/media/podcasts:/data/podcasts # schreibbar, anders als die Bibliotheks-Mounts
+```
+
+Zwei Dinge solltest du vorher wissen. Der Mount muss **schreibbar** sein — die Bibliotheks-Mounts
+sind `:ro`, dieser darf es nicht sein. Und die Dateien heißen nach ihrer Episoden-ID, nicht nach
+ihrem Titel: `/data/podcasts/42.mp3`, nicht `Irgendeine Sendung - Folge 42.mp3`. Du schaust dem
+Server bei seiner eigenen Ablage zu, das ist kein Export.
+
+Zwischengespeicherte Cover (`$AUTOREVERSE_DATA/covers`) bleiben im Volume; sie sind abgeleitete
+Daten und entstehen beim nächsten Scan neu, wenn sie verloren gehen.
 
 ### Bibliothekspfade sind keine Umgebungsvariablen
 

@@ -39,6 +39,10 @@ services:
       # below (/library/books, /library/music) into Settings → Bibliotheken to actually use them.
       - ${AUTOREVERSE_BOOKS_HOST:-./dev-library/books}:/library/books:ro
       - ${AUTOREVERSE_MUSIC_HOST:-./dev-library/music}:/library/music:ro
+      # Downloaded podcast episodes, reachable from the host. Must be writable —
+      # unlike the two library mounts above. Files land here flat, named
+      # <episodeId>.<ext>. Covers stay in the named volume below.
+      - ${AUTOREVERSE_PODCASTS_HOST:-./dev-library/podcasts}:/data/podcasts
       - autoreverse-data:/data
     depends_on:
       postgres:
