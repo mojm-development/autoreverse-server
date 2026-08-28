@@ -24,7 +24,7 @@ export const actions = {
 		const playbackSpeed = Number(data.get('playbackSpeed'));
 		const skipBack = Number(data.get('skipBack'));
 		const skipForward = Number(data.get('skipForward'));
-		await setPreferences(db, userId, playbackSpeed, skipBack, skipForward);
-		return { success: true };
+		const stored = await setPreferences(db, userId, playbackSpeed, skipBack, skipForward);
+		return { success: true, prefs: stored };
 	}
 };

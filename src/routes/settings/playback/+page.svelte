@@ -1,10 +1,30 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import { PLAYER_CONTEXT_KEY, type PlayerStore, type PlayerPreferences } from '$lib/player.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
+
+	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
+	let saved = $state(false);
+	let timer: ReturnType<typeof setTimeout> | null = null;
+
+	const submit: SubmitFunction =
+		() =>
+		async ({ result, update }) => {
+			if (result.type === 'success' && result.data?.prefs) {
+				player.applyPreferences(result.data.prefs as PlayerPreferences);
+				saved = true;
+				if (timer) clearTimeout(timer);
+				timer = setTimeout(() => (saved = false), 2500);
+			}
+			await update({ reset: false });
+		};
 </script>
 
 <h1>Wiedergabe</h1>
-<form method="POST" class="form">
+<form method="POST" class="form" use:enhance={submit}>
 	<label>
 		<span class="eyebrow">Geschwindigkeit</span>
 		<input
@@ -36,13 +56,25 @@
 			value={data.prefs.skipForward}
 		/>
 	</label>
-	<button type="submit" class="primary">Speichern</button>
+	<div class="save">
+		<button type="submit" class="primary">Speichern</button>
+		<span class="saved" role="status" aria-live="polite">{saved ? 'Gespeichert' : ''}</span>
+	</div>
 </form>
 
 <style>
 	h1 {
 		font: 600 20px var(--font-sans);
 		margin-bottom: 16px;
+	}
+	.save {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.saved {
+		color: var(--faint);
+		font-size: 12px;
 	}
 	.form {
 		display: flex;

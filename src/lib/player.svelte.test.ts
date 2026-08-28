@@ -360,4 +360,20 @@ describe('player store', () => {
 		await store.play(42);
 		expect(store.current?.speed).toBe(2);
 	});
+	it('new preferences reach the running player without restarting it', async () => {
+		stubSession();
+		const store = createPlayerStore({ playbackSpeed: 1, skipBack: 30, skipForward: 15 });
+		await store.play(42);
+		store.seek(200);
+		const session = store.current?.sessionId;
+
+		store.applyPreferences({ playbackSpeed: 1.25, skipBack: 45, skipForward: 5 });
+
+		store.skipBack();
+		expect(store.current?.position).toBe(155);
+		store.skipForward();
+		expect(store.current?.position).toBe(160);
+		expect(store.current?.speed).toBe(1.25);
+		expect(store.current?.sessionId).toBe(session);
+	});
 });
