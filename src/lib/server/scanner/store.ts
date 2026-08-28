@@ -217,7 +217,7 @@ export async function markMissing(
 		.from(itemsTable)
 		.where(
 			and(
-				sql`substr(${itemsTable.sourcePath}, 1, ${prefix.length}) = ${prefix}`,
+				sql`(${itemsTable.sourcePath} = ${root} OR substr(${itemsTable.sourcePath}, 1, ${prefix.length}) = ${prefix})`,
 				isNull(itemsTable.missingSince)
 			)
 		);
