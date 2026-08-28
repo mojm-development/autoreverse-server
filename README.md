@@ -160,14 +160,14 @@ Then, still in the web UI:
 
 ## Configuration
 
-| Variable                     | Required        | Default                                                           | Purpose                                                                                              |
-| ---------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                          |
-| `AUTOREVERSE_DATA`           | no              | `./data`                                                          | Base directory for server-managed files. `covers/` and `podcasts/` are created inside it.            |
-| `AUTOREVERSE_ADMIN_USER`     | first boot only | —                                                                 | Username of the first admin account.                                                                 |
-| `AUTOREVERSE_ADMIN_PASSWORD` | first boot only | —                                                                 | Password of that account.                                                                            |
-| `AUTOREVERSE_AUTO_MIGRATE`   | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.       |
-| `ORIGIN`                     | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy). |
+| Variable                     | Required        | Default                                                           | Purpose                                                                                               |
+| ---------------------------- | --------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`               | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                           |
+| `AUTOREVERSE_DATA`           | no              | `./data`                                                          | Base directory for server-managed files. `covers/`, `podcasts/` and `artists/` are created inside it. |
+| `AUTOREVERSE_ADMIN_USER`     | first boot only | —                                                                 | Username of the first admin account.                                                                  |
+| `AUTOREVERSE_ADMIN_PASSWORD` | first boot only | —                                                                 | Password of that account.                                                                             |
+| `AUTOREVERSE_AUTO_MIGRATE`   | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.        |
+| `ORIGIN`                     | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).  |
 
 See [`.env.example`](.env.example) for a copy-paste starting point.
 
@@ -274,6 +274,8 @@ throttle applies.
 | `GET`                  | `/items/{id}/cover`                               | Cover image                                                            |
 | `DELETE`               | `/items/missing`                                  | Purge items whose files are gone (admin)                               |
 | `GET`                  | `/artists`                                        | Distinct artists                                                       |
+| `GET` `POST`           | `/artists/{name}/image`                           | Custom artist image; upload is admin, multipart `image`                |
+| `PUT` `DELETE`         | `/artists/{name}/cover`                           | Pick an album as the artist image, or reset to random (admin)          |
 | `GET`                  | `/search`                                         | Cross-library search                                                   |
 | `GET` `HEAD`           | `/tracks/{id}/stream`                             | Range-capable audio stream                                             |
 | `POST`                 | `/play/{itemId}`                                  | Open a playback session                                                |

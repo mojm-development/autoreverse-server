@@ -211,6 +211,17 @@ export const libraryConfig = pgTable('library_config', {
 	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
 
+export const artistCovers = pgTable(
+	'artist_covers',
+	{
+		artist: text('artist').primaryKey(),
+		itemId: integer('item_id').references(() => items.id, { onDelete: 'cascade' }),
+		imagePath: text('image_path'),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [check('artist_cover_xor', sql`(${t.itemId} IS NULL) <> (${t.imagePath} IS NULL)`)]
+);
+
 export const playlistEntries = pgTable(
 	'playlist_entries',
 	{

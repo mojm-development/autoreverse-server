@@ -161,7 +161,7 @@ Danach, weiterhin in der Weboberfläche:
 | Variable                     | Pflicht               | Standard                                                          | Zweck                                                                                                         |
 | ---------------------------- | --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`               | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                                   |
-| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/` und `podcasts/` entstehen darin automatisch.             |
+| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/`, `podcasts/` und `artists/` entstehen darin automatisch. |
 | `AUTOREVERSE_ADMIN_USER`     | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                      |
 | `AUTOREVERSE_ADMIN_PASSWORD` | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                       |
 | `AUTOREVERSE_AUTO_MIGRATE`   | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen.   |
@@ -278,6 +278,8 @@ Feld `detail` zurück, bei Drosselung zusätzlich mit `retryAfter`.
 | `GET`                  | `/items/{id}/cover`                               | Coverbild                                                                   |
 | `DELETE`               | `/items/missing`                                  | Fehlende Titel entfernen (Verwalter)                                        |
 | `GET`                  | `/artists`                                        | Interpreten                                                                 |
+| `GET` `POST`           | `/artists/{name}/image`                           | Eigenes Interpretenbild; Upload nur für Verwalter, multipart `image`        |
+| `PUT` `DELETE`         | `/artists/{name}/cover`                           | Album als Interpretenbild wählen oder auf Zufall zurücksetzen (Verwalter)   |
 | `GET`                  | `/search`                                         | Suche über die ganze Bibliothek                                             |
 | `GET` `HEAD`           | `/tracks/{id}/stream`                             | Audiostream mit Range-Unterstützung                                         |
 | `POST`                 | `/play/{itemId}`                                  | Wiedergabesitzung öffnen                                                    |
