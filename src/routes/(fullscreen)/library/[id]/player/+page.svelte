@@ -407,12 +407,20 @@
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 10px;
+		/* Takes the room between the status row and the transport, so cover and visualizer
+		   grow into it instead of leaving a hole above them. */
+		flex: 1;
+		min-height: 0;
+		justify-content: flex-end;
 	}
 	.cover-row {
 		display: flex;
 		align-items: stretch;
 		gap: 24px;
 		align-self: stretch;
+		flex: 1;
+		min-height: 220px;
+		margin-bottom: 12px;
 	}
 	.viz-panel {
 		flex: 1;
@@ -428,8 +436,9 @@
 		--viz-segment: 5px;
 	}
 	.cover {
-		width: 300px;
-		height: 300px;
+		height: 100%;
+		aspect-ratio: 1;
+		max-width: 46%;
 		flex: none;
 		border-radius: var(--radius-lg);
 		background: var(--tile);
