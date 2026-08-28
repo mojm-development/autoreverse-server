@@ -13,6 +13,28 @@ function fakeAnalyser(level: number) {
 	} as unknown as AnalyserNode;
 }
 
+/** A spectrum shaped like real music: loud bass, rolling off ~12 dB per decade. */
+function slopedAnalyser() {
+	const binCount = 1024;
+	const sampleRate = 44100;
+	const minDb = -62;
+	const maxDb = -8;
+	return {
+		frequencyBinCount: binCount,
+		context: { sampleRate },
+		getByteFrequencyData: (target: Uint8Array) => {
+			for (let bin = 0; bin < binCount; bin += 1) {
+				const hz = Math.max(20, (bin * sampleRate) / 2 / binCount);
+				const db = -18 - 12 * Math.log10(hz / 50);
+				target[bin] = Math.max(
+					0,
+					Math.min(255, Math.round(((db - minDb) / (maxDb - minDb)) * 255))
+				);
+			}
+		}
+	} as unknown as AnalyserNode;
+}
+
 async function frames(count = 3) {
 	for (let i = 0; i < count; i += 1) {
 		await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -68,6 +90,17 @@ describe('Visualizer.svelte', () => {
 		const heights = bars().map((bar) => parseFloat(bar.style.height));
 		expect(heights).toHaveLength(40);
 		expect(heights.every((height) => height > 20)).toBe(true);
+	});
+
+	it('splits the spectrum logarithmically instead of drowning in the bass', async () => {
+		render(Visualizer, { playing: true, bars: 40, getAnalyser: slopedAnalyser });
+		await frames();
+		const heights = bars().map((bar) => parseFloat(bar.style.height));
+		// A linear bin split used to pin most of the row to the ceiling.
+		expect(heights.filter((height) => height > 95).length).toBeLessThan(4);
+		// The bass end leads, the highs trail, and the first columns are not identical twins.
+		expect(heights[0] - heights[39]).toBeGreaterThan(40);
+		expect(new Set(heights.slice(0, 4)).size).toBe(4);
 	});
 
 	it('renders the number of bars it was asked for', async () => {

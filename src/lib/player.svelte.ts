@@ -120,8 +120,13 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 			const source = context.createMediaElementSource(audioEl);
 			source.connect(context.destination);
 			const node = context.createAnalyser();
-			node.fftSize = 256;
-			node.smoothingTimeConstant = 0.75;
+			// 2048 buys ~21 Hz bins, enough resolution for a log-spaced band split in the
+			// visualizer; the default -30 dB ceiling clips loud music into a solid block, so
+			// give the top end headroom and lift the floor above the room noise.
+			node.fftSize = 2048;
+			node.smoothingTimeConstant = 0.65;
+			node.minDecibels = -62;
+			node.maxDecibels = -8;
 			source.connect(node);
 			audioContext = context;
 			analyser = node;
