@@ -28,7 +28,7 @@
 
 <nav class="sidebar" style="--a: var(--{accent})">
 	<div class="brand">
-		<BrandMark size={20} />
+		<BrandMark size={30} />
 		<span class="wordmark">Autoreverse</span>
 	</div>
 	<a href="/library/search" class="search-shortcut">Alles durchsuchen</a>
@@ -108,7 +108,7 @@
 		padding: 0 10px 18px;
 	}
 	.wordmark {
-		font: 600 15px/1 var(--font-sans);
+		font: 600 16px/1 var(--font-sans);
 		letter-spacing: -0.015em;
 	}
 	.search-shortcut {

@@ -9,7 +9,7 @@
 <div class="login" style="--a: var(--book)">
 	<div class="branding">
 		<div class="brand">
-			<BrandMark size={26} /><span class="wordmark">Autoreverse</span>
+			<BrandMark size={34} /><span class="wordmark">Autoreverse</span>
 		</div>
 		<div>
 			<h1>Ein Server. Alles zum Hören.</h1>

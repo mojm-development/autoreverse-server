@@ -4,7 +4,7 @@
 </script>
 
 <div class="error-page">
-	<div class="brand"><BrandMark size={24} /><span class="wordmark">Autoreverse</span></div>
+	<div class="brand"><BrandMark size={30} /><span class="wordmark">Autoreverse</span></div>
 	<span class="code mono">{page.status}</span>
 	<h1>{page.error?.message ?? 'Etwas ist schiefgelaufen.'}</h1>
 	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
