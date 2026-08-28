@@ -54,6 +54,8 @@ Backups hast.
 - Verzeichnissuche (öffentliche iTunes-Search-API von Apple) — nach Namen suchen statt Feed-URLs
   zusammensuchen
 - Feed-Vorschau vor dem Abonnieren
+- Die neuesten N Folgen eines Abos vorhalten — ein globaler Standard, pro Feed überschreibbar.
+  Downloads jenseits dieser Zahl werden beim nächsten Aktualisieren wieder entfernt
 - Aktualisierung je Feed, Episoden auf Wunsch in den Serverspeicher heruntergeladen
 
 **Benutzer**
@@ -160,14 +162,15 @@ Danach, weiterhin in der Weboberfläche:
 
 ## Konfiguration
 
-| Variable                     | Pflicht               | Standard                                                          | Zweck                                                                                                         |
-| ---------------------------- | --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                                   |
-| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/`, `podcasts/` und `artists/` entstehen darin automatisch. |
-| `AUTOREVERSE_ADMIN_USER`     | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                      |
-| `AUTOREVERSE_ADMIN_PASSWORD` | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                       |
-| `AUTOREVERSE_AUTO_MIGRATE`   | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen.   |
-| `ORIGIN`                     | hinter einem Proxy    | aus dem `Host`-Header abgeleitet, Protokoll als `http` angenommen | Öffentliche URL des Servers. Siehe [Betrieb hinter einem Reverse Proxy](#betrieb-hinter-einem-reverse-proxy). |
+| Variable                            | Pflicht               | Standard                                                          | Zweck                                                                                                         |
+| ----------------------------------- | --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                      | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                                   |
+| `AUTOREVERSE_DATA`                  | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/`, `podcasts/` und `artists/` entstehen darin automatisch. |
+| `AUTOREVERSE_ADMIN_USER`            | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                      |
+| `AUTOREVERSE_ADMIN_PASSWORD`        | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                       |
+| `AUTOREVERSE_AUTO_MIGRATE`          | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen.   |
+| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | nein                  | `6`                                                               | Wie oft der Server alle Feeds aktualisiert und die Downloads nachhält. `0` schaltet den Hintergrundlauf ab.   |
+| `ORIGIN`                            | hinter einem Proxy    | aus dem `Host`-Header abgeleitet, Protokoll als `http` angenommen | Öffentliche URL des Servers. Siehe [Betrieb hinter einem Reverse Proxy](#betrieb-hinter-einem-reverse-proxy). |
 
 Eine Vorlage zum Kopieren liegt in [`.env.example`](.env.example).
 

@@ -6,6 +6,7 @@ import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 import { readJson } from '$lib/server/api/validate';
 import { loadConfig } from '$lib/server/config';
+import { retainForPodcast } from '$lib/server/podcasts/retention';
 
 export async function _podcastsPostHandler(
 	db: DrizzleDb,
@@ -16,8 +17,9 @@ export async function _podcastsPostHandler(
 		const { feed_url } = await readJson<{ feed_url?: unknown }>(event.request);
 		if (typeof feed_url !== 'string' || feed_url.length < 1)
 			return apiError(422, 'feed_url muss eine nicht-leere Zeichenkette sein');
-		const { coverDir } = loadConfig(process.env as Record<string, string | undefined>);
+		const { coverDir, podcastsDir } = loadConfig(process.env as Record<string, string | undefined>);
 		const podcast = await subscribe(db, feed_url, { coversDir: coverDir });
+		void retainForPodcast(db, podcast.id, podcastsDir);
 		return json({
 			id: podcast.id,
 			title: podcast.title,

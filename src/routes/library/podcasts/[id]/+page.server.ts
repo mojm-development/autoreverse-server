@@ -1,4 +1,4 @@
-import { error } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { requireWebUser } from '$lib/server/auth/session';
 import {
@@ -8,6 +8,8 @@ import {
 	itemDurations,
 	progressMap
 } from '$lib/server/library/queries';
+import { requireWebAdmin } from '$lib/server/auth/session';
+import { getKeepDefault, setKeepForPodcast, KEEP_MAX } from '$lib/server/podcasts/retention';
 
 export const load = async ({ locals, params }) => {
 	const userId = requireWebUser(locals);
@@ -23,5 +25,32 @@ export const load = async ({ locals, params }) => {
 		progressMap(db, userId, episodeIds)
 	]);
 	const unread = podcasts.reduce((sum, p) => sum + (p.unheard_count ?? 0), 0);
-	return { podcast, podcasts, unread, episodes, durations, progress };
+	return {
+		podcast,
+		podcasts,
+		unread,
+		episodes,
+		durations,
+		progress,
+		keepDefault: await getKeepDefault(db),
+		keepMax: KEEP_MAX
+	};
+};
+
+export const actions = {
+	keep: async ({ locals, params, request }) => {
+		await requireWebAdmin(locals, db);
+		const form = await request.formData();
+		const raw = String(form.get('keep') ?? '');
+		if (raw === '') {
+			await setKeepForPodcast(db, Number(params.id), null);
+			return { ok: true };
+		}
+		const keep = Number(raw);
+		if (!Number.isInteger(keep) || keep < 0 || keep > KEEP_MAX) {
+			return fail(422, { error: `Bitte eine Zahl zwischen 0 und ${KEEP_MAX}` });
+		}
+		await setKeepForPodcast(db, Number(params.id), keep);
+		return { ok: true };
+	}
 };

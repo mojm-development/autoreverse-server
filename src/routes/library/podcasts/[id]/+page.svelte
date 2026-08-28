@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { getContext } from 'svelte';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
@@ -103,6 +104,22 @@
 						<button class="outline" onclick={unsubscribe}>Abo kündigen</button>
 					{/if}
 				</div>
+				{#if data.user?.isAdmin}
+					<form class="keep" method="POST" action="?/keep" use:enhance>
+						<label for="keep">Folgen vorhalten</label>
+						<input
+							id="keep"
+							name="keep"
+							type="number"
+							min="0"
+							max={data.keepMax}
+							placeholder="Standard ({data.keepDefault})"
+							value={data.podcast.keepEpisodes ?? ''}
+						/>
+						<button type="submit" class="secondary">Übernehmen</button>
+						<span class="keep-hint">leer = Standard ({data.keepDefault})</span>
+					</form>
+				{/if}
 			</div>
 		</div>
 
@@ -205,6 +222,24 @@
 		color: var(--dim);
 		font-size: 12.5px;
 		margin: 0;
+	}
+	.keep {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 12px;
+		flex-wrap: wrap;
+	}
+	.keep label {
+		font-size: 12px;
+		color: var(--dim);
+	}
+	.keep input {
+		width: 130px;
+	}
+	.keep-hint {
+		font-size: 11px;
+		color: var(--faint);
 	}
 	.actions {
 		display: flex;

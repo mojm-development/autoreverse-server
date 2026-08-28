@@ -53,6 +53,8 @@ between releases without a migration path. Run it against data you have backups 
 - Directory search (Apple's public iTunes search API) — search by name instead of hunting for
   feed URLs
 - Preview a feed before subscribing
+- Keep the newest N episodes of a subscription downloaded — a global default, overridable per
+  feed. Downloads past that number are removed again on the next refresh
 - Per-feed refresh, episodes downloaded to server-side storage on demand
 
 **Users**
@@ -161,14 +163,15 @@ Then, still in the web UI:
 
 ## Configuration
 
-| Variable                     | Required        | Default                                                           | Purpose                                                                                               |
-| ---------------------------- | --------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                           |
-| `AUTOREVERSE_DATA`           | no              | `./data`                                                          | Base directory for server-managed files. `covers/`, `podcasts/` and `artists/` are created inside it. |
-| `AUTOREVERSE_ADMIN_USER`     | first boot only | —                                                                 | Username of the first admin account.                                                                  |
-| `AUTOREVERSE_ADMIN_PASSWORD` | first boot only | —                                                                 | Password of that account.                                                                             |
-| `AUTOREVERSE_AUTO_MIGRATE`   | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.        |
-| `ORIGIN`                     | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).  |
+| Variable                            | Required        | Default                                                           | Purpose                                                                                                         |
+| ----------------------------------- | --------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                      | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                                     |
+| `AUTOREVERSE_DATA`                  | no              | `./data`                                                          | Base directory for server-managed files. `covers/`, `podcasts/` and `artists/` are created inside it.           |
+| `AUTOREVERSE_ADMIN_USER`            | first boot only | —                                                                 | Username of the first admin account.                                                                            |
+| `AUTOREVERSE_ADMIN_PASSWORD`        | first boot only | —                                                                 | Password of that account.                                                                                       |
+| `AUTOREVERSE_AUTO_MIGRATE`          | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.                  |
+| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | no              | `6`                                                               | How often the server refreshes every feed and applies the download retention. `0` turns the background job off. |
+| `ORIGIN`                            | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).            |
 
 See [`.env.example`](.env.example) for a copy-paste starting point.
 

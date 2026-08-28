@@ -3,6 +3,7 @@ export interface Config {
 	coverDir: string;
 	podcastsDir: string;
 	artistsDir: string;
+	podcastRefreshHours: number;
 	databaseUrl: string;
 }
 
@@ -13,6 +14,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
 		coverDir: `${dataDir}/covers`,
 		podcastsDir: `${dataDir}/podcasts`,
 		artistsDir: `${dataDir}/artists`,
+		podcastRefreshHours: Math.max(0, Number(env.AUTOREVERSE_PODCAST_REFRESH_HOURS ?? 6) || 0),
 		databaseUrl:
 			env.DATABASE_URL ?? 'postgresql://autoreverse:autoreverse@localhost:5434/autoreverse'
 	};

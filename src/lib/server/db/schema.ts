@@ -64,7 +64,8 @@ export const items = pgTable(
 		publishedAt: timestamp('published_at', { withTimezone: true }),
 		addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
 		missingSince: timestamp('missing_since', { withTimezone: true }),
-		guid: text('guid')
+		guid: text('guid'),
+		keepEpisodes: integer('keep_episodes')
 	},
 	(t) => [
 		check('kind_check', sql`${t.kind} IN ('book','album','podcast','episode')`),
@@ -204,12 +205,17 @@ export const playlists = pgTable(
 	(t) => [index('playlist_user').on(t.userId)]
 );
 
-export const libraryConfig = pgTable('library_config', {
-	id: integer('id').primaryKey(),
-	booksDir: text('books_dir'),
-	musicDir: text('music_dir'),
-	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
-});
+export const libraryConfig = pgTable(
+	'library_config',
+	{
+		id: integer('id').primaryKey(),
+		booksDir: text('books_dir'),
+		musicDir: text('music_dir'),
+		podcastKeepEpisodes: integer('podcast_keep_episodes').notNull().default(0),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [check('keep_episodes_range', sql`${t.podcastKeepEpisodes} BETWEEN 0 AND 50`)]
+);
 
 export const artistCovers = pgTable(
 	'artist_covers',
