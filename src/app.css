@@ -180,7 +180,10 @@ button:disabled {
    instead) — so they stayed unstyled too. Match every type now; icon-only buttons opt out
    via .icon-btn below rather than being excluded here, since a plain type/attribute
    selector can't tell an icon button from a text one. */
-button:not(.primary, .secondary, .icon-btn) {
+/* .bare is excluded because those buttons are layout elements that happen to
+   need keyboard activation — a clickable row, a full-row hit target — not
+   controls that should render as a pill. */
+button:not(.primary, .secondary, .icon-btn, .bare) {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -216,4 +219,18 @@ button:not(.primary, .secondary, .icon-btn) {
 }
 .icon-btn:disabled {
 	opacity: 0.5;
+}
+
+/* Strips both the pill styling above and the user agent's own button chrome,
+   for buttons used as clickable layout. Component styles still win over this
+   (a scoped `.foo` is `.foo.svelte-hash`, so it outranks a single class). */
+.bare {
+	appearance: none;
+	border: none;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	padding: 0;
+	cursor: pointer;
 }

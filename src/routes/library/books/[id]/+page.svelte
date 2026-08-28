@@ -37,6 +37,9 @@
 		return hours >= 1 ? `${hours.toFixed(1)} Std` : `${Math.round(seconds / 60)} min`;
 	}
 
+	function playFrom(position: number) {
+		void player.playFrom(data.book.id, position);
+	}
 	async function restart() {
 		await player.play(data.book.id);
 		player.seek(0);
@@ -112,11 +115,11 @@
 	</div>
 
 	{#if tab === 'chapters'}
-		<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} />
+		<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} onSelect={playFrom} />
 	{:else if tab === 'bookmarks'}
 		<div class="table" role="table" aria-label="Lesezeichen">
 			{#each data.bookmarks as b (b.id)}
-				<ListRow>
+				<ListRow label="Lesezeichen {b.title} abspielen" onclick={() => playFrom(b.position)}>
 					<span class="title">{b.title}</span>
 					<span class="cell mono">{formatHMS(b.position)}</span>
 				</ListRow>

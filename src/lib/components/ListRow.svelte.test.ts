@@ -28,4 +28,31 @@ describe('ListRow.svelte', () => {
 		const row = page.getByRole('row');
 		await expect.element(row).not.toHaveAttribute('href');
 	});
+
+	it('activates on click when onclick is given', async () => {
+		let clicks = 0;
+		render(ListRow, {
+			onclick: () => (clicks += 1),
+			label: 'Punk ist... abspielen',
+			children: textSnippet('Punk ist...')
+		});
+		await page.getByLabelText('Punk ist... abspielen').click();
+		expect(clicks).toBe(1);
+	});
+
+	it('keeps the activator out of the button so nested controls stay valid', async () => {
+		// A <button> may not contain interactive content: wrapping the row in
+		// one makes the parser close it at the first nested button, which
+		// collapses the layout. The activator must therefore be a sibling of
+		// the row content, not its ancestor.
+		render(ListRow, {
+			onclick: () => {},
+			label: 'Rebell abspielen',
+			children: textSnippet('Rebell')
+		});
+		const activator = page.getByLabelText('Rebell abspielen');
+		await expect.element(activator).toBeInTheDocument();
+		await expect.element(page.getByText('Rebell')).toBeInTheDocument();
+		expect(document.querySelector('button button')).toBeNull();
+	});
 });

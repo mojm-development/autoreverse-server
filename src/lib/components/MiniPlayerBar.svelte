@@ -66,12 +66,17 @@
 
 <style>
 	.bar {
-		/* grid-column: 2 takes effect once a later task's /library shell wires
-		   this bar into an actual `display: grid` layout with a sidebar in
-		   column 1 (Task 30+). At the root layout level (this task's scope)
-		   there is no grid ancestor, so this is currently inert — not
-		   dead/accidental CSS, just not yet load-bearing. */
-		grid-column: 2;
+		/* Was `grid-column: 2`, waiting for a shell that would place it in a
+		   grid — but the bar renders in the root layout, a sibling of the
+		   shell rather than a child, so it never had a grid parent and simply
+		   stacked below a `min-height: 100vh` shell, off-screen. Pinning it to
+		   the viewport is what it actually needs; it starts where the sidebar
+		   ends so the account block stays reachable. */
+		position: fixed;
+		left: var(--sidebar-width);
+		right: 0;
+		bottom: 0;
+		z-index: 20;
 		display: flex;
 		align-items: center;
 		gap: 16px;
@@ -142,5 +147,14 @@
 		border-radius: 50%;
 		background: var(--text);
 		margin-left: -5px;
+	}
+
+	@media (max-width: 700px) {
+		/* The sidebar becomes a fixed bottom tab bar at this width — sit on top
+		   of it rather than under it. */
+		.bar {
+			left: 0;
+			bottom: var(--mobile-nav-height);
+		}
 	}
 </style>

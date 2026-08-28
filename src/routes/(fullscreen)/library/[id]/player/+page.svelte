@@ -14,6 +14,10 @@
 		}
 	});
 
+	function playFrom(position: number) {
+		void player.playFrom(data.item.id, position);
+	}
+
 	function accentFor(kind: string): 'book' | 'music' | 'podcast' {
 		if (kind === 'book') return 'book';
 		if (kind === 'album') return 'music';
@@ -148,14 +152,19 @@
 			</button>
 		</div>
 		{#if tab === 'chapters'}
-			<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} />
+			<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} onSelect={playFrom} />
 		{:else}
 			<div class="table" role="table" aria-label="Lesezeichen">
 				{#each data.bookmarks as b (b.id)}
-					<div class="bookmark-row" role="row">
+					<button
+						type="button"
+						class="bookmark-row bare"
+						role="row"
+						onclick={() => playFrom(b.position)}
+					>
 						<span>{b.title}</span>
 						<span class="mono">{formatHMS(b.position)}</span>
-					</div>
+					</button>
 				{/each}
 			</div>
 		{/if}

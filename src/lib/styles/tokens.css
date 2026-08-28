@@ -22,6 +22,13 @@
 	--font-sans: 'Helvetica Neue', Helvetica, system-ui, sans-serif;
 	--font-mono: ui-monospace, Menlo, monospace;
 
+	/* Layout. The fixed MiniPlayerBar has to line up with the sidebar it sits
+	   next to, and it lives in the root layout with no way to measure it —
+	   so the shells and the bar share these instead of each hardcoding 236px. */
+	--sidebar-width: 236px;
+	--player-bar-height: 78px;
+	--mobile-nav-height: 56px;
+
 	/* Radius scale, most-used values from the design export */
 	--radius-pill: 99px;
 	--radius-md: 8px;

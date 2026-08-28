@@ -86,7 +86,7 @@
 
 <style>
 	nav {
-		width: 236px;
+		width: var(--sidebar-width);
 		display: flex;
 		flex-direction: column;
 		padding: 20px 12px 12px;

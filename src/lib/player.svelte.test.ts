@@ -154,4 +154,80 @@ describe('player store', () => {
 		// naive seek(0) — same trackIndex as before — would have failed to do.
 		expect(fakeAudioElement.src).toBe('/tracks/2/stream');
 	});
+	/** Three tracks of 100s each, so a track index maps to a round position. */
+	function stubSession(startPosition = 0) {
+		const fetchMock = vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				session_id: 's1',
+				start_position: startPosition,
+				tracks: [
+					{ id: 11, position: 1, title: 'T1', duration: 100 },
+					{ id: 22, position: 2, title: 'T2', duration: 100 },
+					{ id: 33, position: 3, title: 'T3', duration: 100 }
+				],
+				chapters: []
+			})
+		});
+		vi.stubGlobal('fetch', fetchMock);
+		return fetchMock;
+	}
+
+	it('playTrackAt() starts a not-yet-loaded item at the requested track', async () => {
+		stubSession(250); // saved progress sits in track 3
+		const store = createPlayerStore();
+		await store.playTrackAt(42, 1);
+		expect(store.current?.trackIndex).toBe(1);
+		// The requested track wins over the resume position, otherwise clicking
+		// row 2 would drop the listener wherever they last stopped.
+		expect(store.current?.position).toBe(100);
+		expect(store.current?.playing).toBe(true);
+	});
+
+	it('playTrackAt() jumps inside an already-loaded item without a second session', async () => {
+		const fetchMock = stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+
+		await store.playTrackAt(42, 2);
+		expect(store.current?.trackIndex).toBe(2);
+		expect(store.current?.position).toBe(200);
+		// Still one /play call: re-POSTing would open a second playback session
+		// for something already playing.
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('playTrackAt() clamps an out-of-range index instead of loading nothing', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		await store.playTrackAt(42, 99);
+		expect(store.current?.trackIndex).toBe(2);
+	});
+
+	it('playTrackById() resolves the track by id, not by running order', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.playTrackById(42, 33);
+		expect(store.current?.trackIndex).toBe(2);
+		expect(store.current?.position).toBe(200);
+	});
+
+	it('playTrackById() ignores a track id the item does not contain', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		await store.playTrackById(42, 999);
+		expect(store.current?.trackIndex).toBe(0); // unchanged
+	});
+
+	it('playFrom() seeks to an absolute position across a track boundary', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.playFrom(42, 250); // 50s into track 3 — a chapter or bookmark
+		expect(store.current?.trackIndex).toBe(2);
+		expect(store.current?.position).toBe(250);
+		expect(store.current?.playing).toBe(true);
+	});
 });

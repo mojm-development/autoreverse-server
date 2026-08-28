@@ -1,8 +1,12 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
+	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
+
+	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 
 	function accent(kind: string): string {
 		if (kind === 'book') return 'book';
@@ -102,7 +106,12 @@
 					</ListRow>
 				{/each}
 				{#each data.tracks as track (track.id)}
-					<ListRow>
+					<!-- By id, not by index: a search hit knows which track it is but
+						not where it sits in its item's running order. -->
+					<ListRow
+						label="{track.title} abspielen"
+						onclick={() => player.playTrackById(track.item_id, track.id)}
+					>
 						<span class="dot" style="background: var(--music)"></span>
 						<span class="title">{track.title}</span>
 						<span class="row-meta">{track.item_title}</span>
