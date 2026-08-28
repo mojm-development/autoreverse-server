@@ -6,11 +6,12 @@ export interface PlayerTrack {
 }
 export interface PlayerState {
 	itemId: number;
+	kind: string;
 	sessionId: string;
 	tracks: PlayerTrack[];
 	chapters: { title: string; start: number; end: number }[];
 	trackIndex: number;
-	position: number; // seconds, absolute across all tracks of the item
+	position: number;
 	playing: boolean;
 	speed: number;
 }
@@ -21,9 +22,6 @@ function trackStart(tracks: PlayerTrack[], trackIndex: number): number {
 	return sum;
 }
 
-/** Maps an absolute item-position to the track it falls in and the offset
- * within that track. Clamps to the last track if the position exceeds the
- * item's total duration (skipForward can overshoot near the end). */
 function locate(
 	tracks: PlayerTrack[],
 	absolutePosition: number
@@ -69,18 +67,10 @@ export function createPlayerStore() {
 		});
 	}
 
-	/** Points the shared <audio> element at the given track/offset and, if
-	 * the store says we're playing, starts it. Called on initial play(), on
-	 * auto-advance (onended), and on any seek/skip that crosses a track
-	 * boundary. */
 	function loadTrack(trackIndex: number, offset: number) {
 		if (!current) return;
 		const track = current.tracks[trackIndex];
 		if (!track) return;
-		// State first, media second. The old order bailed out on a missing
-		// audio element before assigning trackIndex, so any jump made before
-		// MiniPlayerBar mounted left the store pointing at the wrong track
-		// while the UI happily rendered it as current.
 		current.trackIndex = trackIndex;
 		if (!audioEl) return;
 		audioEl.src = `/tracks/${track.id}/stream`;
@@ -88,11 +78,6 @@ export function createPlayerStore() {
 		if (current.playing) void audioEl.play();
 	}
 
-	/** Called once, from MiniPlayerBar's onMount — hands the store direct,
-	 * imperative control of the one persistent <audio> element. A single
-	 * owner (this) avoids the feedback loop a two-way reactive binding would
-	 * create between `ontimeupdate` (audio → state) and a $effect that tries
-	 * to write that same time back (state → audio). */
 	function attachAudioElement(el: HTMLAudioElement) {
 		if (audioEl && audioEl !== el) {
 			audioEl.pause();
@@ -119,9 +104,6 @@ export function createPlayerStore() {
 		}
 	}
 
-	/** `startTrackIndex` starts the item at a given track instead of where the
-	 * listener left off — what clicking a row in a track list means, as opposed
-	 * to the big play button's "carry on where I was". */
 	async function play(itemId: number, startTrackIndex?: number) {
 		const res = await fetch(`/play/${itemId}`, { method: 'POST' });
 		const body = await res.json();
@@ -141,6 +123,7 @@ export function createPlayerStore() {
 
 		current = {
 			itemId,
+			kind: body.kind ?? 'album',
 			sessionId: body.session_id,
 			tracks,
 			chapters: body.chapters,
@@ -153,7 +136,6 @@ export function createPlayerStore() {
 		loadTrack(trackIndex, offset);
 	}
 
-	/** Moves the already-loaded item to the start of one of its tracks. */
 	function jumpToTrack(trackIndex: number) {
 		if (!current) return;
 		const index = clampIndex(current.tracks, trackIndex);
@@ -162,9 +144,6 @@ export function createPlayerStore() {
 		loadTrack(index, 0);
 	}
 
-	/** Plays one specific track of an item. When that item is already loaded it
-	 * jumps within it instead of POSTing /play again, which would open a second
-	 * playback session for something already playing. */
 	async function playTrackAt(itemId: number, trackIndex: number) {
 		if (!current || current.itemId !== itemId) {
 			await play(itemId, trackIndex);
@@ -173,9 +152,6 @@ export function createPlayerStore() {
 		jumpToTrack(trackIndex);
 	}
 
-	/** Same, but identifying the track by id — for callers that know which
-	 * track they mean but not where it sits in its item's running order, such
-	 * as search results. */
 	async function playTrackById(itemId: number, trackId: number) {
 		if (!current || current.itemId !== itemId) await play(itemId);
 		const index = current?.tracks.findIndex((t) => t.id === trackId) ?? -1;
@@ -183,8 +159,6 @@ export function createPlayerStore() {
 		jumpToTrack(index);
 	}
 
-	/** Plays an item from an absolute position — what selecting a chapter or a
-	 * bookmark means. Loads the item first when something else is playing. */
 	async function playFrom(itemId: number, position: number) {
 		if (!current || current.itemId !== itemId) await play(itemId);
 		if (!current) return;
@@ -220,11 +194,26 @@ export function createPlayerStore() {
 		if (current) seek(current.position + seconds);
 	}
 
-	/** Reloads the <audio> element for whatever track currently sits at
-	 * `current.trackIndex`, even if that index number hasn't changed — needed
-	 * when the *contents* of `current.tracks` were reordered externally (e.g.
-	 * a shuffle), which `seek()`'s index-comparison optimization can't detect
-	 * on its own since the index itself is unchanged. */
+	function trackOffset(): number {
+		if (!current) return 0;
+		return current.position - trackStart(current.tracks, current.trackIndex);
+	}
+
+	function nextTrack() {
+		if (!current) return;
+		if (current.trackIndex >= current.tracks.length - 1) return;
+		jumpToTrack(current.trackIndex + 1);
+	}
+
+	function previousTrack() {
+		if (!current) return;
+		if (trackOffset() > 3 || current.trackIndex === 0) {
+			jumpToTrack(current.trackIndex);
+			return;
+		}
+		jumpToTrack(current.trackIndex - 1);
+	}
+
 	function reloadCurrentTrack() {
 		if (!current) return;
 		loadTrack(current.trackIndex, 0);
@@ -259,6 +248,9 @@ export function createPlayerStore() {
 		seek,
 		skipBack,
 		skipForward,
+		nextTrack,
+		previousTrack,
+		trackOffset,
 		close,
 		attachAudioElement,
 		reloadCurrentTrack

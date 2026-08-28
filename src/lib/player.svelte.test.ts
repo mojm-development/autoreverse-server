@@ -160,6 +160,7 @@ describe('player store', () => {
 			ok: true,
 			json: async () => ({
 				session_id: 's1',
+				kind: 'album',
 				start_position: startPosition,
 				tracks: [
 					{ id: 11, position: 1, title: 'T1', duration: 100 },
@@ -229,5 +230,64 @@ describe('player store', () => {
 		expect(store.current?.trackIndex).toBe(2);
 		expect(store.current?.position).toBe(250);
 		expect(store.current?.playing).toBe(true);
+	});
+	it('nextTrack() advances and stops at the last track', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		store.nextTrack();
+		expect(store.current?.trackIndex).toBe(1);
+		store.nextTrack();
+		expect(store.current?.trackIndex).toBe(2);
+		store.nextTrack();
+		expect(store.current?.trackIndex).toBe(2);
+	});
+
+	it('previousTrack() restarts the track when more than 3s in', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		store.nextTrack();
+		store.seek(150);
+		expect(store.trackOffset()).toBe(50);
+		store.previousTrack();
+		expect(store.current?.trackIndex).toBe(1);
+		expect(store.current?.position).toBe(100);
+	});
+
+	it('previousTrack() steps back when near the start of the track', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		store.nextTrack();
+		store.seek(102);
+		store.previousTrack();
+		expect(store.current?.trackIndex).toBe(0);
+		expect(store.current?.position).toBe(0);
+	});
+
+	it('previousTrack() on the first track restarts it rather than underflowing', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		store.seek(1);
+		store.previousTrack();
+		expect(store.current?.trackIndex).toBe(0);
+		expect(store.current?.position).toBe(0);
+	});
+
+	it('trackOffset() is relative to the current track, not the whole item', async () => {
+		stubSession(250);
+		const store = createPlayerStore();
+		await store.play(42);
+		expect(store.current?.trackIndex).toBe(2);
+		expect(store.trackOffset()).toBe(50);
+	});
+
+	it('play() records the item kind so the UI can branch on it', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		expect(store.current?.kind).toBe('album');
 	});
 });

@@ -25,6 +25,7 @@ export async function _playPostHandler(
 		const chapterRows = await chapters(db, row.id);
 		return json({
 			session_id: sessionId,
+			kind: row.kind,
 			start_position: startPosition,
 			tracks: trackRows.map(toTrackOut),
 			chapters: chapterRows.map(toChapterOut)

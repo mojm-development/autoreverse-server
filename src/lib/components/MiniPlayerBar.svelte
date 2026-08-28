@@ -12,9 +12,17 @@
 	const isFullscreenPlayer = $derived(page.url.pathname.endsWith('/player'));
 	const current = $derived(player.current);
 	const track = $derived(current?.tracks[current.trackIndex]);
-	const totalDuration = $derived(current?.tracks.reduce((sum, t) => sum + t.duration, 0) ?? 0);
-	const percent = $derived(
-		totalDuration > 0 ? ((current?.position ?? 0) / totalDuration) * 100 : 0
+	const byTrack = $derived(current?.kind === 'album');
+	const elapsed = $derived(byTrack ? player.trackOffset() : (current?.position ?? 0));
+	const total = $derived(
+		byTrack
+			? (track?.duration ?? 0)
+			: (current?.tracks.reduce((sum, t) => sum + t.duration, 0) ?? 0)
+	);
+	const percent = $derived(total > 0 ? (elapsed / total) * 100 : 0);
+	const atFirstTrack = $derived(current?.trackIndex === 0);
+	const atLastTrack = $derived(
+		current !== null && current !== undefined && current.trackIndex >= current.tracks.length - 1
 	);
 
 	function formatTime(seconds: number): string {
@@ -29,9 +37,24 @@
 {#if current && track && !isFullscreenPlayer}
 	<div class="bar">
 		<div class="transport">
-			<button class="icon-btn" aria-label="Zurück" onclick={() => player.skipBack(30)}
-				><Icon name="previous" /></button
-			>
+			{#if byTrack}
+				<button
+					class="icon-btn"
+					aria-label="Vorheriger Titel"
+					disabled={atFirstTrack && player.trackOffset() <= 3}
+					onclick={() => player.previousTrack()}
+				>
+					<Icon name="previous" />
+				</button>
+			{:else}
+				<button
+					class="icon-btn skip"
+					aria-label="30 Sekunden zurück"
+					onclick={() => player.skipBack(30)}
+				>
+					30
+				</button>
+			{/if}
 			<button
 				class="play"
 				aria-label={current.playing ? 'Pause' : 'Abspielen'}
@@ -39,15 +62,30 @@
 			>
 				<Icon name={current.playing ? 'pause' : 'play'} />
 			</button>
-			<button class="icon-btn" aria-label="Vor" onclick={() => player.skipForward(15)}
-				><Icon name="next" /></button
-			>
+			{#if byTrack}
+				<button
+					class="icon-btn"
+					aria-label="Nächster Titel"
+					disabled={atLastTrack}
+					onclick={() => player.nextTrack()}
+				>
+					<Icon name="next" />
+				</button>
+			{:else}
+				<button
+					class="icon-btn skip"
+					aria-label="15 Sekunden vor"
+					onclick={() => player.skipForward(15)}
+				>
+					15
+				</button>
+			{/if}
 		</div>
 		<div class="cover"></div>
 		<div class="info">
 			<div class="line">
 				<span class="title">{track.title}</span>
-				<span class="time mono">{formatTime(current.position)} / {formatTime(totalDuration)}</span>
+				<span class="time mono">{formatTime(elapsed)} / {formatTime(total)}</span>
 			</div>
 			<div class="scrubber">
 				<div class="fill" style="width: {percent}%"></div>
@@ -66,12 +104,6 @@
 
 <style>
 	.bar {
-		/* Was `grid-column: 2`, waiting for a shell that would place it in a
-		   grid — but the bar renders in the root layout, a sibling of the
-		   shell rather than a child, so it never had a grid parent and simply
-		   stacked below a `min-height: 100vh` shell, off-screen. Pinning it to
-		   the viewport is what it actually needs; it starts where the sidebar
-		   ends so the account block stays reachable. */
 		position: fixed;
 		left: var(--sidebar-width);
 		right: 0;
@@ -89,6 +121,13 @@
 		display: flex;
 		align-items: center;
 		gap: 14px;
+	}
+	.icon-btn:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
+	}
+	.skip {
+		font: 600 10.5px var(--font-mono);
 	}
 	.play {
 		width: 34px;
@@ -150,8 +189,6 @@
 	}
 
 	@media (max-width: 700px) {
-		/* The sidebar becomes a fixed bottom tab bar at this width — sit on top
-		   of it rather than under it. */
 		.bar {
 			left: 0;
 			bottom: var(--mobile-nav-height);

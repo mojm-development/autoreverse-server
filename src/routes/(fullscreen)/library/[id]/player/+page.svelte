@@ -33,7 +33,17 @@
 	const totalDuration = $derived(
 		isPlayingThis ? player.current!.tracks.reduce((s, t) => s + t.duration, 0) : 0
 	);
-	const percent = $derived(totalDuration > 0 ? (currentPosition / totalDuration) * 100 : 0);
+	const byTrack = $derived(data.item.kind === 'album');
+	const currentTrack = $derived(
+		isPlayingThis ? (player.current!.tracks[player.current!.trackIndex] ?? null) : null
+	);
+	const barElapsed = $derived(byTrack && isPlayingThis ? player.trackOffset() : currentPosition);
+	const barTotal = $derived(byTrack ? (currentTrack?.duration ?? 0) : totalDuration);
+	const percent = $derived(barTotal > 0 ? (barElapsed / barTotal) * 100 : 0);
+	const atFirstTrack = $derived(isPlayingThis && player.current!.trackIndex === 0);
+	const atLastTrack = $derived(
+		isPlayingThis && player.current!.trackIndex >= player.current!.tracks.length - 1
+	);
 	const currentChapterIndex = $derived(
 		data.chapters.findIndex((c) => currentPosition >= c.start && currentPosition < c.end)
 	);
@@ -59,14 +69,33 @@
 		return `${h}:${pad(m)}:${pad(s)}`;
 	}
 
+	function goPrevious() {
+		if (byTrack) {
+			player.previousTrack();
+			return;
+		}
+		const chapter = data.chapters[currentChapterIndex];
+		if (chapter && currentPosition - chapter.start > 3) {
+			playFrom(chapter.start);
+			return;
+		}
+		const previous = data.chapters[currentChapterIndex - 1];
+		if (previous) playFrom(previous.start);
+	}
+
+	function goNext() {
+		if (byTrack) {
+			player.nextTrack();
+			return;
+		}
+		const next = data.chapters[currentChapterIndex + 1];
+		if (next) playFrom(next.start);
+	}
+
 	function close() {
 		history.back();
 	}
 
-	// ponytail: no backend/persisted sleep-timer concept exists anywhere in this
-	// plan's scope — a real client-side setTimeout calling player.pause() is the
-	// most that's achievable with zero new server surface, per the brief's own
-	// explicit instruction to build exactly this much and no more.
 	let sleepTimerHandle: ReturnType<typeof setTimeout> | null = null;
 	function setSleepTimer(minutes: string) {
 		if (sleepTimerHandle) clearTimeout(sleepTimerHandle);
@@ -107,21 +136,38 @@
 			</p>
 
 			<div class="scrubber">
-				{#each data.chapters as c (c.title + c.start)}
-					<span
-						class="tick"
-						style="left: {totalDuration > 0 ? (c.start / totalDuration) * 100 : 0}%"
-					></span>
-				{/each}
+				{#if !byTrack}
+					{#each data.chapters as c (c.title + c.start)}
+						<span
+							class="tick"
+							style="left: {totalDuration > 0 ? (c.start / totalDuration) * 100 : 0}%"
+						></span>
+					{/each}
+				{/if}
 				<div class="fill" style="width: {percent}%"></div>
+			</div>
+			<div class="times mono">
+				<span>{formatHMS(barElapsed)}</span>
+				<span>{formatHMS(barTotal)}</span>
 			</div>
 
 			<div class="transport">
 				<select class="pill speed" value={player.current?.speed ?? 1} disabled>
 					<option value={1}>1,00×</option>
 				</select>
-				<button class="skip" onclick={() => player.skipBack(30)}>30</button>
-				<button class="icon-btn" aria-label="Vorheriges Kapitel"><Icon name="previous" /></button>
+				{#if !byTrack}
+					<button class="skip" aria-label="30 Sekunden zurück" onclick={() => player.skipBack(30)}
+						>30</button
+					>
+				{/if}
+				<button
+					class="icon-btn"
+					aria-label={byTrack ? 'Vorheriger Titel' : 'Vorheriges Kapitel'}
+					disabled={byTrack ? atFirstTrack && player.trackOffset() <= 3 : currentChapterIndex <= 0}
+					onclick={goPrevious}
+				>
+					<Icon name="previous" />
+				</button>
 				<button
 					class="play"
 					aria-label={player.current?.playing ? 'Pause' : 'Abspielen'}
@@ -129,8 +175,21 @@
 				>
 					<Icon name={player.current?.playing ? 'pause' : 'play'} />
 				</button>
-				<button class="icon-btn" aria-label="Nächstes Kapitel"><Icon name="next" /></button>
-				<button class="skip" onclick={() => player.skipForward(15)}>15</button>
+				<button
+					class="icon-btn"
+					aria-label={byTrack ? 'Nächster Titel' : 'Nächstes Kapitel'}
+					disabled={byTrack
+						? atLastTrack
+						: currentChapterIndex < 0 || currentChapterIndex >= data.chapters.length - 1}
+					onclick={goNext}
+				>
+					<Icon name="next" />
+				</button>
+				{#if !byTrack}
+					<button class="skip" aria-label="15 Sekunden vor" onclick={() => player.skipForward(15)}
+						>15</button
+					>
+				{/if}
 				<select class="pill sleep" onchange={(e) => setSleepTimer(e.currentTarget.value)}>
 					<option value="0">Sleep-Timer</option>
 					<option value="15">15 Min</option>
@@ -374,6 +433,18 @@
 	}
 	.tab.active {
 		color: var(--text);
+	}
+	.times {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 6px;
+		font-size: 11px;
+		color: var(--faint);
+	}
+	.icon-btn:disabled,
+	.skip:disabled {
+		opacity: 0.35;
+		cursor: not-allowed;
 	}
 	.bookmark-row {
 		display: flex;
