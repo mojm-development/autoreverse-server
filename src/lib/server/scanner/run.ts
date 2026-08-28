@@ -1,6 +1,6 @@
 import { scanBooks, libraryRootProblem, type ScanFailure } from './books';
 import { scanMusic } from './music';
-import { knownFiles, storeItems, markMissing } from './store';
+import { knownFiles, storeItems, removeVanished } from './store';
 import { scanState, type ScanReport, type ScanProgress } from '../admin/scanState';
 import { loadConfig } from '../config';
 import { getLibraryPaths } from '../settings/libraryPaths';
@@ -24,7 +24,7 @@ export async function runScan(): Promise<void> {
 	const skipped: string[] = [];
 	const failures: ScanFailure[] = [];
 	const rootErrors: string[] = [];
-	const totals: ScanReport = { new: 0, updated: 0, unchanged: 0, missing: 0, skipped: 0 };
+	const totals: ScanReport = { new: 0, updated: 0, unchanged: 0, removed: 0, skipped: 0 };
 
 	try {
 		for (const [root, scan] of [
@@ -82,11 +82,11 @@ export async function runScan(): Promise<void> {
 			failures.push(...rootFailures);
 			skipped.push(...rootFailures.map((f) => f.path));
 			const found = new Set(scanned.map((s) => s.sourcePath));
-			const missing = await markMissing(db, root, found, skipped);
+			const removed = await removeVanished(db, root, found, skipped);
 			totals.new += report.new;
 			totals.updated += report.updated;
 			totals.unchanged += report.unchanged;
-			totals.missing += missing;
+			totals.removed += removed;
 			totals.skipped = failures.length;
 			scanState.lastReport = { ...totals };
 		}

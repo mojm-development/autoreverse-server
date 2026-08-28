@@ -1,5 +1,5 @@
 import { stat } from 'node:fs/promises';
-import { and, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import {
 	items as itemsTable,
 	tracks as tracksTable,
@@ -202,7 +202,7 @@ export async function storeItems(
 	return report;
 }
 
-export async function markMissing(
+export async function removeVanished(
 	db: DrizzleDb,
 	root: string,
 	found: Set<string>,
@@ -216,26 +216,20 @@ export async function markMissing(
 		.select({ id: itemsTable.id, sourcePath: itemsTable.sourcePath })
 		.from(itemsTable)
 		.where(
-			and(
-				sql`(${itemsTable.sourcePath} = ${root} OR substr(${itemsTable.sourcePath}, 1, ${prefix.length}) = ${prefix})`,
-				isNull(itemsTable.missingSince)
-			)
+			sql`(${itemsTable.sourcePath} = ${root} OR substr(${itemsTable.sourcePath}, 1, ${prefix.length}) = ${prefix})`
 		);
 
-	let count = 0;
+	const doomed = candidates
+		.filter(
+			(candidate) =>
+				!candidate.sourcePath ||
+				(!found.has(candidate.sourcePath) && !isSkipped(candidate.sourcePath))
+		)
+		.map((candidate) => candidate.id);
+	if (doomed.length === 0) return 0;
+
 	await db.transaction(async (tx) => {
-		for (const candidate of candidates) {
-			if (
-				candidate.sourcePath &&
-				(found.has(candidate.sourcePath) || isSkipped(candidate.sourcePath))
-			)
-				continue;
-			await tx
-				.update(itemsTable)
-				.set({ missingSince: sql`now()` })
-				.where(eq(itemsTable.id, candidate.id));
-			count += 1;
-		}
+		await tx.delete(itemsTable).where(inArray(itemsTable.id, doomed));
 	});
-	return count;
+	return doomed.length;
 }

@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { withTestDb } from '../fixtures';
-import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
+import {
+	items as itemsTable,
+	tracks as tracksTable,
+	progress as progressTable,
+	bookmarks as bookmarksTable
+} from '../../src/lib/server/db/schema';
+import { createUser } from '../../src/lib/server/auth/passwords';
 import { eq } from 'drizzle-orm';
-import { storeItems, markMissing } from '../../src/lib/server/scanner/store';
+import { storeItems, removeVanished } from '../../src/lib/server/scanner/store';
 import type { ScannedItem, ScanFailure } from '../../src/lib/server/scanner/books';
 
 function fakeScanned(overrides: Partial<ScannedItem> = {}): ScannedItem {
@@ -85,10 +91,10 @@ describe('storeItems', () => {
 			await storeItems(db, [fakeScanned()], '/library/books', '/data/covers');
 			// Not in `found` because it failed — but it was never observed absent,
 			// so passing it as skipped must keep missing_since null.
-			const missing = await markMissing(db, '/library/books', new Set(), ['/library/books/A/B']);
-			expect(missing).toBe(0);
+			const removed = await removeVanished(db, '/library/books', new Set(), ['/library/books/A/B']);
+			expect(removed).toBe(0);
 			const rows = await db.select().from(itemsTable);
-			expect(rows[0].missingSince).toBeNull();
+			expect(rows).toHaveLength(1);
 		});
 	});
 
@@ -270,38 +276,72 @@ describe('storeItems', () => {
 	});
 });
 
-describe('markMissing', () => {
-	it('marks items under root not found this run, path-prefix scoped (root/x does not match root2)', async () => {
+describe('removeVanished', () => {
+	it('deletes items under root not found this run, path-prefix scoped (root/x does not match root2)', async () => {
 		await withTestDb(async (db) => {
 			await db.insert(itemsTable).values([
 				{ kind: 'book', title: 'A', sortTitle: 'a', sourcePath: '/library/books/A' },
-				{ kind: 'book', title: 'B', sortTitle: 'b', sourcePath: '/library/books2/B' } // different root prefix, must NOT be touched
+				{ kind: 'book', title: 'B', sortTitle: 'b', sourcePath: '/library/books2/B' }
 			]);
-			const marked = await markMissing(db, '/library/books', new Set(), []);
-			expect(marked).toBe(1);
+			const removed = await removeVanished(db, '/library/books', new Set(), []);
+			expect(removed).toBe(1);
 			const rows = await db.select().from(itemsTable);
-			const a = rows.find((r) => r.sourcePath === '/library/books/A')!;
-			const b = rows.find((r) => r.sourcePath === '/library/books2/B')!;
-			expect(a.missingSince).not.toBeNull();
-			expect(b.missingSince).toBeNull();
+			expect(rows.map((r) => r.sourcePath)).toEqual(['/library/books2/B']);
 		});
 	});
 
-	it('does not re-touch an already-missing item (denominator fix)', async () => {
+	it('keeps an item that was found on disk this run', async () => {
 		await withTestDb(async (db) => {
-			const [row] = await db
+			await db
 				.insert(itemsTable)
-				.values({
-					kind: 'book',
-					title: 'A',
-					sortTitle: 'a',
-					sourcePath: '/library/books/A',
-					missingSince: new Date('2020-01-01')
-				})
+				.values({ kind: 'book', title: 'A', sortTitle: 'a', sourcePath: '/library/books/A' });
+			const removed = await removeVanished(db, '/library/books', new Set(['/library/books/A']), []);
+			expect(removed).toBe(0);
+			expect(await db.select().from(itemsTable)).toHaveLength(1);
+		});
+	});
+
+	it('deletes the root folder item itself when it is gone', async () => {
+		await withTestDb(async (db) => {
+			await db
+				.insert(itemsTable)
+				.values({ kind: 'book', title: 'Root', sortTitle: 'root', sourcePath: '/library/books' });
+			expect(await removeVanished(db, '/library/books', new Set(), [])).toBe(1);
+			expect(await db.select().from(itemsTable)).toHaveLength(0);
+		});
+	});
+
+	it('clears out rows an older version had only marked missing', async () => {
+		await withTestDb(async (db) => {
+			await db.insert(itemsTable).values({
+				kind: 'book',
+				title: 'A',
+				sortTitle: 'a',
+				sourcePath: '/library/books/A',
+				missingSince: new Date('2020-01-01')
+			});
+			expect(await removeVanished(db, '/library/books', new Set(), [])).toBe(1);
+			expect(await db.select().from(itemsTable)).toHaveLength(0);
+		});
+	});
+
+	it('takes the item listening history with it', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [item] = await db
+				.insert(itemsTable)
+				.values({ kind: 'book', title: 'A', sortTitle: 'a', sourcePath: '/library/books/A' })
 				.returning();
-			await markMissing(db, '/library/books', new Set(), []);
-			const [after] = await db.select().from(itemsTable).where(eq(itemsTable.id, row.id));
-			expect(after.missingSince?.getTime()).toBe(row.missingSince!.getTime()); // unchanged, not re-stamped
+			await db
+				.insert(progressTable)
+				.values({ userId, itemId: item.id, position: 42, finished: false });
+			await db
+				.insert(bookmarksTable)
+				.values({ userId, itemId: item.id, position: 42, title: 'Stelle' });
+
+			await removeVanished(db, '/library/books', new Set(), []);
+			expect(await db.select().from(progressTable)).toHaveLength(0);
+			expect(await db.select().from(bookmarksTable)).toHaveLength(0);
 		});
 	});
 }, 60_000);

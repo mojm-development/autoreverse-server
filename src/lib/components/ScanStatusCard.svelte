@@ -44,6 +44,7 @@
 		new?: number;
 		updated?: number;
 		unchanged?: number;
+		removed?: number;
 		skipped?: number;
 	}
 	interface Progress extends Counts {
@@ -106,6 +107,7 @@
 			<span>neu {counts.new ?? 0}</span>
 			<span>geändert {counts.updated ?? 0}</span>
 			<span>unverändert {counts.unchanged ?? 0}</span>
+			<span>entfernt {counts.removed ?? 0}</span>
 			<span>übersprungen {counts.skipped ?? 0}</span>
 		</div>
 	{/if}

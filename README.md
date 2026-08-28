@@ -35,8 +35,9 @@ between releases without a migration path. Run it against data you have backups 
 - Chapter extraction from `.m4b` files (via `ffprobe`, which reads the `chpl` atom that tag
   libraries miss)
 - Cover art extracted from tags or picked up from the folder, cached server-side
-- Files that disappear are marked missing rather than silently deleted, and can be purged
-  deliberately
+- Items whose files have disappeared are removed from the database on the next scan, along with
+  their progress, bookmarks and favorites. A library root that cannot be read is skipped whole,
+  and a folder that fails to scan is left alone, so an unreachable mount never empties anything
 - Scans are cancellable and report progress
 
 **Playback**

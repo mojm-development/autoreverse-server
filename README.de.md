@@ -35,8 +35,10 @@ Backups hast.
 - Kapitel aus `.m4b`-Dateien (per `ffprobe`, das den `chpl`-Atom liest, an dem Tag-Bibliotheken
   scheitern)
 - Cover aus den Tags oder aus dem Ordner, serverseitig zwischengespeichert
-- Verschwundene Dateien werden als fehlend markiert statt stillschweigend gelöscht — Aufräumen
-  bleibt eine bewusste Entscheidung
+- Einträge, deren Dateien verschwunden sind, werden beim nächsten Scan aus der Datenbank
+  entfernt — samt Fortschritt, Lesezeichen und Favoriten. Ein unlesbarer Bibliotheks-Ordner wird
+  komplett übersprungen und ein fehlgeschlagener Unterordner ausgenommen, ein nicht erreichbares
+  Laufwerk leert also nichts
 - Scans lassen sich abbrechen und melden ihren Fortschritt
 
 **Wiedergabe**

@@ -2,7 +2,7 @@ export interface ScanReport {
 	new: number;
 	updated: number;
 	unchanged: number;
-	missing: number;
+	removed: number;
 	skipped: number;
 }
 export interface ScanProgress {
