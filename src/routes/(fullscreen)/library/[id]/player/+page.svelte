@@ -315,7 +315,10 @@
 		position: relative;
 		display: grid;
 		grid-template-columns: 1fr 360px;
-		min-height: 100vh;
+		/* The transport must stay on screen: the page never grows past the viewport, the
+		   artwork gives way instead. */
+		height: 100dvh;
+		min-height: 520px;
 		background: var(--bg);
 		overflow: hidden;
 	}
@@ -383,6 +386,8 @@
 		flex-direction: column;
 		justify-content: space-between;
 		padding: 28px 40px;
+		min-height: 0;
+		overflow: hidden;
 	}
 	.status-row {
 		display: flex;
@@ -409,7 +414,7 @@
 		gap: 10px;
 		/* Takes the room between the status row and the transport, so cover and visualizer
 		   grow into it instead of leaving a hole above them. */
-		flex: 1;
+		flex: 1 1 0;
 		min-height: 0;
 		justify-content: flex-end;
 	}
@@ -418,8 +423,11 @@
 		align-items: stretch;
 		gap: 24px;
 		align-self: stretch;
-		flex: 1;
-		min-height: 220px;
+		/* basis 0, so the square artwork sizes itself from the leftover height rather than
+		   pushing the transport off screen. */
+		flex: 1 1 0;
+		min-height: 0;
+		max-height: 42dvh;
 		margin-bottom: 12px;
 	}
 	.viz-panel {
@@ -438,7 +446,7 @@
 	.cover {
 		height: 100%;
 		aspect-ratio: 1;
-		max-width: 46%;
+		max-width: 40%;
 		flex: none;
 		border-radius: var(--radius-lg);
 		background: var(--tile);
@@ -525,6 +533,8 @@
 	.right {
 		position: relative;
 		z-index: 1;
+		min-height: 0;
+		overflow-y: auto;
 		background: var(--sidebar);
 		border-left: 1px solid var(--line);
 		padding: 24px 20px;
