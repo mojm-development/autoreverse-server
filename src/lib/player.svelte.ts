@@ -39,6 +39,10 @@ function locate(
 	return { trackIndex: 0, offset: 0 };
 }
 
+function clampIndex(tracks: PlayerTrack[], index: number): number {
+	return Math.max(0, Math.min(index, tracks.length - 1));
+}
+
 export function createPlayerStore() {
 	let current = $state<PlayerState | null>(null);
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -70,10 +74,15 @@ export function createPlayerStore() {
 	 * auto-advance (onended), and on any seek/skip that crosses a track
 	 * boundary. */
 	function loadTrack(trackIndex: number, offset: number) {
-		if (!current || !audioEl) return;
+		if (!current) return;
 		const track = current.tracks[trackIndex];
 		if (!track) return;
+		// State first, media second. The old order bailed out on a missing
+		// audio element before assigning trackIndex, so any jump made before
+		// MiniPlayerBar mounted left the store pointing at the wrong track
+		// while the UI happily rendered it as current.
 		current.trackIndex = trackIndex;
+		if (!audioEl) return;
 		audioEl.src = `/tracks/${track.id}/stream`;
 		audioEl.currentTime = offset;
 		if (current.playing) void audioEl.play();
@@ -110,23 +119,77 @@ export function createPlayerStore() {
 		}
 	}
 
-	async function play(itemId: number) {
+	/** `startTrackIndex` starts the item at a given track instead of where the
+	 * listener left off — what clicking a row in a track list means, as opposed
+	 * to the big play button's "carry on where I was". */
+	async function play(itemId: number, startTrackIndex?: number) {
 		const res = await fetch(`/play/${itemId}`, { method: 'POST' });
 		const body = await res.json();
 		const tracks: PlayerTrack[] = body.tracks;
-		const { trackIndex, offset } = locate(tracks, body.start_position);
+
+		let trackIndex: number;
+		let offset: number;
+		let position: number;
+		if (startTrackIndex === undefined) {
+			({ trackIndex, offset } = locate(tracks, body.start_position));
+			position = body.start_position;
+		} else {
+			trackIndex = clampIndex(tracks, startTrackIndex);
+			offset = 0;
+			position = trackStart(tracks, trackIndex);
+		}
+
 		current = {
 			itemId,
 			sessionId: body.session_id,
 			tracks,
 			chapters: body.chapters,
 			trackIndex,
-			position: body.start_position,
+			position,
 			playing: true,
 			speed: 1
 		};
 		startHeartbeat();
 		loadTrack(trackIndex, offset);
+	}
+
+	/** Moves the already-loaded item to the start of one of its tracks. */
+	function jumpToTrack(trackIndex: number) {
+		if (!current) return;
+		const index = clampIndex(current.tracks, trackIndex);
+		current.playing = true;
+		current.position = trackStart(current.tracks, index);
+		loadTrack(index, 0);
+	}
+
+	/** Plays one specific track of an item. When that item is already loaded it
+	 * jumps within it instead of POSTing /play again, which would open a second
+	 * playback session for something already playing. */
+	async function playTrackAt(itemId: number, trackIndex: number) {
+		if (!current || current.itemId !== itemId) {
+			await play(itemId, trackIndex);
+			return;
+		}
+		jumpToTrack(trackIndex);
+	}
+
+	/** Same, but identifying the track by id — for callers that know which
+	 * track they mean but not where it sits in its item's running order, such
+	 * as search results. */
+	async function playTrackById(itemId: number, trackId: number) {
+		if (!current || current.itemId !== itemId) await play(itemId);
+		const index = current?.tracks.findIndex((t) => t.id === trackId) ?? -1;
+		if (index < 0) return;
+		jumpToTrack(index);
+	}
+
+	/** Plays an item from an absolute position — what selecting a chapter or a
+	 * bookmark means. Loads the item first when something else is playing. */
+	async function playFrom(itemId: number, position: number) {
+		if (!current || current.itemId !== itemId) await play(itemId);
+		if (!current) return;
+		current.playing = true;
+		seek(position);
 	}
 
 	function pause() {
@@ -188,6 +251,9 @@ export function createPlayerStore() {
 			return current;
 		},
 		play,
+		playTrackAt,
+		playTrackById,
+		playFrom,
 		pause,
 		resume,
 		seek,

@@ -4,11 +4,16 @@
 	let {
 		chapters,
 		currentPosition,
-		isPlayingThis
+		isPlayingThis,
+		onSelect
 	}: {
 		chapters: { title: string; start: number; end: number }[];
 		currentPosition: number;
 		isPlayingThis: boolean;
+		/** Required rather than optional: a chapter list nobody can jump from is
+		 * a decorative table, and omitting it should be a type error, not a
+		 * silently dead list. */
+		onSelect: (start: number) => void;
 	} = $props();
 
 	const currentChapter = $derived(
@@ -30,7 +35,7 @@
 	{#each chapters as c, i (c.title + c.start)}
 		{@const playing = isPlayingThis && c === currentChapter}
 		{@const heard = !playing && currentPosition >= c.end}
-		<ListRow ariaCurrent={playing}>
+		<ListRow ariaCurrent={playing} label="{c.title} abspielen" onclick={() => onSelect(c.start)}>
 			<span class="index mono">{i + 1}</span>
 			<span class="title">{c.title}</span>
 			<span class="cell state">{playing ? 'läuft' : heard ? 'gehört' : ''}</span>

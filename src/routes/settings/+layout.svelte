@@ -31,7 +31,7 @@
 <style>
 	.shell {
 		display: grid;
-		grid-template-columns: 236px 1fr;
+		grid-template-columns: var(--sidebar-width) 1fr;
 		min-height: 100vh;
 	}
 	.settings {
@@ -56,6 +56,6 @@
 		color: var(--text);
 	}
 	.content {
-		padding: 24px 32px;
+		padding: 24px 32px var(--player-bar-height);
 	}
 </style>

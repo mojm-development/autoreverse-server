@@ -126,7 +126,7 @@
 		<div class="table" role="table" aria-label="Folgen">
 			{#each filtered as episode (episode.id)}
 				{@const downloaded = episode.id in data.durations}
-				<ListRow>
+				<ListRow label="{episode.title} abspielen" onclick={() => player.play(episode.id)}>
 					<Icon name={statusOf(episode.id) === 'finished' ? 'heart-filled' : 'play'} />
 					<span class="title">{episode.title}</span>
 					<span class="cell mono"

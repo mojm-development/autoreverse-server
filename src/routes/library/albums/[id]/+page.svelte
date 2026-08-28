@@ -83,13 +83,19 @@
 				player.current !== null &&
 				player.current.itemId === data.album.id &&
 				player.current.trackIndex === i}
-			<ListRow ariaCurrent={playing}>
+			<ListRow
+				ariaCurrent={playing}
+				label="{track.title ?? `Titel ${i + 1}`} abspielen"
+				onclick={() => player.playTrackAt(data.album.id, i)}
+			>
 				<span class="index mono">
 					{#if playing}<Icon name="play" />{:else}{i + 1}{/if}
 				</span>
 				<span class="title">{track.title ?? `Titel ${i + 1}`}</span>
 				<span class="cell">{data.album.artist ?? '—'}</span>
-				<span class="cell fav">
+				<!-- `above` lifts the heart past the row activator; without it the
+					activator covers it and clicking the heart would start the track. -->
+				<span class="cell fav above">
 					<button
 						class="icon-btn small"
 						aria-label="Titel favorisieren"
