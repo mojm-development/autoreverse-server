@@ -29,7 +29,13 @@
 
 {#if data.user}
 	<div class="shell">
-		<Sidebar {accent} activeHref={page.url.pathname} user={data.user} counts={data.counts} />
+		<Sidebar
+			{accent}
+			activeHref={page.url.pathname}
+			activeQuery={page.url.search}
+			user={data.user}
+			counts={data.counts}
+		/>
 		<main>{@render children()}</main>
 	</div>
 {:else}

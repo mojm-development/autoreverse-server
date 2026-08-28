@@ -313,6 +313,35 @@ export async function seriesSiblings(db: DrizzleDb, series: string) {
 		);
 }
 
+export async function newEpisodes(db: DrizzleDb, userId: number, limit = 60) {
+	const rows = await db.execute(sql`
+		SELECT episode.id, episode.title, episode.published_at, episode.cover_path,
+		       podcast.id AS podcast_id, podcast.title AS podcast_title,
+		       (SELECT count(*) FROM tracks WHERE tracks.item_id = episode.id) > 0 AS downloaded,
+		       coalesce(sum(track.duration), 0) AS duration
+		FROM items AS episode
+		JOIN items AS podcast ON podcast.id = episode.parent_id
+		LEFT JOIN progress ON progress.item_id = episode.id AND progress.user_id = ${userId}
+		LEFT JOIN tracks AS track ON track.item_id = episode.id
+		WHERE episode.kind = 'episode'
+		  AND episode.published_at >= podcast.added_at
+		  AND (progress.item_id IS NULL OR progress.finished = false)
+		GROUP BY episode.id, podcast.id, progress.item_id
+		ORDER BY episode.published_at DESC NULLS LAST
+		LIMIT ${limit}
+	`);
+	return rows as unknown as Array<{
+		id: number;
+		title: string;
+		published_at: string | null;
+		cover_path: string | null;
+		podcast_id: number;
+		podcast_title: string;
+		downloaded: boolean;
+		duration: number;
+	}>;
+}
+
 export async function podcastOverview(db: DrizzleDb, userId: number) {
 	const rows = await db.execute(sql`
 		SELECT podcast.*,
