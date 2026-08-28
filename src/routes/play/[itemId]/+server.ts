@@ -26,6 +26,7 @@ export async function _playPostHandler(
 		return json({
 			session_id: sessionId,
 			kind: row.kind,
+			has_cover: Boolean(row.coverPath),
 			start_position: startPosition,
 			tracks: trackRows.map(toTrackOut),
 			chapters: chapterRows.map(toChapterOut)

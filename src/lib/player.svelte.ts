@@ -7,6 +7,7 @@ export interface PlayerTrack {
 export interface PlayerState {
 	itemId: number;
 	kind: string;
+	hasCover: boolean;
 	sessionId: string;
 	tracks: PlayerTrack[];
 	chapters: { title: string; start: number; end: number }[];
@@ -124,6 +125,7 @@ export function createPlayerStore() {
 		current = {
 			itemId,
 			kind: body.kind ?? 'album',
+			hasCover: Boolean(body.has_cover),
 			sessionId: body.session_id,
 			tracks,
 			chapters: body.chapters,

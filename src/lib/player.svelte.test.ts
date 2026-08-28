@@ -161,6 +161,7 @@ describe('player store', () => {
 			json: async () => ({
 				session_id: 's1',
 				kind: 'album',
+				has_cover: true,
 				start_position: startPosition,
 				tracks: [
 					{ id: 11, position: 1, title: 'T1', duration: 100 },
@@ -289,5 +290,29 @@ describe('player store', () => {
 		const store = createPlayerStore();
 		await store.play(42);
 		expect(store.current?.kind).toBe('album');
+	});
+	it('play() records whether the item has a cover so the bar can show it', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+		expect(store.current?.hasCover).toBe(true);
+	});
+
+	it('hasCover is false when the response omits it', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					session_id: 's1',
+					start_position: 0,
+					tracks: [{ id: 1, position: 1, title: 'T', duration: 100 }],
+					chapters: []
+				})
+			})
+		);
+		const store = createPlayerStore();
+		await store.play(42);
+		expect(store.current?.hasCover).toBe(false);
 	});
 });

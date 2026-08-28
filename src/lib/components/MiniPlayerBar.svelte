@@ -81,7 +81,11 @@
 				</button>
 			{/if}
 		</div>
-		<div class="cover"></div>
+		<div class="cover">
+			{#if current.hasCover}
+				<img src="/items/{current.itemId}/cover" alt="" />
+			{/if}
+		</div>
 		<div class="info">
 			<div class="line">
 				<span class="title">{track.title}</span>
@@ -144,6 +148,13 @@
 		flex: none;
 		border-radius: 6px;
 		background: var(--tile);
+		overflow: hidden;
+	}
+	.cover img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
 	}
 	.info {
 		flex: 1;
