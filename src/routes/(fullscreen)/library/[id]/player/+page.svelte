@@ -152,7 +152,13 @@
 				<div class="cover">
 					{#if data.item.coverPath}<img src="/items/{data.item.id}/cover" alt="" />{/if}
 				</div>
-				<Visualizer playing={player.current?.playing ?? false} getAnalyser={player.getAnalyser} />
+				<div class="viz-panel">
+					<Visualizer
+						bars={40}
+						playing={player.current?.playing ?? false}
+						getAnalyser={player.getAnalyser}
+					/>
+				</div>
 			</div>
 			<h1>{currentChapter?.title ?? data.item.title}</h1>
 			<p class="subtitle">
@@ -173,10 +179,10 @@
 					format={formatHMS}
 					onSeek={(seconds) => (byTrack ? player.seekInTrack(seconds) : player.seek(seconds))}
 				/>
-			</div>
-			<div class="times mono">
-				<span>{formatHMS(barElapsed)}</span>
-				<span>{formatHMS(barTotal)}</span>
+				<div class="times mono">
+					<span>{formatHMS(barElapsed)}</span>
+					<span>{formatHMS(barTotal)}</span>
+				</div>
 			</div>
 
 			<div class="transport">
@@ -259,10 +265,13 @@
 							onclick={() => player.playTrackAt(data.item.id, i)}
 						>
 							<span class="index mono">
-								{#if i === playingIndex}<Visualizer
-										playing={player.current?.playing ?? false}
-										getAnalyser={player.getAnalyser}
-									/>{:else}{i + 1}{/if}
+								{#if i === playingIndex}<span class="row-viz">
+										<Visualizer
+											bars={4}
+											playing={player.current?.playing ?? false}
+											getAnalyser={player.getAnalyser}
+										/>
+									</span>{:else}{i + 1}{/if}
 							</span>
 							<span class="track-title">{track.title ?? `Titel ${i + 1}`}</span>
 							<span class="mono track-length">{formatMinutes(track.duration)}</span>
@@ -401,8 +410,22 @@
 	}
 	.cover-row {
 		display: flex;
-		align-items: flex-end;
-		gap: 18px;
+		align-items: stretch;
+		gap: 24px;
+		align-self: stretch;
+	}
+	.viz-panel {
+		flex: 1;
+		min-width: 0;
+		--viz-gap: 5px;
+		--viz-segment: 12px;
+	}
+	.row-viz {
+		display: block;
+		width: 22px;
+		height: 18px;
+		--viz-gap: 2px;
+		--viz-segment: 5px;
 	}
 	.cover {
 		width: 300px;

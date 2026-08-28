@@ -2,22 +2,27 @@
 	let {
 		playing = false,
 		getAnalyser,
+		bars = 5,
 		label = 'Wiedergabe läuft'
 	}: {
 		playing?: boolean;
 		getAnalyser?: () => AnalyserNode | null;
+		bars?: number;
 		label?: string;
 	} = $props();
 
-	const BARS = [0, 1, 2, 3, 4];
-	const FLOOR = 14;
+	const FLOOR = 8;
 	const CEILING = 100;
+	const USABLE_SPECTRUM = 0.62;
+
+	const columns = $derived(Array.from({ length: bars }, (_, index) => index));
 
 	let root = $state<HTMLElement | null>(null);
 	let live = $state(false);
 
 	$effect(() => {
 		const element = root;
+		const count = bars;
 		if (!element || !playing || !getAnalyser) return;
 
 		const node = getAnalyser();
@@ -25,19 +30,20 @@
 		live = true;
 
 		const spectrum = new Uint8Array(node.frequencyBinCount);
-		const bars = Array.from(element.querySelectorAll<HTMLElement>('.bar'));
-		const width = Math.max(1, Math.floor(spectrum.length / bars.length));
+		const usable = Math.max(count, Math.floor(spectrum.length * USABLE_SPECTRUM));
+		const width = Math.max(1, Math.floor(usable / count));
+		const columnEls = Array.from(element.querySelectorAll<HTMLElement>('.bar'));
 		let frame = 0;
 
 		const draw = () => {
 			node.getByteFrequencyData(spectrum);
-			bars.forEach((bar, index) => {
+			columnEls.forEach((bar, index) => {
 				let sum = 0;
 				for (let offset = 0; offset < width; offset += 1) {
 					sum += spectrum[index * width + offset] ?? 0;
 				}
 				const level = sum / width / 255;
-				bar.style.height = `${Math.min(CEILING, FLOOR + level * 130)}%`;
+				bar.style.height = `${Math.min(CEILING, FLOOR + level * 135)}%`;
 			});
 			frame = requestAnimationFrame(draw);
 		};
@@ -54,28 +60,33 @@
 	role="img"
 	aria-label={playing ? label : 'Pausiert'}
 >
-	{#each BARS as bar (bar)}
-		<span class="bar" style="--i: {bar}"></span>
+	{#each columns as column (column)}
+		<span class="bar" style="--i: {column}"></span>
 	{/each}
 </span>
 
 <style>
 	.viz {
-		display: inline-flex;
+		display: flex;
 		align-items: flex-end;
-		gap: 3px;
-		height: 26px;
+		gap: var(--viz-gap, 3px);
+		width: 100%;
+		height: 100%;
 	}
 	.bar {
-		width: 3px;
+		flex: 1;
+		min-width: 2px;
 		height: 30%;
 		border-radius: 2px;
-		background: var(--a, var(--music));
-		transform-origin: bottom;
+		background-image: repeating-linear-gradient(
+			to top,
+			var(--a, var(--music)) 0 calc(var(--viz-segment, 10px) - 3px),
+			transparent calc(var(--viz-segment, 10px) - 3px) var(--viz-segment, 10px)
+		);
 		animation: bounce 900ms ease-in-out infinite alternate;
 		animation-delay: calc(var(--i) * -170ms);
 		animation-play-state: paused;
-		opacity: 0.45;
+		opacity: 0.4;
 	}
 	.viz.playing .bar {
 		animation-play-state: running;
@@ -84,11 +95,11 @@
 	.viz.live .bar {
 		animation: none;
 		opacity: 1;
-		transition: height 90ms linear;
+		transition: height 80ms linear;
 	}
 	@keyframes bounce {
 		from {
-			height: 22%;
+			height: 18%;
 		}
 		to {
 			height: 100%;

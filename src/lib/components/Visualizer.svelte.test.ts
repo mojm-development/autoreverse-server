@@ -8,7 +8,7 @@ function bars() {
 
 function fakeAnalyser(level: number) {
 	return {
-		frequencyBinCount: 32,
+		frequencyBinCount: 128,
 		getByteFrequencyData: (target: Uint8Array) => target.fill(level)
 	} as unknown as AnalyserNode;
 }
@@ -57,5 +57,21 @@ describe('Visualizer.svelte', () => {
 	it('tells assistive technology which state it is showing', async () => {
 		render(Visualizer, { playing: true, label: 'Wiedergabe läuft' });
 		expect(document.querySelector('.viz')!.getAttribute('aria-label')).toBe('Wiedergabe läuft');
+	});
+	it('spreads a wide bar count across the spectrum without dead columns', async () => {
+		render(Visualizer, {
+			playing: true,
+			bars: 40,
+			getAnalyser: () => fakeAnalyser(200)
+		});
+		await frames();
+		const heights = bars().map((bar) => parseFloat(bar.style.height));
+		expect(heights).toHaveLength(40);
+		expect(heights.every((height) => height > 20)).toBe(true);
+	});
+
+	it('renders the number of bars it was asked for', async () => {
+		render(Visualizer, { playing: false, bars: 12 });
+		expect(bars()).toHaveLength(12);
 	});
 });

@@ -120,7 +120,7 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 			const source = context.createMediaElementSource(audioEl);
 			source.connect(context.destination);
 			const node = context.createAnalyser();
-			node.fftSize = 64;
+			node.fftSize = 256;
 			node.smoothingTimeConstant = 0.75;
 			source.connect(node);
 			audioContext = context;
