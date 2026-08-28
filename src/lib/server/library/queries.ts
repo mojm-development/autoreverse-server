@@ -24,6 +24,7 @@ export const SORT_LABELS: Record<string, string> = {
 	added: 'Zuletzt dazu',
 	series: 'Serie & Folge'
 };
+export const PAGE_SIZE = 100;
 export const BOOK_SORTS = ['series', 'title', 'added'] as const;
 export type SortKey = 'title' | 'added' | 'series';
 
@@ -37,7 +38,7 @@ export interface ItemsFilter {
 	favoritesOf?: number;
 }
 
-export async function items(db: DrizzleDb, filter: ItemsFilter) {
+function itemConditions(filter: { kind?: string; q?: string; missing?: boolean }) {
 	const conditions = [isNull(itemsTable.parentId)];
 	if (filter.kind) conditions.push(eq(itemsTable.kind, filter.kind));
 	if (filter.q) {
@@ -49,6 +50,11 @@ export async function items(db: DrizzleDb, filter: ItemsFilter) {
 	if (filter.missing !== undefined) {
 		conditions.push(filter.missing ? isNotNull(itemsTable.missingSince) : PRESENT);
 	}
+	return conditions;
+}
+
+export async function items(db: DrizzleDb, filter: ItemsFilter) {
+	const conditions = itemConditions(filter);
 	let query = db.select({ item: itemsTable }).from(itemsTable).$dynamic();
 	if (filter.favoritesOf !== undefined) {
 		query = query.innerJoin(
@@ -99,11 +105,15 @@ export async function children(db: DrizzleDb, parentId: number) {
 		.orderBy(sql`${itemsTable.publishedAt} DESC NULLS LAST`, itemsTable.id);
 }
 
-export async function countItems(db: DrizzleDb, kind: string): Promise<number> {
+export async function countItems(
+	db: DrizzleDb,
+	kind: string,
+	filter: { q?: string; missing?: boolean } = {}
+): Promise<number> {
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)::int` })
 		.from(itemsTable)
-		.where(and(isNull(itemsTable.parentId), eq(itemsTable.kind, kind), PRESENT));
+		.where(and(...itemConditions({ kind, missing: filter.missing ?? false, q: filter.q })));
 	return n;
 }
 

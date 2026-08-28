@@ -6,6 +6,7 @@ import {
 	countMissing,
 	itemDurations,
 	albumsOfArtist,
+	PAGE_SIZE,
 	SORT_LABELS
 } from '$lib/server/library/queries';
 
@@ -20,12 +21,12 @@ export const load = async ({ locals, url }) => {
 	const [rows, total] = await Promise.all([
 		artist
 			? albumsOfArtist(db, artist)
-			: items(db, { kind: 'album', sort, q, missing, limit: 200, offset: 0 }),
+			: items(db, { kind: 'album', sort, q, missing, limit: PAGE_SIZE, offset: 0 }),
 		artist
 			? albumsOfArtist(db, artist).then((r) => r.length)
 			: missing
 				? countMissing(db, 'album')
-				: countItems(db, 'album')
+				: countItems(db, 'album', { q, missing })
 	]);
 	const durations = await itemDurations(
 		db,
@@ -40,6 +41,8 @@ export const load = async ({ locals, url }) => {
 		missing,
 		albums: rows,
 		total,
-		durations
+		durations,
+		pageSize: PAGE_SIZE,
+		hasMore: !artist && rows.length === PAGE_SIZE
 	};
 };

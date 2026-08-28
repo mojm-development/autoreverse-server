@@ -4,8 +4,65 @@
 	import CoverTile from '$lib/components/CoverTile.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import ViewToggle from '$lib/components/ViewToggle.svelte';
+	import InfiniteScroll from '$lib/components/InfiniteScroll.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
+
+	type Album = PageData['albums'][number];
+	interface Loaded {
+		key: string;
+		items: Album[];
+		durations: Record<number, number>;
+		exhausted: boolean;
+	}
+
+	const EMPTY: Loaded = { key: '', items: [], durations: {}, exhausted: false };
+
+	const filterKey = $derived([data.sort, data.q, data.artist, data.missing].join('\u0000'));
+
+	let stored = $state<Loaded>(EMPTY);
+	let loading = $state(false);
+
+	const loaded = $derived(stored.key === filterKey ? stored : EMPTY);
+	const albums = $derived([...data.albums, ...loaded.items]);
+	const durations = $derived({ ...data.durations, ...loaded.durations });
+	const done = $derived(!data.hasMore || loaded.exhausted);
+
+	async function loadMore() {
+		if (loading || done) return;
+		const key = filterKey;
+		const before = loaded;
+		loading = true;
+		const params = new SvelteURLSearchParams({
+			kind: 'album',
+			sort: data.sort,
+			offset: String(data.albums.length + before.items.length),
+			limit: String(data.pageSize)
+		});
+		if (data.q) params.set('q', data.q);
+		if (data.missing) params.set('missing', 'true');
+		try {
+			const response = await fetch(`/library/more?${params}`);
+			if (key !== filterKey) return;
+			if (!response.ok) {
+				stored = { ...before, key, exhausted: true };
+				return;
+			}
+			const body = await response.json();
+			if (key !== filterKey) return;
+			const known = new Set([...data.albums, ...before.items].map((a) => a.id));
+			stored = {
+				key,
+				items: [...before.items, ...body.items.filter((item: Album) => !known.has(item.id))],
+				durations: { ...before.durations, ...body.durations },
+				exhausted: !body.hasMore
+			};
+		} catch {
+			stored = { ...before, key, exhausted: true };
+		} finally {
+			loading = false;
+		}
+	}
 
 	function viewHref(target: 'grid' | 'list'): string {
 		const params = new SvelteURLSearchParams();
@@ -57,7 +114,7 @@
 
 	{#if data.view === 'grid'}
 		<div class="grid-6">
-			{#each data.albums as album (album.id)}
+			{#each albums as album (album.id)}
 				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 				<a href="/library/albums/{album.id}" class="tile-link">
 					<CoverTile
@@ -76,7 +133,7 @@
 					>Genre</span
 				><span>Dauer</span>
 			</div>
-			{#each data.albums as album, i (album.id)}
+			{#each albums as album, i (album.id)}
 				<ListRow href="/library/albums/{album.id}">
 					<span class="mono index">{i + 1}</span>
 					<span
@@ -87,11 +144,13 @@
 					<span class="cell">{album.artist ?? '—'}</span>
 					<span class="cell">{album.year ?? '—'}</span>
 					<span class="cell">—</span>
-					<span class="mono cell">{formatDuration(data.durations[album.id] ?? 0)}</span>
+					<span class="mono cell">{formatDuration(durations[album.id] ?? 0)}</span>
 				</ListRow>
 			{/each}
 		</div>
 	{/if}
+
+	<InfiniteScroll {done} {loading} onLoadMore={loadMore} label="Weitere Alben werden geladen" />
 </div>
 
 <style>
