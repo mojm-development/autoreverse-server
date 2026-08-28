@@ -1,7 +1,7 @@
 import { extname, join } from 'node:path';
 import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { artistCovers, items as itemsTable } from '../db/schema';
 import type { DrizzleDb } from '../db';
 import { ApiError } from '../api/errors';
@@ -45,6 +45,7 @@ export async function fallbackCovers(db: DrizzleDb): Promise<Map<string, number>
 		SELECT DISTINCT ON (artist) artist, id
 		FROM items
 		WHERE kind = 'album' AND artist IS NOT NULL AND cover_path IS NOT NULL
+		  AND missing_since IS NULL
 		ORDER BY artist, md5(artist || ':' || id::text)
 	`);
 	const map = new Map<string, number>();
@@ -63,7 +64,13 @@ export async function albumsOf(db: DrizzleDb, artist: string) {
 			coverPath: itemsTable.coverPath
 		})
 		.from(itemsTable)
-		.where(and(eq(itemsTable.kind, 'album'), eq(itemsTable.artist, artist)))
+		.where(
+			and(
+				eq(itemsTable.kind, 'album'),
+				eq(itemsTable.artist, artist),
+				isNull(itemsTable.missingSince)
+			)
+		)
 		.orderBy(sql`${itemsTable.year} DESC NULLS LAST`, sql`lower(${itemsTable.sortTitle})`);
 }
 

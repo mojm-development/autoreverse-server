@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { withTestDb } from '../fixtures';
 import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
-import { items, tracks, countItems, deleteMissing } from '../../src/lib/server/library/queries';
+import {
+	items,
+	tracks,
+	countItems,
+	countMissing,
+	deleteMissing,
+	artists,
+	albumsOfArtist,
+	searchItems,
+	libraryCounts
+} from '../../src/lib/server/library/queries';
 import type { DrizzleDb } from '../../src/lib/server/db';
 
 async function seedAlbum(db: DrizzleDb, overrides: Partial<typeof itemsTable.$inferInsert> = {}) {
@@ -63,6 +73,30 @@ describe('core item queries', () => {
 			expect(await items(db, { missing: false, limit: 10, offset: 0, sort: 'title' })).toHaveLength(
 				1
 			);
+		});
+	});
+
+	it('hides items that vanished from disk from every album listing', async () => {
+		await withTestDb(async (db) => {
+			await seedAlbum(db, { title: 'Weg', sortTitle: 'weg', missingSince: new Date() });
+			await seedAlbum(db, { title: 'Da', sortTitle: 'da' });
+
+			expect(
+				(await items(db, { kind: 'album', missing: false, limit: 10, offset: 0 })).length
+			).toBe(1);
+			expect(await countItems(db, 'album')).toBe(1);
+			expect((await libraryCounts(db)).album_count).toBe(1);
+			expect(await artists(db)).toEqual([{ name: 'Ansa Volt', albumCount: 1 }]);
+			expect((await albumsOfArtist(db, 'Ansa Volt')).map((a) => a.title)).toEqual(['Da']);
+			expect(await searchItems(db, 'Weg', ['album'], 10)).toHaveLength(0);
+			expect(await countMissing(db, 'album')).toBe(1);
+		});
+	});
+
+	it('drops an artist whose every album is gone', async () => {
+		await withTestDb(async (db) => {
+			await seedAlbum(db, { missingSince: new Date() });
+			expect(await artists(db)).toHaveLength(0);
 		});
 	});
 

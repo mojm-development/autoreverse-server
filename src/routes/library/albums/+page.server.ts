@@ -3,6 +3,7 @@ import { requireWebUser } from '$lib/server/auth/session';
 import {
 	items,
 	countItems,
+	countMissing,
 	itemDurations,
 	albumsOfArtist,
 	SORT_LABELS
@@ -14,12 +15,17 @@ export const load = async ({ locals, url }) => {
 	const sort = (url.searchParams.get('sort') as 'title' | 'added') ?? 'title';
 	const q = url.searchParams.get('q') ?? undefined;
 	const artist = url.searchParams.get('artist') ?? undefined;
+	const missing = url.searchParams.get('missing') === 'true';
 
 	const [rows, total] = await Promise.all([
 		artist
 			? albumsOfArtist(db, artist)
-			: items(db, { kind: 'album', sort, q, limit: 200, offset: 0 }),
-		artist ? albumsOfArtist(db, artist).then((r) => r.length) : countItems(db, 'album')
+			: items(db, { kind: 'album', sort, q, missing, limit: 200, offset: 0 }),
+		artist
+			? albumsOfArtist(db, artist).then((r) => r.length)
+			: missing
+				? countMissing(db, 'album')
+				: countItems(db, 'album')
 	]);
 	const durations = await itemDurations(
 		db,
@@ -31,6 +37,7 @@ export const load = async ({ locals, url }) => {
 		sortLabel: SORT_LABELS[sort],
 		q: q ?? '',
 		artist: artist ?? null,
+		missing,
 		albums: rows,
 		total,
 		durations

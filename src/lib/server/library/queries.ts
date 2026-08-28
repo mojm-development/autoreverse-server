@@ -11,6 +11,7 @@ import { naturalKey, episodeNumber } from './sorting';
 import type { DrizzleDb } from '../db';
 
 const NATURAL_TITLE = naturalKey(itemsTable.sortTitle);
+const PRESENT = isNull(itemsTable.missingSince);
 const EPISODE_NO = episodeNumber(itemsTable.title);
 
 const SORTS: Record<string, ReturnType<typeof sql>> = {
@@ -46,9 +47,7 @@ export async function items(db: DrizzleDb, filter: ItemsFilter) {
 		);
 	}
 	if (filter.missing !== undefined) {
-		conditions.push(
-			filter.missing ? isNotNull(itemsTable.missingSince) : isNull(itemsTable.missingSince)
-		);
+		conditions.push(filter.missing ? isNotNull(itemsTable.missingSince) : PRESENT);
 	}
 	let query = db.select({ item: itemsTable }).from(itemsTable).$dynamic();
 	if (filter.favoritesOf !== undefined) {
@@ -104,15 +103,19 @@ export async function countItems(db: DrizzleDb, kind: string): Promise<number> {
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)::int` })
 		.from(itemsTable)
-		.where(and(isNull(itemsTable.parentId), eq(itemsTable.kind, kind)));
+		.where(and(isNull(itemsTable.parentId), eq(itemsTable.kind, kind), PRESENT));
 	return n;
 }
 
-export async function countMissing(db: DrizzleDb): Promise<number> {
+export async function countMissing(db: DrizzleDb, kind?: string): Promise<number> {
 	const [{ n }] = await db
 		.select({ n: sql<number>`count(*)::int` })
 		.from(itemsTable)
-		.where(isNotNull(itemsTable.missingSince));
+		.where(
+			kind
+				? and(isNotNull(itemsTable.missingSince), eq(itemsTable.kind, kind))
+				: isNotNull(itemsTable.missingSince)
+		);
 	return n;
 }
 
@@ -120,11 +123,15 @@ export async function libraryCounts(db: DrizzleDb) {
 	const rows = await db
 		.select({ kind: itemsTable.kind, n: sql<number>`count(*)::int` })
 		.from(itemsTable)
-		.where(isNull(itemsTable.parentId))
+		.where(and(isNull(itemsTable.parentId), PRESENT))
 		.groupBy(itemsTable.kind);
 	const counts: Record<string, number> = { book: 0, album: 0, podcast: 0 };
 	for (const row of rows) if (row.kind in counts) counts[row.kind] = row.n;
-	const [{ n: trackCount }] = await db.select({ n: sql<number>`count(*)::int` }).from(tracksTable);
+	const [{ n: trackCount }] = await db
+		.select({ n: sql<number>`count(*)::int` })
+		.from(tracksTable)
+		.innerJoin(itemsTable, eq(itemsTable.id, tracksTable.itemId))
+		.where(PRESENT);
 	return {
 		book_count: counts.book,
 		album_count: counts.album,
@@ -149,6 +156,7 @@ export async function searchItems(db: DrizzleDb, q: string, kinds: string[], lim
 		.where(
 			and(
 				inArray(itemsTable.kind, kinds),
+				PRESENT,
 				sql`(${itemsTable.title} ILIKE ${pattern} ESCAPE '\\' OR ${itemsTable.author} ILIKE ${pattern} ESCAPE '\\' OR ${itemsTable.artist} ILIKE ${pattern} ESCAPE '\\')`
 			)
 		)
@@ -162,7 +170,7 @@ export async function searchTracks(db: DrizzleDb, q: string, limit: number) {
 		SELECT track.id, track.title, track.duration, track.item_id,
 		       item.title AS item_title, item.kind AS item_kind
 		FROM tracks AS track JOIN items AS item ON item.id = track.item_id
-		WHERE track.title ILIKE ${pattern} ESCAPE '\\'
+		WHERE track.title ILIKE ${pattern} ESCAPE '\\' AND item.missing_since IS NULL
 		ORDER BY lower(track.title) LIMIT ${limit}
 	`);
 	return rows as unknown as Array<{
@@ -179,7 +187,7 @@ export async function artists(db: DrizzleDb) {
 	const rows = await db
 		.select({ name: itemsTable.artist, albumCount: sql<number>`count(*)::int` })
 		.from(itemsTable)
-		.where(and(eq(itemsTable.kind, 'album'), isNotNull(itemsTable.artist)))
+		.where(and(eq(itemsTable.kind, 'album'), isNotNull(itemsTable.artist), PRESENT))
 		.groupBy(itemsTable.artist)
 		.orderBy(sql`lower(${itemsTable.artist})`);
 	return rows;
@@ -189,7 +197,7 @@ export async function albumsOfArtist(db: DrizzleDb, artist: string) {
 	return db
 		.select()
 		.from(itemsTable)
-		.where(and(eq(itemsTable.kind, 'album'), eq(itemsTable.artist, artist)))
+		.where(and(eq(itemsTable.kind, 'album'), eq(itemsTable.artist, artist), PRESENT))
 		.orderBy(sql`${itemsTable.year} DESC NULLS LAST`, NATURAL_TITLE);
 }
 
@@ -198,10 +206,12 @@ export async function searchArtists(db: DrizzleDb, q: string, limit: number) {
 	const rows = await db.execute(sql`
 		SELECT name, role, count(*)::int AS work_count FROM (
 			SELECT artist AS name, 'artist' AS role FROM items
-			WHERE kind = 'album' AND artist IS NOT NULL AND artist ILIKE ${pattern} ESCAPE '\\'
+			WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
+			  AND artist ILIKE ${pattern} ESCAPE '\\'
 			UNION ALL
 			SELECT author AS name, 'author' AS role FROM items
-			WHERE kind = 'book' AND author IS NOT NULL AND author ILIKE ${pattern} ESCAPE '\\'
+			WHERE kind = 'book' AND author IS NOT NULL AND missing_since IS NULL
+			  AND author ILIKE ${pattern} ESCAPE '\\'
 		) AS named
 		GROUP BY name, role ORDER BY lower(name) LIMIT ${limit}
 	`);
@@ -219,6 +229,7 @@ export async function continueListening(db: DrizzleDb, userId: number, limit = 2
 			SELECT sum(tracks.duration) AS duration FROM tracks WHERE tracks.item_id = item.id
 		) AS total ON true
 		WHERE progress.user_id = ${userId} AND progress.finished = false
+		  AND item.missing_since IS NULL
 		ORDER BY progress.updated_at DESC LIMIT ${limit}
 	`);
 	return rows as unknown as Array<{
@@ -284,7 +295,7 @@ export async function seriesSiblings(db: DrizzleDb, series: string) {
 	return db
 		.select()
 		.from(itemsTable)
-		.where(and(eq(itemsTable.kind, 'book'), eq(itemsTable.series, series)))
+		.where(and(eq(itemsTable.kind, 'book'), eq(itemsTable.series, series), PRESENT))
 		.orderBy(
 			sql`${itemsTable.seriesIndex} NULLS LAST`,
 			sql`${EPISODE_NO} NULLS LAST`,
@@ -371,12 +382,15 @@ export async function recentlyAdded(db: DrizzleDb, limit = 12) {
 	return db
 		.select()
 		.from(itemsTable)
-		.where(and(isNull(itemsTable.parentId), isNull(itemsTable.missingSince)))
+		.where(and(isNull(itemsTable.parentId), PRESENT))
 		.orderBy(desc(itemsTable.addedAt), desc(itemsTable.id))
 		.limit(limit);
 }
 
 export async function totalItems(db: DrizzleDb): Promise<number> {
-	const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(itemsTable);
+	const [{ n }] = await db
+		.select({ n: sql<number>`count(*)::int` })
+		.from(itemsTable)
+		.where(PRESENT);
 	return n;
 }

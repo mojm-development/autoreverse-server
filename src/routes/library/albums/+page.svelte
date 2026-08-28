@@ -24,18 +24,25 @@
 <div class="content" style="--a: var(--music)">
 	<header>
 		<h1>
-			{data.artist ? `Alben von ${data.artist}` : 'Alben'}
+			{data.artist ? `Alben von ${data.artist}` : data.missing ? 'Fehlende Alben' : 'Alben'}
 			<span class="count mono">{data.total}</span>
 		</h1>
 	</header>
 
 	<div class="pills">
-		<span class="pill active">Alle</span>
+		{#if data.missing}
+			<a class="pill" href={resolve('/library/albums')}>Alle</a>
+		{:else}
+			<span class="pill active">Alle</span>
+		{/if}
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a class="pill" href="/library/favorites">Favoriten</a>
 		<a class="pill" href={resolve('/library/albums?sort=added')}>Zuletzt dazu</a>
 		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 		<a class="pill" href="/library/artists">Interpreten</a>
+		{#if data.missing}
+			<span class="pill active">Fehlend</span>
+		{/if}
 	</div>
 
 	<div class="toolbar">

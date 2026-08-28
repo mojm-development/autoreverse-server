@@ -30,7 +30,7 @@ export const load = async ({ locals, url }) => {
 		total = rows.length;
 	} else {
 		[rows, total] = await Promise.all([
-			items(db, { kind: 'book', sort, q, limit: 200, offset: 0 }),
+			items(db, { kind: 'book', sort, q, missing: false, limit: 200, offset: 0 }),
 			countItems(db, 'book')
 		]);
 	}
