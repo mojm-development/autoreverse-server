@@ -1,7 +1,17 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
+	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import ListRow from '$lib/components/ListRow.svelte';
+	import SortToggle from '$lib/components/SortToggle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
+
+	function sortHref(target: string): string {
+		const params = new SvelteURLSearchParams();
+		if (data.q) params.set('q', data.q);
+		params.set('sort', target);
+		return `${resolve('/library/books')}?${params}`;
+	}
 
 	type Status = 'listening' | 'unstarted' | 'finished';
 	function statusOf(bookId: number): Status {
@@ -57,12 +67,17 @@
 
 	<div class="toolbar">
 		<form method="GET" class="search-form">
+			<!-- Without this the chosen sort is dropped the moment someone searches. -->
+			<input type="hidden" name="sort" value={data.sort} />
 			<input type="search" name="q" value={data.q} placeholder="Bibliothek durchsuchen" />
 		</form>
-		<!-- ponytail: fixed "zuletzt gehört" label per the brief's own static copy — no
-		     alternate sort mode is wired for this screen (unlike Albums' Task 33 ?sort=
-		     toggle), so there's nothing to make dynamic here yet. -->
-		<span class="sort-label mono">sortiert: zuletzt gehört</span>
+		{#if data.sortable}
+			<span class="sort-label mono">sortiert:</span>
+			<SortToggle
+				current={data.sort}
+				options={data.sortOptions.map((o) => ({ ...o, href: sortHref(o.key) }))}
+			/>
+		{/if}
 	</div>
 
 	<div class="table" role="table" aria-label="Hörbücher">

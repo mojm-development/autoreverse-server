@@ -7,13 +7,28 @@ import {
 	progress as progressTable
 } from '../db/schema';
 import { likePattern } from './like';
+import { naturalKey, episodeNumber } from './sorting';
 import type { DrizzleDb } from '../db';
 
+const NATURAL_TITLE = naturalKey(itemsTable.sortTitle);
+const EPISODE_NO = episodeNumber(itemsTable.title);
+
 const SORTS: Record<string, ReturnType<typeof sql>> = {
-	title: sql`lower(${itemsTable.sortTitle})`,
-	added: sql`${itemsTable.addedAt} DESC, lower(${itemsTable.sortTitle})`
+	title: sql`${NATURAL_TITLE}`,
+	added: sql`${itemsTable.addedAt} DESC, ${NATURAL_TITLE}`,
+	// Author, then series, then instalment number: the grouping an audiobook
+	// library actually has. Falling through to the natural title keeps items
+	// with no detectable number in a stable, sensible place rather than
+	// bunching every NULL together in insertion order.
+	series: sql`lower(${itemsTable.author}) NULLS LAST, lower(${itemsTable.series}) NULLS LAST, ${EPISODE_NO} NULLS LAST, ${NATURAL_TITLE}`
 };
-export const SORT_LABELS: Record<string, string> = { title: 'Titel A–Z', added: 'Zuletzt dazu' };
+export const SORT_LABELS: Record<string, string> = {
+	title: 'Titel A–Z',
+	added: 'Zuletzt dazu',
+	series: 'Serie & Folge'
+};
+export const BOOK_SORTS = ['series', 'title', 'added'] as const;
+export type SortKey = 'title' | 'added' | 'series';
 
 export interface ItemsFilter {
 	kind?: string;
@@ -21,7 +36,7 @@ export interface ItemsFilter {
 	limit: number;
 	offset: number;
 	missing?: boolean;
-	sort?: 'title' | 'added';
+	sort?: SortKey;
 	favoritesOf?: number;
 }
 
@@ -141,7 +156,7 @@ export async function searchItems(db: DrizzleDb, q: string, kinds: string[], lim
 				sql`(${itemsTable.title} ILIKE ${pattern} ESCAPE '\\' OR ${itemsTable.author} ILIKE ${pattern} ESCAPE '\\' OR ${itemsTable.artist} ILIKE ${pattern} ESCAPE '\\')`
 			)
 		)
-		.orderBy(sql`lower(${itemsTable.sortTitle})`)
+		.orderBy(NATURAL_TITLE)
 		.limit(limit);
 }
 
@@ -179,7 +194,7 @@ export async function albumsOfArtist(db: DrizzleDb, artist: string) {
 		.select()
 		.from(itemsTable)
 		.where(and(eq(itemsTable.kind, 'album'), eq(itemsTable.artist, artist)))
-		.orderBy(sql`${itemsTable.year} DESC NULLS LAST`, sql`lower(${itemsTable.sortTitle})`);
+		.orderBy(sql`${itemsTable.year} DESC NULLS LAST`, NATURAL_TITLE);
 }
 
 export async function searchArtists(db: DrizzleDb, q: string, limit: number) {
@@ -274,7 +289,13 @@ export async function seriesSiblings(db: DrizzleDb, series: string) {
 		.select()
 		.from(itemsTable)
 		.where(and(eq(itemsTable.kind, 'book'), eq(itemsTable.series, series)))
-		.orderBy(sql`${itemsTable.seriesIndex} NULLS LAST`, sql`lower(${itemsTable.sortTitle})`);
+		.orderBy(
+			// series_index first so a future scanner that does populate it wins;
+			// today it is always NULL and the derived number carries the order.
+			sql`${itemsTable.seriesIndex} NULLS LAST`,
+			sql`${EPISODE_NO} NULLS LAST`,
+			NATURAL_TITLE
+		);
 }
 
 export async function podcastOverview(db: DrizzleDb, userId: number) {

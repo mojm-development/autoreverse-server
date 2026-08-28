@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { bookmarks, items as itemsTable } from '../db/schema';
+import { naturalKey } from './sorting';
 import type { DrizzleDb } from '../db';
 
 export async function addBookmark(
@@ -49,5 +50,5 @@ export async function allBookmarks(db: DrizzleDb, userId: number) {
 		.from(bookmarks)
 		.innerJoin(itemsTable, eq(itemsTable.id, bookmarks.itemId))
 		.where(eq(bookmarks.userId, userId))
-		.orderBy(sql`lower(${itemsTable.sortTitle})`, bookmarks.position);
+		.orderBy(naturalKey(itemsTable.sortTitle), bookmarks.position);
 }
