@@ -2,7 +2,10 @@
 	import { onMount, getContext } from 'svelte';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import BrandMark from '$lib/components/BrandMark.svelte';
+	import Equalizer from '$lib/components/Equalizer.svelte';
 	import ChapterList from '$lib/components/ChapterList.svelte';
+	import ListRow from '$lib/components/ListRow.svelte';
 	import Scrubber from '$lib/components/Scrubber.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
@@ -68,6 +71,12 @@
 	);
 
 	let tab = $state<'chapters' | 'bookmarks'>('chapters');
+	const listLabel = $derived(byTrack ? 'Titel' : 'Kapitel');
+	const playingIndex = $derived(isPlayingThis ? player.current!.trackIndex : -1);
+
+	function formatMinutes(seconds: number): string {
+		return `${Math.max(1, Math.round(seconds / 60))} min`;
+	}
 	let sessionStart = Date.now();
 	let elapsedMinutes = $state(0);
 	onMount(() => {
@@ -133,13 +142,17 @@
 	<div class="left">
 		<div class="status-row">
 			<button class="close" aria-label="Schließen" onclick={close}><Icon name="expand" /></button>
+			<BrandMark size={26} />
 			<span class="eyebrow">Läuft gerade · {kindLabel}</span>
 			<span class="session mono">Sitzung offen · {elapsedMinutes} Min</span>
 		</div>
 
 		<div class="hero">
-			<div class="cover">
-				{#if data.item.coverPath}<img src="/items/{data.item.id}/cover" alt="" />{/if}
+			<div class="cover-row">
+				<div class="cover">
+					{#if data.item.coverPath}<img src="/items/{data.item.id}/cover" alt="" />{/if}
+				</div>
+				<Equalizer playing={player.current?.playing ?? false} />
 			</div>
 			<h1>{currentChapter?.title ?? data.item.title}</h1>
 			<p class="subtitle">
@@ -230,14 +243,39 @@
 	<div class="right">
 		<div class="tabs">
 			<button class="tab" class:active={tab === 'chapters'} onclick={() => (tab = 'chapters')}
-				>Kapitel</button
+				>{listLabel}</button
 			>
 			<button class="tab" class:active={tab === 'bookmarks'} onclick={() => (tab = 'bookmarks')}>
 				Lesezeichen · {data.bookmarks.length}
 			</button>
 		</div>
 		{#if tab === 'chapters'}
-			<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} onSelect={playFrom} />
+			{#if byTrack}
+				<div class="table" role="table" aria-label="Titel">
+					{#each data.tracks as track, i (track.id)}
+						<ListRow
+							ariaCurrent={i === playingIndex}
+							label="{track.title ?? `Titel ${i + 1}`} abspielen"
+							onclick={() => player.playTrackAt(data.item.id, i)}
+						>
+							<span class="index mono">
+								{#if i === playingIndex}<Equalizer
+										playing={player.current?.playing ?? false}
+									/>{:else}{i + 1}{/if}
+							</span>
+							<span class="track-title">{track.title ?? `Titel ${i + 1}`}</span>
+							<span class="mono track-length">{formatMinutes(track.duration)}</span>
+						</ListRow>
+					{/each}
+				</div>
+			{:else}
+				<ChapterList
+					chapters={data.chapters}
+					{currentPosition}
+					{isPlayingThis}
+					onSelect={playFrom}
+				/>
+			{/if}
 		{:else}
 			<div class="table" role="table" aria-label="Lesezeichen">
 				{#each data.bookmarks as b (b.id)}
@@ -360,9 +398,15 @@
 		align-items: flex-start;
 		gap: 10px;
 	}
+	.cover-row {
+		display: flex;
+		align-items: flex-end;
+		gap: 18px;
+	}
 	.cover {
 		width: 300px;
 		height: 300px;
+		flex: none;
 		border-radius: var(--radius-lg);
 		background: var(--tile);
 		overflow: hidden;
@@ -386,6 +430,9 @@
 		font-size: 12px;
 	}
 	.scrubber-wrap {
+		align-self: stretch;
+		width: 100%;
+		max-width: 460px;
 		margin-top: 14px;
 		--scrubber-height: 6px;
 		--scrubber-thumb: 12px;
@@ -418,6 +465,30 @@
 		place-items: center;
 	}
 
+	.table {
+		display: flex;
+		flex-direction: column;
+	}
+	.index {
+		width: 26px;
+		flex: none;
+		color: var(--faint);
+		display: flex;
+		align-items: center;
+	}
+	.track-title {
+		flex: 1;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		font-size: 13px;
+	}
+	.track-length {
+		flex: none;
+		color: var(--faint);
+		font-size: 11px;
+	}
 	.right {
 		position: relative;
 		z-index: 1;
