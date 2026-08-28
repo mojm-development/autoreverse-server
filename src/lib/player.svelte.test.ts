@@ -333,4 +333,31 @@ describe('player store', () => {
 		store.seekInTrack(25);
 		expect(store.current?.position).toBe(25);
 	});
+	it('applyPreferences() called from an effect does not re-trigger itself', async () => {
+		stubSession();
+		const store = createPlayerStore();
+		await store.play(42);
+
+		let runs = 0;
+		const cleanup = $effect.root(() => {
+			$effect(() => {
+				runs += 1;
+				store.applyPreferences({ playbackSpeed: 1.5, skipBack: 20, skipForward: 20 });
+			});
+		});
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		cleanup();
+
+		expect(runs).toBe(1);
+		expect(store.preferences.playbackSpeed).toBe(1.5);
+		expect(store.current?.speed).toBe(1.5);
+	});
+
+	it('takes its starting preferences from the caller', async () => {
+		stubSession();
+		const store = createPlayerStore({ playbackSpeed: 2, skipBack: 45, skipForward: 5 });
+		expect(store.preferences.skipBack).toBe(45);
+		await store.play(42);
+		expect(store.current?.speed).toBe(2);
+	});
 });

@@ -1,18 +1,14 @@
 <script lang="ts">
 	import '../app.css';
-	import { setContext } from 'svelte';
+	import { setContext, untrack } from 'svelte';
 
 	import { createPlayerStore, PLAYER_CONTEXT_KEY } from '$lib/player.svelte';
 	import MiniPlayerBar from '$lib/components/MiniPlayerBar.svelte';
 	import IconSprite from '$lib/components/IconSprite.svelte';
 	let { children, data } = $props();
 
-	const player = createPlayerStore();
+	const player = createPlayerStore(untrack(() => data.preferences));
 	setContext(PLAYER_CONTEXT_KEY, player);
-
-	$effect(() => {
-		if (data.preferences) player.applyPreferences(data.preferences);
-	});
 
 	if (typeof window !== 'undefined') {
 		window.addEventListener('beforeunload', () => {

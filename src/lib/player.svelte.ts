@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 export interface PlayerTrack {
 	id: number;
 	position: number;
@@ -54,9 +55,9 @@ const DEFAULT_PREFERENCES: PlayerPreferences = {
 	skipForward: 15
 };
 
-export function createPlayerStore() {
+export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 	let current = $state<PlayerState | null>(null);
-	let preferences = $state<PlayerPreferences>({ ...DEFAULT_PREFERENCES });
+	let preferences = $state<PlayerPreferences>({ ...DEFAULT_PREFERENCES, ...initial });
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 	let audioEl: HTMLAudioElement | null = null;
 
@@ -218,9 +219,11 @@ export function createPlayerStore() {
 	}
 
 	function applyPreferences(next: Partial<PlayerPreferences>) {
-		preferences = { ...preferences, ...next };
-		if (current) current.speed = preferences.playbackSpeed;
-		if (audioEl) audioEl.playbackRate = preferences.playbackSpeed;
+		untrack(() => {
+			preferences = { ...preferences, ...next };
+			if (current) current.speed = preferences.playbackSpeed;
+			if (audioEl) audioEl.playbackRate = preferences.playbackSpeed;
+		});
 	}
 
 	function seekInTrack(offset: number) {
