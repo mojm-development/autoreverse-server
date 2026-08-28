@@ -42,8 +42,21 @@ function clampIndex(tracks: PlayerTrack[], index: number): number {
 	return Math.max(0, Math.min(index, tracks.length - 1));
 }
 
+export interface PlayerPreferences {
+	playbackSpeed: number;
+	skipBack: number;
+	skipForward: number;
+}
+
+const DEFAULT_PREFERENCES: PlayerPreferences = {
+	playbackSpeed: 1,
+	skipBack: 30,
+	skipForward: 15
+};
+
 export function createPlayerStore() {
 	let current = $state<PlayerState | null>(null);
+	let preferences = $state<PlayerPreferences>({ ...DEFAULT_PREFERENCES });
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 	let audioEl: HTMLAudioElement | null = null;
 
@@ -76,6 +89,7 @@ export function createPlayerStore() {
 		if (!audioEl) return;
 		audioEl.src = `/tracks/${track.id}/stream`;
 		audioEl.currentTime = offset;
+		audioEl.playbackRate = current.speed;
 		if (current.playing) void audioEl.play();
 	}
 
@@ -132,7 +146,7 @@ export function createPlayerStore() {
 			trackIndex,
 			position,
 			playing: true,
-			speed: 1
+			speed: preferences.playbackSpeed
 		};
 		startHeartbeat();
 		loadTrack(trackIndex, offset);
@@ -189,11 +203,24 @@ export function createPlayerStore() {
 		}
 		current.position = clamped;
 	}
-	function skipBack(seconds: number) {
+	function skipBack(seconds = preferences.skipBack) {
 		if (current) seek(current.position - seconds);
 	}
-	function skipForward(seconds: number) {
+	function skipForward(seconds = preferences.skipForward) {
 		if (current) seek(current.position + seconds);
+	}
+
+	function setSpeed(value: number) {
+		const clamped = Math.min(4, Math.max(0.5, value));
+		preferences = { ...preferences, playbackSpeed: clamped };
+		if (current) current.speed = clamped;
+		if (audioEl) audioEl.playbackRate = clamped;
+	}
+
+	function applyPreferences(next: Partial<PlayerPreferences>) {
+		preferences = { ...preferences, ...next };
+		if (current) current.speed = preferences.playbackSpeed;
+		if (audioEl) audioEl.playbackRate = preferences.playbackSpeed;
 	}
 
 	function seekInTrack(offset: number) {
@@ -246,6 +273,11 @@ export function createPlayerStore() {
 		get current() {
 			return current;
 		},
+		get preferences() {
+			return preferences;
+		},
+		setSpeed,
+		applyPreferences,
 		play,
 		playTrackAt,
 		playTrackById,

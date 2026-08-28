@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getContext, onMount } from 'svelte';
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from './Icon.svelte';
 	import Scrubber from './Scrubber.svelte';
@@ -49,10 +50,10 @@
 			{:else}
 				<button
 					class="icon-btn skip"
-					aria-label="30 Sekunden zurück"
-					onclick={() => player.skipBack(30)}
+					aria-label="{player.preferences.skipBack} Sekunden zurück"
+					onclick={() => player.skipBack()}
 				>
-					30
+					{player.preferences.skipBack}
 				</button>
 			{/if}
 			<button
@@ -74,10 +75,10 @@
 			{:else}
 				<button
 					class="icon-btn skip"
-					aria-label="15 Sekunden vor"
-					onclick={() => player.skipForward(15)}
+					aria-label="{player.preferences.skipForward} Sekunden vor"
+					onclick={() => player.skipForward()}
 				>
-					15
+					{player.preferences.skipForward}
 				</button>
 			{/if}
 		</div>
@@ -103,6 +104,13 @@
 			<span class="pill mono"
 				>{current.speed.toLocaleString('de-DE', { minimumFractionDigits: 2 })}×</span
 			>
+			<a
+				class="icon-btn"
+				href={resolve('/(fullscreen)/library/[id]/player', { id: String(current.itemId) })}
+				aria-label="Großer Player"
+			>
+				<Icon name="expand" />
+			</a>
 		</div>
 	</div>
 {/if}
@@ -128,6 +136,24 @@
 		display: flex;
 		align-items: center;
 		gap: 14px;
+	}
+	.extra {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.extra .icon-btn {
+		width: 30px;
+		height: 30px;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		border: 1px solid var(--line);
+		color: var(--dim);
+	}
+	.extra .icon-btn:hover {
+		color: var(--text);
+		background: var(--panel);
 	}
 	.icon-btn:disabled {
 		opacity: 0.35;

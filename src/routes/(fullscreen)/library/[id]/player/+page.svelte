@@ -15,6 +15,21 @@
 		}
 	});
 
+	const SPEEDS = [0.75, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+
+	async function setSpeed(value: number) {
+		player.setSpeed(value);
+		await fetch('/me/playback', {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				playback_speed: value,
+				skip_back: player.preferences.skipBack,
+				skip_forward: player.preferences.skipForward
+			})
+		});
+	}
+
 	function playFrom(position: number) {
 		void player.playFrom(data.item.id, position);
 	}
@@ -152,12 +167,21 @@
 			</div>
 
 			<div class="transport">
-				<select class="pill speed" value={player.current?.speed ?? 1} disabled>
-					<option value={1}>1,00×</option>
+				<select
+					class="pill speed"
+					aria-label="Geschwindigkeit"
+					value={player.preferences.playbackSpeed}
+					onchange={(e) => setSpeed(Number(e.currentTarget.value))}
+				>
+					{#each SPEEDS as value (value)}
+						<option {value}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2 })}×</option>
+					{/each}
 				</select>
 				{#if !byTrack}
-					<button class="skip" aria-label="30 Sekunden zurück" onclick={() => player.skipBack(30)}
-						>30</button
+					<button
+						class="skip"
+						aria-label="{player.preferences.skipBack} Sekunden zurück"
+						onclick={() => player.skipBack()}>{player.preferences.skipBack}</button
 					>
 				{/if}
 				<button
@@ -186,8 +210,10 @@
 					<Icon name="next" />
 				</button>
 				{#if !byTrack}
-					<button class="skip" aria-label="15 Sekunden vor" onclick={() => player.skipForward(15)}
-						>15</button
+					<button
+						class="skip"
+						aria-label="{player.preferences.skipForward} Sekunden vor"
+						onclick={() => player.skipForward()}>{player.preferences.skipForward}</button
 					>
 				{/if}
 				<select class="pill sleep" onchange={(e) => setSleepTimer(e.currentTarget.value)}>
