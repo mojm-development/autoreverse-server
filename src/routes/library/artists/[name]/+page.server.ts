@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { requireWebAdmin } from '$lib/server/auth/session';
 import { loadConfig } from '$lib/server/config';
@@ -54,7 +54,7 @@ export const actions = {
 		} catch (e) {
 			return fail(422, { error: message(e) });
 		}
-		return { ok: true };
+		redirect(303, '/library/artists');
 	},
 	upload: async ({ locals, params, request }) => {
 		await requireWebAdmin(locals, db);
@@ -74,7 +74,7 @@ export const actions = {
 		} catch (e) {
 			return fail(422, { error: message(e) });
 		}
-		return { ok: true };
+		redirect(303, '/library/artists');
 	},
 	reset: async ({ locals, params }) => {
 		await requireWebAdmin(locals, db);
