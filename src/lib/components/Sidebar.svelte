@@ -91,6 +91,15 @@
 		flex-direction: column;
 		padding: 20px 12px 12px;
 		box-sizing: border-box;
+		/* As a grid item the sidebar stretched to the row height, which on a long
+		   page (1750 albums) is the whole document — so `.account`'s margin-top:auto
+		   parked the settings/logout block thousands of pixels below the fold.
+		   Pinning it to one viewport height makes "auto" mean the bottom of the
+		   screen again, and sticky keeps it there while the list scrolls. */
+		position: sticky;
+		top: 0;
+		height: 100vh;
+		overflow-y: auto;
 		background: linear-gradient(
 			180deg,
 			color-mix(in oklab, var(--a) 22%, var(--sidebar)),
@@ -218,8 +227,13 @@
 			width: 100%;
 			flex-direction: row;
 			position: fixed;
+			/* Undo the desktop `top: 0`: with top, bottom and height all set,
+			   fixed positioning is over-constrained and drops `bottom`, which
+			   would strand the tab bar at the top of the screen. */
+			top: auto;
 			bottom: 0;
 			height: 56px;
+			overflow: visible;
 			padding: 0;
 			border-right: none;
 			border-top: 1px solid var(--line);

@@ -65,8 +65,8 @@
 	}
 	.grid-6 {
 		display: grid;
-		grid-template-columns: repeat(6, 1fr);
-		gap: 16px;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 22px 16px;
 	}
 	.table {
 		display: flex;

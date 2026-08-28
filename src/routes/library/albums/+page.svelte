@@ -134,11 +134,16 @@
 	}
 	.grid-6 {
 		display: grid;
-		grid-template-columns: repeat(6, 1fr);
-		gap: 16px;
+		/* auto-fill against a px minimum, not repeat(6, 1fr): a fixed column
+		   count leaves half the row empty on a wide screen, and `1fr` is
+		   minmax(auto, 1fr) — the auto floor let a long title widen the track
+		   instead of being ellipsed. */
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 22px 16px;
 	}
 	.tile-link {
 		color: inherit;
+		min-width: 0;
 	}
 	.table {
 		display: flex;
