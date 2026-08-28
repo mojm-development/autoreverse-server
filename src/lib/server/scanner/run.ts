@@ -1,7 +1,7 @@
 import { scanBooks, libraryRootProblem, type ScanFailure } from './books';
 import { scanMusic } from './music';
 import { knownFiles, storeItems, markMissing } from './store';
-import { scanState, type ScanReport } from '../admin/scanState';
+import { scanState, type ScanReport, type ScanProgress } from '../admin/scanState';
 import { loadConfig } from '../config';
 import { getLibraryPaths } from '../settings/libraryPaths';
 import { db } from '../db';
@@ -57,8 +57,45 @@ export async function runScan(): Promise<void> {
 			// Per-root, then merged: `failures` spans both passes, and re-deriving
 			// the skip list from it would hand the music pass the books' failures.
 			const rootFailures: ScanFailure[] = [];
-			const scanned = await scan(root, known, rootFailures);
-			const report = await storeItems(db, scanned, root, config.coverDir, rootFailures);
+
+			// Counts carry across both roots so they only ever climb; processed and
+			// total restart per phase, which is what `root` and `phase` are there to
+			// explain to whoever is watching the bar.
+			const progress: ScanProgress = {
+				phase: 'scanning',
+				root,
+				total: null,
+				processed: 0,
+				new: totals.new,
+				updated: totals.updated,
+				unchanged: totals.unchanged,
+				skipped: totals.skipped
+			};
+			scanState.progress = progress;
+
+			const scanned = await scan(root, known, rootFailures, (processed, total) => {
+				progress.processed = processed;
+				progress.total = total;
+			});
+
+			progress.phase = 'storing';
+			progress.processed = 0;
+			progress.total = scanned.length;
+			const report = await storeItems(
+				db,
+				scanned,
+				root,
+				config.coverDir,
+				rootFailures,
+				(processed, total, counts) => {
+					progress.processed = processed;
+					progress.total = total;
+					progress.new = totals.new + counts.new;
+					progress.updated = totals.updated + counts.updated;
+					progress.unchanged = totals.unchanged + counts.unchanged;
+					progress.skipped = totals.skipped + counts.skipped;
+				}
+			);
 			failures.push(...rootFailures);
 			// A folder that failed keeps its existing rows: it was not observed to be
 			// absent, only impossible to read.
@@ -78,6 +115,7 @@ export async function runScan(): Promise<void> {
 	} finally {
 		scanState.running = false;
 		scanState.finishedAt = new Date().toISOString();
+		scanState.progress = null; // the bar gives way to the finished report
 		scanState.lastSkipped = failures.map((f) => `${f.path}: ${f.message}`);
 	}
 }

@@ -2,6 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, extname, basename, relative, sep } from 'node:path';
 import { readTags, type TrackTags } from './tags';
 import { readChapters, type Chapter } from './chapters';
+import type { ProgressFn } from '../admin/scanState';
 
 export const AUDIO = new Set(['.mp3', '.m4a', '.m4b', '.flac', '.ogg', '.opus', '.wav', '.aac']);
 
@@ -253,17 +254,19 @@ export async function scanTree(
 	root: string,
 	kind: 'book' | 'album',
 	known: Record<string, [number, number]>,
-	failures: ScanFailure[] = []
+	failures: ScanFailure[] = [],
+	onProgress?: ProgressFn
 ): Promise<ScannedItem[]> {
 	const dirs = await allDirectories(root);
 	const results: ScannedItem[] = [];
-	for (const dir of dirs) {
+	for (const [i, dir] of dirs.entries()) {
 		try {
 			const scanned = await scanFolder(root, dir, kind, known);
 			if (scanned) results.push(scanned);
 		} catch (e) {
 			failures.push({ path: dir, message: reason(e) });
 		}
+		onProgress?.(i + 1, dirs.length);
 	}
 	return results;
 }
@@ -271,7 +274,8 @@ export async function scanTree(
 export async function scanBooks(
 	root: string,
 	known: Record<string, [number, number]>,
-	failures: ScanFailure[] = []
+	failures: ScanFailure[] = [],
+	onProgress?: ProgressFn
 ): Promise<ScannedItem[]> {
-	return scanTree(root, 'book', known, failures);
+	return scanTree(root, 'book', known, failures, onProgress);
 }

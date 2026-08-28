@@ -7,6 +7,7 @@ import {
 import { findCoverFile, extractEmbedded } from './covers';
 import type { ScannedItem, ScanFailure } from './books';
 import type { DrizzleDb } from '../db';
+import type { StoreProgressFn } from '../admin/scanState';
 
 export async function knownFiles(db: DrizzleDb): Promise<Record<string, [number, number]>> {
 	const rows = await db
@@ -51,10 +52,11 @@ export async function storeItems(
 	scanned: ScannedItem[],
 	root: string,
 	coversDir: string,
-	failures: ScanFailure[] = []
+	failures: ScanFailure[] = [],
+	onProgress?: StoreProgressFn
 ): Promise<{ new: number; updated: number; unchanged: number; skipped: number }> {
 	const report = { new: 0, updated: 0, unchanged: 0, skipped: 0 };
-	for (const entry of scanned) {
+	for (const [i, entry] of scanned.entries()) {
 		// Per folder, not per pass. Each entry is its own transaction already, so
 		// a failure here has nothing half-written to leave behind — but an
 		// exception escaping the loop used to abandon every folder after it too.
@@ -209,6 +211,7 @@ export async function storeItems(
 			});
 			report.skipped += 1;
 		}
+		onProgress?.(i + 1, scanned.length, report);
 	}
 	return report;
 }
