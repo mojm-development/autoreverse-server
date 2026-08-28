@@ -102,6 +102,10 @@ services:
       # First-admin bootstrap, only used once against an empty `users` table — change these.
       AUTOREVERSE_ADMIN_USER: admin
       AUTOREVERSE_ADMIN_PASSWORD: change-me
+      # Required as soon as a reverse proxy sits in front — the public URL as the
+      # browser sees it. Without it, logging in fails with "Cross-site POST form
+      # submissions are forbidden". Drop it if you reach the server directly.
+      ORIGIN: https://autoreverse.example.com
     volumes:
       # Point these at your own media; both are mounted read-only. After first login,
       # enter the in-container paths (/library/books, /library/music) under
@@ -150,15 +154,45 @@ Then, still in the web UI:
 
 ## Configuration
 
-| Variable                     | Required        | Default                                                           | Purpose                                                                                        |
-| ---------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                    |
-| `AUTOREVERSE_DATA`           | no              | `./data`                                                          | Base directory for server-managed files. `covers/` and `podcasts/` are created inside it.      |
-| `AUTOREVERSE_ADMIN_USER`     | first boot only | —                                                                 | Username of the first admin account.                                                           |
-| `AUTOREVERSE_ADMIN_PASSWORD` | first boot only | —                                                                 | Password of that account.                                                                      |
-| `AUTOREVERSE_AUTO_MIGRATE`   | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`. |
+| Variable                     | Required        | Default                                                           | Purpose                                                                                              |
+| ---------------------------- | --------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`               | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                          |
+| `AUTOREVERSE_DATA`           | no              | `./data`                                                          | Base directory for server-managed files. `covers/` and `podcasts/` are created inside it.            |
+| `AUTOREVERSE_ADMIN_USER`     | first boot only | —                                                                 | Username of the first admin account.                                                                 |
+| `AUTOREVERSE_ADMIN_PASSWORD` | first boot only | —                                                                 | Password of that account.                                                                            |
+| `AUTOREVERSE_AUTO_MIGRATE`   | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.       |
+| `ORIGIN`                     | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy). |
 
 See [`.env.example`](.env.example) for a copy-paste starting point.
+
+### Running behind a reverse proxy
+
+If anything terminates TLS in front of Autoreverse — Caddy, nginx, Traefik — set `ORIGIN` to the
+public URL, exactly as the browser sees it and without a trailing slash:
+
+```yaml
+environment:
+  ORIGIN: https://autoreverse.example.com
+```
+
+Skip this and the web UI login fails with **`Cross-site POST form submissions are forbidden`**.
+The reason: SvelteKit compares the browser's `Origin` header against the server's own origin on
+every form POST. Behind a TLS-terminating proxy the browser reports `https://your.domain` while
+the Node process, which only ever sees plain HTTP on port 3000, believes it is `http://…:3000`.
+The two disagree, so the POST is rejected. Only form submissions are affected — the JSON API
+authenticates fine, which is why the failure shows up at the login screen specifically.
+
+If you would rather not hard-code the hostname, the alternative is to let the proxy tell the
+server (Caddy sets both headers by default):
+
+```yaml
+environment:
+  PROTOCOL_HEADER: x-forwarded-proto
+  HOST_HEADER: x-forwarded-host
+```
+
+Prefer `ORIGIN` where you can. The header variant trusts whatever sends those headers, so it is
+only safe if nothing but your proxy can reach the container.
 
 ### Library paths are not environment variables
 

@@ -102,6 +102,10 @@ services:
       # Erst-Verwalter, nur einmalig gegen eine leere `users`-Tabelle benutzt — ändere das.
       AUTOREVERSE_ADMIN_USER: admin
       AUTOREVERSE_ADMIN_PASSWORD: change-me
+      # Pflicht, sobald ein Reverse Proxy davorsteht — die öffentliche URL, so wie
+      # der Browser sie sieht. Ohne sie scheitert die Anmeldung mit „Cross-site POST
+      # form submissions are forbidden". Weglassen, wenn du den Server direkt erreichst.
+      ORIGIN: https://autoreverse.example.com
     volumes:
       # Auf deine eigenen Medien zeigen lassen; beide werden nur lesend eingebunden.
       # Nach dem ersten Login die Container-Pfade (/library/books, /library/music)
@@ -151,15 +155,47 @@ Danach, weiterhin in der Weboberfläche:
 
 ## Konfiguration
 
-| Variable                     | Pflicht               | Standard                                                          | Zweck                                                                                                       |
-| ---------------------------- | --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                                 |
-| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/` und `podcasts/` entstehen darin automatisch.           |
-| `AUTOREVERSE_ADMIN_USER`     | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                    |
-| `AUTOREVERSE_ADMIN_PASSWORD` | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                     |
-| `AUTOREVERSE_AUTO_MIGRATE`   | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen. |
+| Variable                     | Pflicht               | Standard                                                          | Zweck                                                                                                         |
+| ---------------------------- | --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`               | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                                   |
+| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/` und `podcasts/` entstehen darin automatisch.             |
+| `AUTOREVERSE_ADMIN_USER`     | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                      |
+| `AUTOREVERSE_ADMIN_PASSWORD` | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                       |
+| `AUTOREVERSE_AUTO_MIGRATE`   | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen.   |
+| `ORIGIN`                     | hinter einem Proxy    | aus dem `Host`-Header abgeleitet, Protokoll als `http` angenommen | Öffentliche URL des Servers. Siehe [Betrieb hinter einem Reverse Proxy](#betrieb-hinter-einem-reverse-proxy). |
 
 Eine Vorlage zum Kopieren liegt in [`.env.example`](.env.example).
+
+### Betrieb hinter einem Reverse Proxy
+
+Wenn vor Autoreverse irgendetwas TLS terminiert — Caddy, nginx, Traefik —, setze `ORIGIN` auf die
+öffentliche URL, exakt so wie der Browser sie sieht und ohne Schrägstrich am Ende:
+
+```yaml
+environment:
+  ORIGIN: https://autoreverse.example.com
+```
+
+Lässt du das weg, scheitert die Anmeldung in der Weboberfläche mit
+**`Cross-site POST form submissions are forbidden`**. Der Grund: SvelteKit vergleicht bei jedem
+Formular-POST den `Origin`-Header des Browsers mit der eigenen Origin des Servers. Hinter einem
+TLS-terminierenden Proxy meldet der Browser `https://deine.domain`, während der Node-Prozess, der
+nur schlichtes HTTP auf Port 3000 zu sehen bekommt, sich für `http://…:3000` hält. Beide weichen
+voneinander ab, also wird der POST abgelehnt. Betroffen sind ausschließlich Formulare — die
+JSON-API authentifiziert sich einwandfrei, weshalb der Fehler ausgerechnet am Anmeldebildschirm
+auftritt.
+
+Wenn du den Hostnamen nicht fest eintragen willst, kann stattdessen der Proxy es dem Server sagen
+(Caddy setzt beide Header von sich aus):
+
+```yaml
+environment:
+  PROTOCOL_HEADER: x-forwarded-proto
+  HOST_HEADER: x-forwarded-host
+```
+
+Nimm im Zweifel `ORIGIN`. Die Header-Variante vertraut jedem, der diese Header schickt — sie ist
+nur dann sicher, wenn niemand außer deinem Proxy an den Container herankommt.
 
 ### Bibliothekspfade sind keine Umgebungsvariablen
 

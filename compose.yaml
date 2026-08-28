@@ -28,6 +28,11 @@ services:
       # First-admin bootstrap, only used once against an empty `users` table — change these.
       AUTOREVERSE_ADMIN_USER: admin
       AUTOREVERSE_ADMIN_PASSWORD: change-me
+      # Not needed here — this stack publishes the server directly on 8180, so the
+      # Origin the browser sends and the one the server derives already agree. Put a
+      # reverse proxy in front and you must set the public URL, or form POSTs are
+      # rejected with "Cross-site POST form submissions are forbidden":
+      # ORIGIN: https://autoreverse.example.com
     volumes:
       # These bind mounts just make the paths available inside the container — the server
       # itself doesn't read them from env. After first login, type the in-container paths
