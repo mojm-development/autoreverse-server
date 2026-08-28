@@ -3,7 +3,7 @@
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import BrandMark from '$lib/components/BrandMark.svelte';
-	import Equalizer from '$lib/components/Equalizer.svelte';
+	import Visualizer from '$lib/components/Visualizer.svelte';
 	import ChapterList from '$lib/components/ChapterList.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import Scrubber from '$lib/components/Scrubber.svelte';
@@ -152,7 +152,7 @@
 				<div class="cover">
 					{#if data.item.coverPath}<img src="/items/{data.item.id}/cover" alt="" />{/if}
 				</div>
-				<Equalizer playing={player.current?.playing ?? false} />
+				<Visualizer playing={player.current?.playing ?? false} getAnalyser={player.getAnalyser} />
 			</div>
 			<h1>{currentChapter?.title ?? data.item.title}</h1>
 			<p class="subtitle">
@@ -259,8 +259,9 @@
 							onclick={() => player.playTrackAt(data.item.id, i)}
 						>
 							<span class="index mono">
-								{#if i === playingIndex}<Equalizer
+								{#if i === playingIndex}<Visualizer
 										playing={player.current?.playing ?? false}
+										getAnalyser={player.getAnalyser}
 									/>{:else}{i + 1}{/if}
 							</span>
 							<span class="track-title">{track.title ?? `Titel ${i + 1}`}</span>

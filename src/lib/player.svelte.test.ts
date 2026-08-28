@@ -376,4 +376,39 @@ describe('player store', () => {
 		expect(store.current?.speed).toBe(1.25);
 		expect(store.current?.sessionId).toBe(session);
 	});
+	it('getAnalyser() taps the source without taking the audio path with it', async () => {
+		const store = createPlayerStore();
+		const el = document.createElement('audio');
+		document.body.appendChild(el);
+		store.attachAudioElement(el);
+
+		const node = store.getAnalyser();
+		expect(node).not.toBeNull();
+		expect(node?.frequencyBinCount).toBeGreaterThan(0);
+		expect(store.getAnalyser()).toBe(node);
+		el.remove();
+	});
+
+	it('getAnalyser() gives up quietly when there is no element yet', () => {
+		const store = createPlayerStore();
+		expect(store.getAnalyser()).toBeNull();
+	});
+
+	it('a second call after an element swap does not reuse the old graph', async () => {
+		const store = createPlayerStore();
+		const first = document.createElement('audio');
+		const second = document.createElement('audio');
+		document.body.append(first, second);
+
+		store.attachAudioElement(first);
+		const one = store.getAnalyser();
+		store.attachAudioElement(second);
+		const two = store.getAnalyser();
+
+		expect(one).not.toBeNull();
+		expect(two).not.toBeNull();
+		expect(two).not.toBe(one);
+		first.remove();
+		second.remove();
+	});
 });

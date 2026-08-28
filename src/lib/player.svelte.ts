@@ -58,6 +58,9 @@ const DEFAULT_PREFERENCES: PlayerPreferences = {
 export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 	let current = $state<PlayerState | null>(null);
 	let preferences = $state<PlayerPreferences>({ ...DEFAULT_PREFERENCES, ...initial });
+	let audioContext: AudioContext | null = null;
+	let analyser: AnalyserNode | null = null;
+	let analyserUnavailable = false;
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 	let audioEl: HTMLAudioElement | null = null;
 
@@ -91,13 +94,50 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 		audioEl.src = `/tracks/${track.id}/stream`;
 		audioEl.currentTime = offset;
 		audioEl.playbackRate = current.speed;
-		if (current.playing) void audioEl.play();
+		if (current.playing) {
+			void audioContext?.resume().catch(() => undefined);
+			void audioEl.play();
+		}
+	}
+
+	function releaseAnalyser() {
+		analyser = null;
+		analyserUnavailable = false;
+		const context = audioContext;
+		audioContext = null;
+		if (context) void context.close().catch(() => undefined);
+	}
+
+	function getAnalyser(): AnalyserNode | null {
+		if (analyser || analyserUnavailable || !audioEl) return analyser;
+		try {
+			const Constructor = window.AudioContext;
+			if (!Constructor) {
+				analyserUnavailable = true;
+				return null;
+			}
+			const context = new Constructor();
+			const source = context.createMediaElementSource(audioEl);
+			source.connect(context.destination);
+			const node = context.createAnalyser();
+			node.fftSize = 64;
+			node.smoothingTimeConstant = 0.75;
+			source.connect(node);
+			audioContext = context;
+			analyser = node;
+			void context.resume().catch(() => undefined);
+			return analyser;
+		} catch {
+			analyserUnavailable = true;
+			return null;
+		}
 	}
 
 	function attachAudioElement(el: HTMLAudioElement) {
 		if (audioEl && audioEl !== el) {
 			audioEl.pause();
 			audioEl.removeAttribute('src');
+			releaseAnalyser();
 		}
 		audioEl = el;
 		audioEl.ontimeupdate = () => {
@@ -191,6 +231,7 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 	function resume() {
 		if (!current) return;
 		current.playing = true;
+		void audioContext?.resume().catch(() => undefined);
 		void audioEl?.play();
 	}
 	function seek(seconds: number) {
@@ -295,6 +336,7 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 		seekInTrack,
 		trackOffset,
 		close,
+		getAnalyser,
 		attachAudioElement,
 		reloadCurrentTrack
 	};
