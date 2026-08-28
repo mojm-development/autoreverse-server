@@ -66,7 +66,64 @@ Backups hast.
 
 ## Schnellstart (Docker Compose)
 
-Das Repository bringt eine `compose.yaml` mit, die Postgres und den Server zusammen startet.
+Ein fertig gebautes Image liegt auf GHCR:
+[`ghcr.io/mojm-development/autoreverse-server`](https://ghcr.io/mojm-development/autoreverse-server)
+(`latest` folgt `main`, Versions-Tags folgen Releases). Speichere Folgendes als `compose.yaml`,
+passe die beiden Medien-Einbindungen und die Verwalter-Zugangsdaten an — mehr ist nicht nötig, das
+Image spielt Datenbankmigrationen beim Start selbst ein:
+
+```yaml
+name: autoreverse
+
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: autoreverse
+      POSTGRES_PASSWORD: autoreverse
+      POSTGRES_DB: autoreverse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U autoreverse']
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: ghcr.io/mojm-development/autoreverse-server:latest
+    restart: always
+    ports:
+      - '8180:3000'
+    environment:
+      DATABASE_URL: postgresql://autoreverse:autoreverse@postgres:5432/autoreverse
+      AUTOREVERSE_DATA: /data
+      # Erst-Verwalter, nur einmalig gegen eine leere `users`-Tabelle benutzt — ändere das.
+      AUTOREVERSE_ADMIN_USER: admin
+      AUTOREVERSE_ADMIN_PASSWORD: change-me
+    volumes:
+      # Auf deine eigenen Medien zeigen lassen; beide werden nur lesend eingebunden.
+      # Nach dem ersten Login die Container-Pfade (/library/books, /library/music)
+      # unter Einstellungen → Bibliotheken eintragen, damit sie benutzt werden.
+      - /srv/media/hoerbuecher:/library/books:ro
+      - /srv/media/musik:/library/music:ro
+      - autoreverse-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  autoreverse-data:
+```
+
+```sh
+docker compose up -d
+```
+
+Alternativ baust du selbst aus dem Quellcode — die `compose.yaml` im Repository baut das Image
+lokal, statt es zu ziehen:
 
 ```sh
 git clone https://github.com/mojm-development/autoreverse-server.git
@@ -79,9 +136,9 @@ export AUTOREVERSE_MUSIC_HOST=/srv/media/musik
 docker compose up -d
 ```
 
-Der Server läuft dann auf <http://localhost:8180>. Melde dich mit `AUTOREVERSE_ADMIN_USER` /
-`AUTOREVERSE_ADMIN_PASSWORD` aus der `compose.yaml` an — **ändere die vor dem ersten Start**, sie
-legen dein Verwalterkonto an.
+So oder so läuft der Server dann auf <http://localhost:8180>. Melde dich mit
+`AUTOREVERSE_ADMIN_USER` / `AUTOREVERSE_ADMIN_PASSWORD` aus deiner `compose.yaml` an — **ändere
+die vor dem ersten Start**, sie legen dein Verwalterkonto an.
 
 Danach, weiterhin in der Weboberfläche:
 
@@ -94,12 +151,13 @@ Danach, weiterhin in der Weboberfläche:
 
 ## Konfiguration
 
-| Variable                     | Pflicht               | Standard                                                          | Zweck                                                                                             |
-| ---------------------------- | --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`               | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                       |
-| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/` und `podcasts/` entstehen darin automatisch. |
-| `AUTOREVERSE_ADMIN_USER`     | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                          |
-| `AUTOREVERSE_ADMIN_PASSWORD` | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                           |
+| Variable                     | Pflicht               | Standard                                                          | Zweck                                                                                                       |
+| ---------------------------- | --------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`               | ja                    | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres-Verbindungsstring.                                                                                 |
+| `AUTOREVERSE_DATA`           | nein                  | `./data`                                                          | Basisverzeichnis für servereigene Dateien. `covers/` und `podcasts/` entstehen darin automatisch.           |
+| `AUTOREVERSE_ADMIN_USER`     | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                    |
+| `AUTOREVERSE_ADMIN_PASSWORD` | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                     |
+| `AUTOREVERSE_AUTO_MIGRATE`   | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen. |
 
 Eine Vorlage zum Kopieren liegt in [`.env.example`](.env.example).
 

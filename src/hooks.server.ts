@@ -1,11 +1,19 @@
 import type { Handle, HandleServerError, ServerInit } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { SESSION_COOKIE, tokenFromRequest } from '$lib/server/auth/session';
 import { userForToken } from '$lib/server/auth/tokens';
 import { ensureFirstAdmin } from '$lib/server/auth/bootstrap';
 import { db } from '$lib/server/db';
 
 export const init: ServerInit = async () => {
-	await ensureFirstAdmin(db, process.env as Record<string, string | undefined>);
+	// Opt-in, not default: dev databases synced via `db:push` have no migration
+	// history, so running the migration journal against them would fail. The
+	// Docker image sets this — a pulled image must work against a fresh Postgres.
+	if (env.AUTOREVERSE_AUTO_MIGRATE) {
+		await migrate(db, { migrationsFolder: 'drizzle' });
+	}
+	await ensureFirstAdmin(db, env);
 };
 
 export const handle: Handle = async ({ event, resolve }) => {

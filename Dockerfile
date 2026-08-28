@@ -14,5 +14,8 @@ WORKDIR /app
 COPY --from=build /app/build build
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/package.json package.json
+COPY --from=build /app/drizzle drizzle
+# A pulled image must come up against a fresh Postgres without manual steps.
+ENV AUTOREVERSE_AUTO_MIGRATE=1
 EXPOSE 3000
 CMD ["node", "build"]
