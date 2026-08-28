@@ -3,7 +3,7 @@ import { withTestDb } from '../fixtures';
 import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { storeItems, markMissing } from '../../src/lib/server/scanner/store';
-import type { ScannedItem } from '../../src/lib/server/scanner/books';
+import type { ScannedItem, ScanFailure } from '../../src/lib/server/scanner/books';
 
 function fakeScanned(overrides: Partial<ScannedItem> = {}): ScannedItem {
 	return {
@@ -31,6 +31,67 @@ function fakeScanned(overrides: Partial<ScannedItem> = {}): ScannedItem {
 }
 
 describe('storeItems', () => {
+	it('skips a folder whose insert fails and stores the rest', async () => {
+		await withTestDb(async (db) => {
+			// Two tracks claiming the same position collide on
+			// UNIQUE(item_id, position). scanFolder no longer produces this, but
+			// storeItems must survive whatever it is handed — before, the throw
+			// escaped the loop and every later folder was abandoned with it.
+			const broken = fakeScanned({
+				sourcePath: '/library/books/A/Kaputt',
+				title: 'Kaputt',
+				tracks: [
+					{
+						path: '/library/books/A/Kaputt/01.mp3',
+						position: 1,
+						title: 'eins',
+						disc: null,
+						duration: 10,
+						mtime: 100,
+						size: 200
+					},
+					{
+						path: '/library/books/A/Kaputt/02.mp3',
+						position: 1,
+						title: 'zwei',
+						disc: null,
+						duration: 10,
+						mtime: 100,
+						size: 200
+					}
+				]
+			});
+			const healthy = fakeScanned({ sourcePath: '/library/books/A/Heil', title: 'Heil' });
+
+			const failures: ScanFailure[] = [];
+			const report = await storeItems(
+				db,
+				[broken, healthy],
+				'/library/books',
+				'/data/covers',
+				failures
+			);
+
+			expect(report.skipped).toBe(1);
+			expect(report.new).toBe(1);
+			expect(failures.map((f) => f.path)).toEqual(['/library/books/A/Kaputt']);
+			const stored = await db.select().from(itemsTable);
+			expect(stored.map((i) => i.title)).toEqual(['Heil']);
+		});
+	});
+
+	it('spares a failed folder from being marked missing', async () => {
+		await withTestDb(async (db) => {
+			await storeItems(db, [fakeScanned()], '/library/books', '/data/covers');
+			// Not in `found` because it failed — but it was never observed absent,
+			// so passing it as skipped must keep missing_since null.
+			const missing = await markMissing(db, '/library/books', new Set(), ['/library/books/A/B']);
+			expect(missing).toBe(0);
+			const rows = await db.select().from(itemsTable);
+			expect(rows[0].missingSince).toBeNull();
+		});
+	});
+
 	it('inserts a new item with its tracks and chapters', async () => {
 		await withTestDb(async (db) => {
 			const report = await storeItems(db, [fakeScanned()], '/library/books', '/data/covers');

@@ -69,6 +69,45 @@ async function audioFilesIn(dir: string): Promise<string[]> {
 		.sort();
 }
 
+/** One folder that could not be scanned or stored, with the reason. Collected
+ * instead of thrown: a single unreadable album must not cost the operator the
+ * other several thousand. */
+export interface ScanFailure {
+	path: string;
+	message: string;
+}
+
+function reason(e: unknown): string {
+	const code = (e as NodeJS.ErrnoException)?.code;
+	if (code === 'ENOENT') return 'Verzeichnis existiert nicht';
+	if (code === 'EACCES' || code === 'EPERM') return 'Verzeichnis ist nicht lesbar';
+	if (code) return `Verzeichnis nicht zugänglich (${code})`;
+	return e instanceof Error ? e.message : String(e);
+}
+
+/** Why a library root cannot be scanned, or null if it can be.
+ *
+ * allDirectories and audioFilesIn both swallow readdir failures so that one
+ * bad subfolder doesn't abort its siblings. Applied to the root itself that
+ * turns "the mount is gone" into "the library is empty" — indistinguishable
+ * from a genuinely empty library, and the caller must tell them apart before
+ * markMissing empties the database on the strength of it. */
+export async function libraryRootProblem(root: string): Promise<string | null> {
+	let stats;
+	try {
+		stats = await stat(root);
+	} catch (e) {
+		return reason(e);
+	}
+	if (!stats.isDirectory()) return 'Pfad ist kein Verzeichnis';
+	try {
+		await readdir(root);
+	} catch (e) {
+		return reason(e);
+	}
+	return null;
+}
+
 export interface RawTrack {
 	path: string;
 	tags: TrackTags;
@@ -205,15 +244,34 @@ export async function scanFolder(
 	};
 }
 
-export async function scanBooks(
+/** Walks root and scans every folder in it, isolating failures per folder.
+ * scanFolder touches the filesystem and the tag reader at every step, so a
+ * single unreadable file used to abort the entire pass — the caller got an
+ * exception and no items at all, however many folders had already scanned
+ * cleanly. */
+export async function scanTree(
 	root: string,
-	known: Record<string, [number, number]>
+	kind: 'book' | 'album',
+	known: Record<string, [number, number]>,
+	failures: ScanFailure[] = []
 ): Promise<ScannedItem[]> {
 	const dirs = await allDirectories(root);
 	const results: ScannedItem[] = [];
 	for (const dir of dirs) {
-		const scanned = await scanFolder(root, dir, 'book', known);
-		if (scanned) results.push(scanned);
+		try {
+			const scanned = await scanFolder(root, dir, kind, known);
+			if (scanned) results.push(scanned);
+		} catch (e) {
+			failures.push({ path: dir, message: reason(e) });
+		}
 	}
 	return results;
+}
+
+export async function scanBooks(
+	root: string,
+	known: Record<string, [number, number]>,
+	failures: ScanFailure[] = []
+): Promise<ScannedItem[]> {
+	return scanTree(root, 'book', known, failures);
 }
