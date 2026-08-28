@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import BrandMark from '$lib/components/BrandMark.svelte';
 </script>
 
 <div class="error-page">
-	<div class="brand"><span class="logo-ring"></span><span class="wordmark">Autoreverse</span></div>
+	<div class="brand"><BrandMark size={24} /><span class="wordmark">Autoreverse</span></div>
 	<span class="code mono">{page.status}</span>
 	<h1>{page.error?.message ?? 'Etwas ist schiefgelaufen.'}</h1>
 	<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
@@ -25,12 +26,6 @@
 		align-items: center;
 		gap: 11px;
 		margin-bottom: 20px;
-	}
-	.logo-ring {
-		width: 19px;
-		height: 19px;
-		border-radius: 50%;
-		border: 4px solid var(--book);
 	}
 	.wordmark {
 		font: 600 19px/1 var(--font-sans);

@@ -1,15 +1,18 @@
 <script lang="ts">
+	import BrandMark from './BrandMark.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import Icon from './Icon.svelte';
 
 	let {
 		accent,
 		activeHref,
+		activeQuery = '',
 		user,
 		counts
 	}: {
 		accent: 'book' | 'music' | 'podcast';
 		activeHref: string;
+		activeQuery?: string;
 		user: { name: string; isAdmin: boolean };
 		counts: {
 			albums: number;
@@ -25,7 +28,7 @@
 
 <nav class="sidebar" style="--a: var(--{accent})">
 	<div class="brand">
-		<span class="logo-ring"></span>
+		<BrandMark size={20} />
 		<span class="wordmark">Autoreverse</span>
 	</div>
 	<a href="/library/search" class="search-shortcut">Alles durchsuchen</a>
@@ -41,12 +44,15 @@
 	<a href="/library/favorites" aria-current={activeHref === '/library/favorites'}>Favoriten</a>
 
 	<div class="eyebrow" style="color: var(--podcast)">Podcasts</div>
-	<a href="/library/podcasts" aria-current={activeHref === '/library/podcasts'}>
+	<a
+		href="/library/podcasts"
+		aria-current={activeHref === '/library/podcasts' && activeQuery !== '?filter=new'}
+	>
 		Abos <span class="count mono">{counts.podcasts}</span>
 	</a>
 	<a
 		href="/library/podcasts?filter=new"
-		aria-current={activeHref === '/library/podcasts?filter=new'}
+		aria-current={activeHref === '/library/podcasts' && activeQuery === '?filter=new'}
 	>
 		Neue Folgen {#if counts.unreadEpisodes > 0}<span class="badge">{counts.unreadEpisodes}</span
 			>{/if}
@@ -100,13 +106,6 @@
 		align-items: center;
 		gap: 9px;
 		padding: 0 10px 18px;
-	}
-	.logo-ring {
-		width: 15px;
-		height: 15px;
-		border-radius: 50%;
-		border: 3px solid var(--a);
-		box-sizing: border-box;
 	}
 	.wordmark {
 		font: 600 15px/1 var(--font-sans);

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import BrandMark from '$lib/components/BrandMark.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import type { ActionData, PageData } from './$types';
 	let { form, data }: { form: ActionData; data: PageData } = $props();
@@ -8,7 +9,7 @@
 <div class="login" style="--a: var(--book)">
 	<div class="branding">
 		<div class="brand">
-			<span class="logo-ring"></span><span class="wordmark">Autoreverse</span>
+			<BrandMark size={26} /><span class="wordmark">Autoreverse</span>
 		</div>
 		<div>
 			<h1>Ein Server. Alles zum Hören.</h1>
@@ -94,12 +95,6 @@
 		display: flex;
 		align-items: center;
 		gap: 11px;
-	}
-	.logo-ring {
-		width: 19px;
-		height: 19px;
-		border-radius: 50%;
-		border: 4px solid var(--a);
 	}
 	.wordmark {
 		font: 600 19px/1 var(--font-sans);

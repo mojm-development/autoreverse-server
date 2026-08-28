@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { setContext } from 'svelte';
-	import favicon from '$lib/assets/favicon.svg';
+
 	import { createPlayerStore, PLAYER_CONTEXT_KEY } from '$lib/player.svelte';
 	import MiniPlayerBar from '$lib/components/MiniPlayerBar.svelte';
 	import IconSprite from '$lib/components/IconSprite.svelte';
@@ -9,6 +9,10 @@
 
 	const player = createPlayerStore();
 	setContext(PLAYER_CONTEXT_KEY, player);
+
+	$effect(() => {
+		if (data.preferences) player.applyPreferences(data.preferences);
+	});
 
 	if (typeof window !== 'undefined') {
 		window.addEventListener('beforeunload', () => {
@@ -26,7 +30,8 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" href="/favicon.png" sizes="any" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 </svelte:head>
 
 <IconSprite />
