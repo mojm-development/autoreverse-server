@@ -394,6 +394,88 @@ describe('player store', () => {
 		expect(store.getAnalyser()).toBeNull();
 	});
 
+	function sessionFetch(startPosition = 0) {
+		return vi.fn().mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				session_id: 's1',
+				start_position: startPosition,
+				tracks: [
+					{ id: 1, position: 1, title: 'T1', duration: 100 },
+					{ id: 2, position: 2, title: 'T2', duration: 100 }
+				],
+				chapters: []
+			})
+		});
+	}
+
+	function fakeAudio(play: () => unknown) {
+		return {
+			pause: vi.fn(),
+			removeAttribute: vi.fn(),
+			play,
+			src: '',
+			currentTime: 0,
+			readyState: 0,
+			playbackRate: 1,
+			onplay: null as unknown,
+			onpause: null as unknown,
+			onloadedmetadata: null as (() => void) | null,
+			ontimeupdate: null as unknown,
+			onended: null as unknown
+		};
+	}
+
+	it('a refused autoplay leaves the player on pause instead of claiming to play', async () => {
+		vi.stubGlobal('fetch', sessionFetch());
+		const store = createPlayerStore();
+		await store.play(42);
+		const refusal = Object.assign(new Error('blocked'), { name: 'NotAllowedError' });
+		const el = fakeAudio(() => Promise.reject(refusal));
+		store.attachAudioElement(el as unknown as HTMLAudioElement);
+		await vi.waitFor(() => expect(store.current?.playing).toBe(false));
+	});
+
+	it('a pause coming from the element itself is believed', async () => {
+		vi.stubGlobal('fetch', sessionFetch());
+		const store = createPlayerStore();
+		await store.play(42);
+		const el = fakeAudio(() => Promise.resolve());
+		store.attachAudioElement(el as unknown as HTMLAudioElement);
+		await vi.waitFor(() => expect(store.current?.playing).toBe(true));
+
+		(el.onpause as () => void)();
+		expect(store.current?.playing).toBe(false);
+		(el.onplay as () => void)();
+		expect(store.current?.playing).toBe(true);
+	});
+
+	it('the pause that a source swap fires does not count as a stop', async () => {
+		vi.stubGlobal('fetch', sessionFetch());
+		const store = createPlayerStore();
+		await store.play(42);
+		// Never settles: the element is still working its way into playback.
+		const el = fakeAudio(() => new Promise<void>(() => {}));
+		store.attachAudioElement(el as unknown as HTMLAudioElement);
+
+		(el.onpause as () => void)();
+		expect(store.current?.playing).toBe(true);
+	});
+
+	it('a position set before the metadata arrives is written again once it does', async () => {
+		vi.stubGlobal('fetch', sessionFetch(150));
+		const store = createPlayerStore();
+		await store.play(42);
+		const el = fakeAudio(() => Promise.resolve());
+		store.attachAudioElement(el as unknown as HTMLAudioElement);
+
+		// readyState 0: the browser drops the write, so the store must repeat it.
+		expect(el.currentTime).toBe(0);
+		el.readyState = 1;
+		el.onloadedmetadata?.();
+		expect(el.currentTime).toBe(50);
+	});
+
 	it('a second call after an element swap does not reuse the old graph', async () => {
 		const store = createPlayerStore();
 		const first = document.createElement('audio');

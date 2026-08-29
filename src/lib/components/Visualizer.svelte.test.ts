@@ -103,6 +103,21 @@ describe('Visualizer.svelte', () => {
 		expect(new Set(heights.slice(0, 4)).size).toBe(4);
 	});
 
+	it('goes back to the paused look when playback stops', async () => {
+		const { rerender } = render(Visualizer, {
+			playing: true,
+			bars: 6,
+			getAnalyser: () => fakeAnalyser(180)
+		});
+		await frames();
+		expect(bars()[0].style.height).not.toBe('');
+
+		await rerender({ playing: false, bars: 6, getAnalyser: () => fakeAnalyser(180) });
+		await frames(1);
+		expect(bars()[0].style.height).toBe('');
+		expect(document.querySelector('.viz')!.classList.contains('live')).toBe(false);
+	});
+
 	it('renders the number of bars it was asked for', async () => {
 		render(Visualizer, { playing: false, bars: 12 });
 		expect(bars()).toHaveLength(12);

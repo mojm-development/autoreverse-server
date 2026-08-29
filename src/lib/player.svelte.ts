@@ -63,6 +63,8 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 	let analyserUnavailable = false;
 	let heartbeat: ReturnType<typeof setInterval> | null = null;
 	let audioEl: HTMLAudioElement | null = null;
+	let pendingOffset: number | null = null;
+	let switchingTrack = false;
 
 	function stopHeartbeat() {
 		if (heartbeat) clearInterval(heartbeat);
@@ -85,19 +87,57 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 		});
 	}
 
+	/**
+	 * A fresh `src` has no duration yet, and `currentTime` written before the
+	 * metadata arrives is dropped on the floor — remember it and write it again
+	 * from `onloadedmetadata`.
+	 */
+	function setOffset(offset: number) {
+		if (!audioEl) return;
+		pendingOffset = offset;
+		if (audioEl.readyState >= 1) {
+			audioEl.currentTime = offset;
+			pendingOffset = null;
+		}
+	}
+
+	function startPlayback() {
+		if (!audioEl) return;
+		void audioContext?.resume().catch(() => undefined);
+		const started = audioEl.play() as Promise<void> | undefined;
+		if (!started?.catch) {
+			switchingTrack = false;
+			return;
+		}
+		started
+			.then(() => {
+				switchingTrack = false;
+			})
+			.catch((error: unknown) => {
+				switchingTrack = false;
+				// A reload carries no user gesture, so the browser refuses to play. Say so
+				// instead of showing a pause button over silence.
+				const name = (error as { name?: string } | null)?.name;
+				if (current && (name === 'NotAllowedError' || name === 'NotSupportedError')) {
+					current.playing = false;
+				}
+			});
+	}
+
 	function loadTrack(trackIndex: number, offset: number) {
 		if (!current) return;
 		const track = current.tracks[trackIndex];
 		if (!track) return;
 		current.trackIndex = trackIndex;
 		if (!audioEl) return;
+		// Reloading the source fires `pause` on an element that was playing; that one is
+		// bookkeeping, not the user, so it must not flip `playing`.
+		switchingTrack = true;
 		audioEl.src = `/tracks/${track.id}/stream`;
-		audioEl.currentTime = offset;
+		setOffset(offset);
 		audioEl.playbackRate = current.speed;
-		if (current.playing) {
-			void audioContext?.resume().catch(() => undefined);
-			void audioEl.play();
-		}
+		if (current.playing) startPlayback();
+		else switchingTrack = false;
 	}
 
 	function releaseAnalyser() {
@@ -145,6 +185,19 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 			releaseAnalyser();
 		}
 		audioEl = el;
+		// The element is the truth about what is audible: media keys, headset buttons and a
+		// refused autoplay all change it without going through this store.
+		audioEl.onplay = () => {
+			if (current) current.playing = true;
+		};
+		audioEl.onpause = () => {
+			if (current && !switchingTrack) current.playing = false;
+		};
+		audioEl.onloadedmetadata = () => {
+			if (pendingOffset === null || !audioEl) return;
+			audioEl.currentTime = pendingOffset;
+			pendingOffset = null;
+		};
 		audioEl.ontimeupdate = () => {
 			if (!current || !audioEl) return;
 			current.position = trackStart(current.tracks, current.trackIndex) + audioEl.currentTime;
@@ -236,8 +289,13 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 	function resume() {
 		if (!current) return;
 		current.playing = true;
-		void audioContext?.resume().catch(() => undefined);
-		void audioEl?.play();
+		if (audioEl && !audioEl.src) {
+			// Nothing loaded yet (a reload rebuilt the element): pick the track back up.
+			const { trackIndex, offset } = locate(current.tracks, current.position);
+			loadTrack(trackIndex, offset);
+			return;
+		}
+		startPlayback();
 	}
 	function seek(seconds: number) {
 		if (!current) return;
@@ -246,7 +304,7 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 		if (trackIndex !== current.trackIndex) {
 			loadTrack(trackIndex, offset);
 		} else if (audioEl) {
-			audioEl.currentTime = offset;
+			setOffset(offset);
 		}
 		current.position = clamped;
 	}

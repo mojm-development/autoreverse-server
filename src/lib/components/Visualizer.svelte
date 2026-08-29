@@ -98,7 +98,13 @@
 			frame = requestAnimationFrame(draw);
 		};
 		frame = requestAnimationFrame(draw);
-		return () => cancelAnimationFrame(frame);
+		return () => {
+			cancelAnimationFrame(frame);
+			// Hand the bars back to CSS, or they keep the last frame's heights and sit there
+			// as a flat line once playback stops.
+			live = false;
+			columnEls.forEach((bar) => bar.style.removeProperty('height'));
+		};
 	});
 </script>
 
