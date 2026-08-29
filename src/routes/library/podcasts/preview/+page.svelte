@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import PodcastRail from '$lib/components/PodcastRail.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData, ActionData } from './$types';
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
@@ -30,6 +31,8 @@
 		return hours >= 1 ? `${hours.toFixed(1)} Std` : `${Math.round(seconds / 60)} min`;
 	}
 </script>
+
+<PageTitle title={data.feed?.title ?? 'Podcast abonnieren'} />
 
 <div class="layout" style="--a: var(--podcast)">
 	<PodcastRail podcasts={data.podcasts} />

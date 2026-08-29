@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData, ActionData } from './$types';
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
+
+<PageTitle title={data.artist} />
 
 <div class="content" style="--a: var(--music)">
 	<header>

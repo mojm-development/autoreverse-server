@@ -1,10 +1,13 @@
 <script lang="ts">
 	import BrandMark from '$lib/components/BrandMark.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { ActionData, PageData } from './$types';
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 	let showPassword = $state(false);
 </script>
+
+<PageTitle title="Anmelden" />
 
 <div class="login" style="--a: var(--book)">
 	<div class="branding">

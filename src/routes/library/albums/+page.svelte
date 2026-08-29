@@ -5,6 +5,7 @@
 	import ListRow from '$lib/components/ListRow.svelte';
 	import ViewToggle from '$lib/components/ViewToggle.svelte';
 	import InfiniteScroll from '$lib/components/InfiniteScroll.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -77,6 +78,10 @@
 		return hours >= 1 ? `${hours.toFixed(1)} Std` : `${Math.round(seconds / 60)} min`;
 	}
 </script>
+
+<PageTitle
+	title={data.artist ? `Alben von ${data.artist}` : data.missing ? 'Fehlende Alben' : 'Alben'}
+/>
 
 <div class="content" style="--a: var(--music)">
 	<header>

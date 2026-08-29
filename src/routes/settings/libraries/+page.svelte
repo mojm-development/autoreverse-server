@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import ScanStatusCard from '$lib/components/ScanStatusCard.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData, ActionData } from './$types';
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
+
+<PageTitle title="Bibliotheken" />
 
 <h1>Bibliotheken</h1>
 

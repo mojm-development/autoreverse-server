@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ListRow from '$lib/components/ListRow.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -15,6 +16,8 @@
 		return `/library/${segment}/${id}`;
 	}
 </script>
+
+<PageTitle title="Lesezeichen" />
 
 <div class="content" style="--a: var(--book)">
 	<h1>Lesezeichen <span class="count mono">{data.bookmarks.length}</span></h1>

@@ -2,9 +2,12 @@
 	import { resolve } from '$app/paths';
 	import { enhance } from '$app/forms';
 	import PodcastSearch from '$lib/components/PodcastSearch.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData, ActionData } from './$types';
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
+
+<PageTitle title="Podcast-Abos" />
 
 <h1>Podcast-Abos</h1>
 

@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 </script>
+
+<PageTitle title={`Fehler ${page.status}`} />
 
 <div class="error-page" style="--a: var(--book)">
 	<span class="code mono">{page.status}</span>

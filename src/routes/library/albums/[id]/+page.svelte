@@ -3,6 +3,7 @@
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -34,6 +35,8 @@
 		player.reloadCurrentTrack();
 	}
 </script>
+
+<PageTitle title={data.album.title} />
 
 <div class="content" style="--a: var(--music)">
 	<div class="hero">

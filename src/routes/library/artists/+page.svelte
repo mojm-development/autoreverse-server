@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 </script>
+
+<PageTitle title="Interpreten" />
 
 <div class="content" style="--a: var(--music)">
 	<h1>Interpreten <span class="count mono">{data.artists.length}</span></h1>

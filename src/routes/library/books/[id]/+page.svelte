@@ -4,6 +4,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import ChapterList from '$lib/components/ChapterList.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -53,6 +54,8 @@
 		});
 	}
 </script>
+
+<PageTitle title={data.book.title} />
 
 <div class="content" style="--a: var(--book)">
 	<div class="hero">

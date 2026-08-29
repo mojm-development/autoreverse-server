@@ -5,6 +5,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import PodcastRail from '$lib/components/PodcastRail.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -63,6 +64,8 @@
 		if (data.episodes.length > 0) void player.play(data.episodes[0].id);
 	}
 </script>
+
+<PageTitle title={data.podcast.title} />
 
 <div class="layout" style="--a: var(--podcast)">
 	<PodcastRail podcasts={data.podcasts} activeId={data.podcast.id}>

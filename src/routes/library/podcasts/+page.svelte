@@ -7,6 +7,7 @@
 	import ListRow from '$lib/components/ListRow.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { invalidateAll } from '$app/navigation';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -31,6 +32,8 @@
 		}
 	}
 </script>
+
+<PageTitle title={data.showNew ? 'Neue Folgen' : 'Podcasts'} />
 
 <div class="layout" style="--a: var(--podcast)">
 	<PodcastRail podcasts={data.podcasts} />

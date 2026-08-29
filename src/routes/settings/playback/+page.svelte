@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore, type PlayerPreferences } from '$lib/player.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -22,6 +23,8 @@
 			await update({ reset: false });
 		};
 </script>
+
+<PageTitle title="Wiedergabe" />
 
 <h1>Wiedergabe</h1>
 <form method="POST" class="form" use:enhance={submit}>

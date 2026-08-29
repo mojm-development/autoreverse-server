@@ -1,4 +1,5 @@
 <script lang="ts">
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -22,6 +23,8 @@
 		location.reload();
 	}
 </script>
+
+<PageTitle title={data.playlist.name} />
 
 <div class="content" style="--a: var(--music)">
 	<header><h1>{data.playlist.name}</h1></header>

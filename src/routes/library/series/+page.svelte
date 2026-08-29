@@ -1,7 +1,10 @@
 <script lang="ts">
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 </script>
+
+<PageTitle title="Serien" />
 
 <div class="content" style="--a: var(--book)">
 	<h1>Serien <span class="count mono">{data.series.length}</span></h1>

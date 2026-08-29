@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import BrandMark from '$lib/components/BrandMark.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 </script>
+
+<PageTitle title={`Fehler ${page.status}`} />
 
 <div class="error-page">
 	<div class="brand"><BrandMark size={30} /><span class="wordmark">Autoreverse</span></div>

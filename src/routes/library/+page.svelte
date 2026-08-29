@@ -2,6 +2,7 @@
 	import ContinueCard from '$lib/components/ContinueCard.svelte';
 	import CoverTile from '$lib/components/CoverTile.svelte';
 	import SegmentFilter from '$lib/components/SegmentFilter.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -27,6 +28,8 @@
 		return hours >= 1 ? `${hours.toFixed(1)} h` : `${Math.round(seconds / 60)} min`;
 	}
 </script>
+
+<PageTitle title="Start" />
 
 <div class="content">
 	<header>

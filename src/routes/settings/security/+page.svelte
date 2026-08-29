@@ -1,7 +1,10 @@
 <script lang="ts">
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { ActionData } from './$types';
 	let { form }: { form: ActionData } = $props();
 </script>
+
+<PageTitle title="Sicherheit" />
 
 <h1>Sicherheit</h1>
 <form method="POST" class="form">

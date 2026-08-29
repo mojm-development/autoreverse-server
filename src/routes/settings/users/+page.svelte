@@ -1,8 +1,11 @@
 <script lang="ts">
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData, ActionData } from './$types';
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 	let showCreate = $state(false);
 </script>
+
+<PageTitle title="Nutzer" />
 
 <h1>Nutzer <span class="count mono">{data.users.length}</span></h1>
 <button onclick={() => (showCreate = !showCreate)}>Nutzer anlegen</button>

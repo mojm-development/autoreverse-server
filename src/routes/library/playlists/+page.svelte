@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '$lib/components/Icon.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -7,6 +8,8 @@
 		return (seconds / 3600).toFixed(1);
 	}
 </script>
+
+<PageTitle title="Playlists" />
 
 <div class="content" style="--a: var(--music)">
 	<header><h1>Playlists</h1></header>

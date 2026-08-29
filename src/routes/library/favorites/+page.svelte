@@ -1,6 +1,7 @@
 <script lang="ts">
 	import CoverTile from '$lib/components/CoverTile.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -9,6 +10,8 @@
 		return `/library/${segment}/${id}`;
 	}
 </script>
+
+<PageTitle title="Favoriten" />
 
 <div class="content" style="--a: var(--music)">
 	<h1>Favoriten</h1>

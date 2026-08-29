@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { SETTINGS_SECTIONS } from '$lib/settingsSections';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 	const sections = $derived(SETTINGS_SECTIONS.filter((s) => !s.admin || data.user?.isAdmin));
 </script>
+
+<PageTitle title="Einstellungen" />
 
 <h1>Einstellungen</h1>
 <p class="lede">Alles, was sich an diesem Server einstellen lässt — nach Bereichen sortiert.</p>

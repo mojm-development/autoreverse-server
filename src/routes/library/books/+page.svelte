@@ -3,6 +3,7 @@
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import SortToggle from '$lib/components/SortToggle.svelte';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -37,6 +38,8 @@
 		return Math.round((p.position / total) * 100);
 	}
 </script>
+
+<PageTitle title={data.series ? `Serie ${data.series}` : 'Bibliothek'} />
 
 <div class="content" style="--a: var(--book)">
 	<header>

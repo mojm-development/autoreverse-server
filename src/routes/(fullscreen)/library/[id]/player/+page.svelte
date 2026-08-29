@@ -8,6 +8,7 @@
 	import ListRow from '$lib/components/ListRow.svelte';
 	import Scrubber from '$lib/components/Scrubber.svelte';
 	import { shortcutFor } from '$lib/playerShortcuts';
+	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -179,6 +180,8 @@
 		}
 	}
 </script>
+
+<PageTitle title={data.item.title} />
 
 <div class="np" style="--a: var(--{accent})">
 	<div class="ambient" aria-hidden="true">
