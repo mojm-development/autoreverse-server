@@ -9,7 +9,15 @@ test('toggling the view switches between grid and list without a full reload cha
 	await expect(page.getByRole('table')).toBeVisible();
 });
 
-test('sort label reflects the applied sort', async ({ page }) => {
+test('the sort toggle marks the applied sort', async ({ page }) => {
 	await page.goto('/library/albums?sort=added');
-	await expect(page.getByText('sortiert: Zuletzt dazu')).toBeVisible();
+	const applied = page.getByRole('group', { name: 'Sortierung' }).getByText('Zuletzt dazu');
+	await expect(applied).toHaveAttribute('aria-current', 'true');
+});
+
+test('a filtered list says what is filtering it and offers a way out', async ({ page }) => {
+	await page.goto('/library/albums?q=zzz-nichts-findet-das');
+	await expect(page.getByText('Suche: zzz-nichts-findet-das')).toBeVisible();
+	await page.getByRole('link', { name: 'Suche aufheben' }).click();
+	await expect(page).toHaveURL('/library/albums');
 });

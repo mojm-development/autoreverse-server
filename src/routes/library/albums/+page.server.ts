@@ -6,8 +6,7 @@ import {
 	countMissing,
 	itemDurations,
 	albumsOfArtist,
-	PAGE_SIZE,
-	SORT_LABELS
+	PAGE_SIZE
 } from '$lib/server/library/queries';
 
 export const load = async ({ locals, url }) => {
@@ -35,7 +34,6 @@ export const load = async ({ locals, url }) => {
 	return {
 		view,
 		sort,
-		sortLabel: SORT_LABELS[sort],
 		q: q ?? '',
 		artist: artist ?? null,
 		missing,

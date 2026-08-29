@@ -1,5 +1,5 @@
 import { page } from 'vitest/browser';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import CoverTile from './CoverTile.svelte';
 
@@ -25,5 +25,34 @@ describe('CoverTile.svelte', () => {
 	it('renders the striped placeholder when coverUrl is null', async () => {
 		render(CoverTile, { kind: 'book', coverUrl: null, title: 'X', subtitle: 'Y' });
 		await expect.element(page.getByAltText('')).not.toBeInTheDocument();
+	});
+
+	it('carries a play button only when one is offered, and playing does not follow the link', async () => {
+		const onPlay = vi.fn();
+		const { unmount } = render(CoverTile, {
+			kind: 'album',
+			coverUrl: null,
+			title: 'Iron Man 2',
+			subtitle: 'AC/DC'
+		});
+		expect(document.querySelector('.play')).toBeNull();
+		unmount();
+
+		render(CoverTile, {
+			kind: 'album',
+			coverUrl: null,
+			title: 'Iron Man 2',
+			subtitle: 'AC/DC',
+			playLabel: 'Iron Man 2 abspielen',
+			onPlay
+		});
+		const play = document.querySelector<HTMLButtonElement>('.play')!;
+		expect(play.getAttribute('aria-label')).toBe('Iron Man 2 abspielen');
+
+		// The tile sits inside a link to the detail page; the button must not navigate.
+		const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+		play.dispatchEvent(event);
+		expect(onPlay).toHaveBeenCalled();
+		expect(event.defaultPrevented).toBe(true);
 	});
 });
