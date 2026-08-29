@@ -22,12 +22,13 @@ export const load = async ({ locals, url }) => {
 	const userId = requireWebUser(locals);
 	const q = url.searchParams.get('q') ?? undefined;
 	const series = url.searchParams.get('series') ?? undefined;
+	const seriesAuthor = url.searchParams.get('author') ?? undefined;
 	const sort = sortFrom(url);
 	const view: 'grid' | 'list' = url.searchParams.get('view') === 'list' ? 'list' : 'grid';
 
 	let rows, total;
 	if (series) {
-		rows = await seriesSiblings(db, series);
+		rows = await seriesSiblings(db, series, seriesAuthor);
 		total = rows.length;
 	} else {
 		[rows, total] = await Promise.all([
@@ -44,6 +45,7 @@ export const load = async ({ locals, url }) => {
 		view,
 		q: q ?? '',
 		series: series ?? null,
+		seriesAuthor: seriesAuthor ?? null,
 		books: rows,
 		total,
 		durations,

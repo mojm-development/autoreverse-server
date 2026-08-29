@@ -15,6 +15,22 @@
 				)
 			: data.series
 	);
+
+	/** One section per author: a series belongs to whoever wrote it. */
+	const byAuthor = $derived(
+		shown.reduce<{ author: string | null; entries: typeof shown }[]>((groups, entry) => {
+			const last = groups[groups.length - 1];
+			if (last && last.author === entry.author) last.entries.push(entry);
+			else groups.push({ author: entry.author, entries: [entry] });
+			return groups;
+		}, [])
+	);
+
+	function seriesHref(entry: { series: string; author: string | null }): string {
+		const series = `series=${encodeURIComponent(entry.series)}`;
+		const author = entry.author ? `&author=${encodeURIComponent(entry.author)}` : '';
+		return `/library/books?${series}${author}`;
+	}
 </script>
 
 <PageTitle title="Serien" />
@@ -40,33 +56,42 @@
 				: `Keine Serie passt zu „${query}“.`}
 		</p>
 	{:else}
-		<ul class="grid">
-			{#each shown as entry (entry.series)}
-				<li>
-					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-					<a class="tile" href="/library/books?series={encodeURIComponent(entry.series)}">
-						<span class="stack">
-							{#each (entry.covers ?? []).slice(0, 3) as coverId, i (coverId)}
-								<span class="spine" style="background-image: url(/items/{coverId}/cover); --i: {i}"
-								></span>
-							{/each}
-							{#if (entry.covers ?? []).length === 0}
-								<span class="spine empty-spine" style="--i: 0"></span>
-							{/if}
-						</span>
-						<span class="body">
-							<span class="name">{entry.series}</span>
-							{#if entry.author}<span class="author">{entry.author}</span>{/if}
-							<span class="count-sub mono">
-								{entry.count}
-								{entry.count === 1 ? 'Band' : 'Bände'}
-								{#if entry.finished_count > 0}· {entry.finished_count} beendet{/if}
-							</span>
-						</span>
-					</a>
-				</li>
-			{/each}
-		</ul>
+		{#each byAuthor as group (group.author ?? '\u0000')}
+			<section class="author-group">
+				<h2 class="author-name">
+					{group.author ?? 'Ohne Autor'}
+					<span class="count mono">{group.entries.length}</span>
+				</h2>
+				<ul class="grid">
+					{#each group.entries as entry (entry.series)}
+						<li>
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+							<a class="tile" href={seriesHref(entry)}>
+								<span class="stack">
+									{#each (entry.covers ?? []).slice(0, 3) as coverId, i (coverId)}
+										<span
+											class="spine"
+											style="background-image: url(/items/{coverId}/cover); --i: {i}"
+										></span>
+									{/each}
+									{#if (entry.covers ?? []).length === 0}
+										<span class="spine empty-spine" style="--i: 0"></span>
+									{/if}
+								</span>
+								<span class="body">
+									<span class="name">{entry.series}</span>
+									<span class="count-sub mono">
+										{entry.count}
+										{entry.count === 1 ? 'Band' : 'Bände'}
+										{#if entry.finished_count > 0}· {entry.finished_count} beendet{/if}
+									</span>
+								</span>
+							</a>
+						</li>
+					{/each}
+				</ul>
+			</section>
+		{/each}
 	{/if}
 </div>
 
@@ -117,6 +142,19 @@
 		display: none;
 	}
 
+	.author-group {
+		margin-bottom: 26px;
+	}
+	.author-name {
+		display: flex;
+		align-items: baseline;
+		gap: 8px;
+		font: 600 13px var(--font-sans);
+		color: var(--dim);
+		margin: 0 0 10px;
+		padding-bottom: 6px;
+		border-bottom: 1px solid var(--line);
+	}
 	.grid {
 		list-style: none;
 		margin: 0;
@@ -170,13 +208,6 @@
 	}
 	.name {
 		font: 600 13px var(--font-sans);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.author {
-		font-size: 11.5px;
-		color: var(--dim);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;

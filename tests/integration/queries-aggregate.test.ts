@@ -235,7 +235,7 @@ describe('aggregate queries', () => {
 		});
 	});
 
-	it('bookSeries groups a shelf: three cover ids, the shared author, finished volumes', async () => {
+	it('bookSeries groups a shelf per author, with covers and finished volumes', async () => {
 		await withTestDb(async (db) => {
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
 			const volumes = await db
@@ -276,15 +276,24 @@ describe('aggregate queries', () => {
 						series: 'Perry Rhodan',
 						seriesIndex: 4
 					},
-					// A second series with two different authors and no covers at all.
-					{ kind: 'book', title: 'A', sortTitle: 'a', author: 'Erste', series: 'Duett' },
-					{ kind: 'book', title: 'B', sortTitle: 'b', author: 'Zweite', series: 'Duett' },
+					// The same series name from another writer: a separate shelf, not a merge.
+					{
+						kind: 'book',
+						title: 'Fremder Band',
+						sortTitle: 'fremder band',
+						author: 'K. H. Scheer',
+						series: 'Perry Rhodan',
+						seriesIndex: 1
+					},
+					// A series whose books carry no author at all.
+					{ kind: 'book', title: 'A', sortTitle: 'a', series: 'Anonym' },
 					// Not in any series, and one that is gone from disk.
 					{ kind: 'book', title: 'Solo', sortTitle: 'solo' },
 					{
 						kind: 'book',
 						title: 'Verschwunden',
 						sortTitle: 'verschwunden',
+						author: 'Andreas Eschbach',
 						series: 'Perry Rhodan',
 						missingSince: new Date()
 					}
@@ -295,19 +304,22 @@ describe('aggregate queries', () => {
 				.values({ userId, itemId: volumes[0].id, position: 500, finished: true });
 
 			const rows = await bookSeries(db, userId);
-			expect(rows.map((r) => r.series)).toEqual(['Duett', 'Perry Rhodan']);
+			// Ordered by author, then series; the nameless author sorts last.
+			expect(rows.map((r) => [r.author, r.series])).toEqual([
+				['Andreas Eschbach', 'Perry Rhodan'],
+				['K. H. Scheer', 'Perry Rhodan'],
+				[null, 'Anonym']
+			]);
 
-			const rhodan = rows.find((r) => r.series === 'Perry Rhodan')!;
-			expect(rhodan.count).toBe(4); // the missing volume is not counted
-			expect(rhodan.author).toBe('Andreas Eschbach');
-			expect(rhodan.finished_count).toBe(1);
+			const eschbach = rows[0];
+			expect(eschbach.count).toBe(4); // the missing volume is not counted
+			expect(eschbach.finished_count).toBe(1);
 			// Covers stop at three, in volume order, skipping the one without artwork.
-			expect(rhodan.covers).toEqual([volumes[0].id, volumes[1].id, volumes[2].id]);
+			expect(eschbach.covers).toEqual([volumes[0].id, volumes[1].id, volumes[2].id]);
 
-			const duett = rows.find((r) => r.series === 'Duett')!;
-			expect(duett.author).toBeNull(); // two authors: no single name to show
-			expect(duett.covers).toBeNull();
-			expect(duett.finished_count).toBe(0);
+			const scheer = rows[1];
+			expect(scheer.count).toBe(1);
+			expect(scheer.covers).toBeNull();
 		});
 	}, 60_000);
 }, 60_000);

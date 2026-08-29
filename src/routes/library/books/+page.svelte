@@ -19,6 +19,8 @@
 		const search = new SvelteURLSearchParams();
 		if (data.q) search.set('q', data.q);
 		if (data.series) search.set('series', data.series);
+		// The author scopes the series: two writers can use the same series name.
+		if (data.seriesAuthor) search.set('author', data.seriesAuthor);
 		if (data.sort !== 'series') search.set('sort', data.sort);
 		if (data.view !== 'grid') search.set('view', data.view);
 		for (const [key, value] of Object.entries(params)) {
@@ -71,14 +73,17 @@
 	}
 </script>
 
-<PageTitle title={data.series ? `Serie ${data.series}` : 'Bibliothek'} />
+<PageTitle title={data.series ?? 'Bibliothek'} />
 
 <div class="content" style="--a: var(--book)">
 	<header>
 		<h1>
-			{data.series ? `Serie ${data.series}` : 'Bibliothek'}
+			{data.series ? data.series : 'Bibliothek'}
 			<span class="count mono">{data.total}</span>
 		</h1>
+		{#if data.series && data.seriesAuthor}
+			<span class="head-author">{data.seriesAuthor}</span>
+		{/if}
 	</header>
 
 	<div class="toolbar">
@@ -86,6 +91,7 @@
 			<input type="hidden" name="sort" value={data.sort} />
 			<input type="hidden" name="view" value={data.view} />
 			{#if data.series}<input type="hidden" name="series" value={data.series} />{/if}
+			{#if data.seriesAuthor}<input type="hidden" name="author" value={data.seriesAuthor} />{/if}
 			<span class="search-field">
 				<Icon name="search" />
 				<input type="search" name="q" value={data.q} placeholder="Bibliothek durchsuchen" />
@@ -130,9 +136,10 @@
 			{/if}
 			{#if data.series}
 				<span class="chip">
-					Serie: {data.series}
+					Serie: {data.series}{#if data.seriesAuthor}
+						· {data.seriesAuthor}{/if}
 					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-					<a href={href({ series: '' })} aria-label="Serienfilter aufheben">×</a>
+					<a href={href({ series: '', author: '' })} aria-label="Serienfilter aufheben">×</a>
 				</span>
 			{/if}
 		</div>
@@ -211,6 +218,10 @@
 	.count {
 		color: var(--faint);
 		font-size: 13px;
+	}
+	.head-author {
+		color: var(--dim);
+		font-size: 12.5px;
 	}
 	.toolbar {
 		display: flex;

@@ -187,4 +187,16 @@ describe('seriesSiblings', () => {
 			expect(rows.map((r) => r.title)).toEqual(['Fall 1: Eins', 'Fall 2: Zwei', 'Fall 10: Zehn']);
 		});
 	});
+
+	it('keeps two writers with the same series name apart', async () => {
+		await withTestDb(async (db) => {
+			await seed(db, 'book', ['Ihr Band'], { series: 'Sternenwind', author: 'Erste' });
+			await seed(db, 'book', ['Sein Band'], { series: 'Sternenwind', author: 'Zweite' });
+
+			const scoped = await seriesSiblings(db, 'Sternenwind', 'Erste');
+			expect(scoped.map((r) => r.title)).toEqual(['Ihr Band']);
+			// Without an author the drill-down stays as wide as it was.
+			expect(await seriesSiblings(db, 'Sternenwind')).toHaveLength(2);
+		});
+	});
 });

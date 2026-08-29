@@ -321,11 +321,15 @@ export async function itemDurations(
 	return map;
 }
 
-export async function seriesSiblings(db: DrizzleDb, series: string) {
+export async function seriesSiblings(db: DrizzleDb, series: string, author?: string | null) {
+	// Without the author this would pull in a same-named series by someone else.
+	const scope = author
+		? and(eq(itemsTable.series, series), eq(itemsTable.author, author))
+		: eq(itemsTable.series, series);
 	return db
 		.select()
 		.from(itemsTable)
-		.where(and(eq(itemsTable.kind, 'book'), eq(itemsTable.series, series), PRESENT))
+		.where(and(eq(itemsTable.kind, 'book'), scope, PRESENT))
 		.orderBy(
 			sql`${itemsTable.seriesIndex} NULLS LAST`,
 			sql`${EPISODE_NO} NULLS LAST`,
@@ -366,26 +370,27 @@ export async function newEpisodes(db: DrizzleDb, userId: number, limit = 60) {
 }
 
 export async function bookSeries(db: DrizzleDb, userId: number) {
-	// Cover ids for the first three volumes, the author when the whole series shares one,
-	// and how many volumes this listener finished — a name and a count said nothing.
+	// A series belongs to an author: two writers can use the same series name, and
+	// grouping by the name alone merged their shelves into one. Cover ids for the
+	// first three volumes, and how many the listener finished.
 	const rows = await db.execute(sql`
 		SELECT item.series,
+		       item.author,
 		       count(*)::int AS count,
 		       (array_agg(item.id ORDER BY item.series_index NULLS LAST, item.sort_title)
 		           FILTER (WHERE item.cover_path IS NOT NULL))[1:3] AS covers,
-		       CASE WHEN count(DISTINCT item.author) = 1 THEN min(item.author) END AS author,
 		       count(*) FILTER (WHERE progress.finished)::int AS finished_count
 		FROM items AS item
 		LEFT JOIN progress ON progress.item_id = item.id AND progress.user_id = ${userId}
 		WHERE item.kind = 'book' AND item.series IS NOT NULL AND item.missing_since IS NULL
-		GROUP BY item.series
-		ORDER BY lower(item.series)
+		GROUP BY item.series, item.author
+		ORDER BY lower(item.author) NULLS LAST, lower(item.series)
 	`);
 	return rows as unknown as Array<{
 		series: string;
+		author: string | null;
 		count: number;
 		covers: number[] | null;
-		author: string | null;
 		finished_count: number;
 	}>;
 }
