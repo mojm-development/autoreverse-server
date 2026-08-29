@@ -318,7 +318,9 @@ export async function newEpisodes(db: DrizzleDb, userId: number, limit = 60) {
 		SELECT episode.id, episode.title, episode.published_at, episode.cover_path,
 		       podcast.id AS podcast_id, podcast.title AS podcast_title,
 		       (SELECT count(*) FROM tracks WHERE tracks.item_id = episode.id) > 0 AS downloaded,
-		       coalesce(sum(track.duration), 0) AS duration
+		       coalesce(sum(track.duration), 0) AS duration,
+		       -- Started but unfinished episodes get a "continue at" line in the UI.
+		       coalesce(progress.position, 0) AS position
 		FROM items AS episode
 		JOIN items AS podcast ON podcast.id = episode.parent_id
 		LEFT JOIN progress ON progress.item_id = episode.id AND progress.user_id = ${userId}
@@ -326,7 +328,7 @@ export async function newEpisodes(db: DrizzleDb, userId: number, limit = 60) {
 		WHERE episode.kind = 'episode'
 		  AND episode.published_at >= podcast.added_at
 		  AND (progress.item_id IS NULL OR progress.finished = false)
-		GROUP BY episode.id, podcast.id, progress.item_id
+		GROUP BY episode.id, podcast.id, progress.item_id, progress.position
 		ORDER BY episode.published_at DESC NULLS LAST
 		LIMIT ${limit}
 	`);
@@ -339,6 +341,7 @@ export async function newEpisodes(db: DrizzleDb, userId: number, limit = 60) {
 		podcast_title: string;
 		downloaded: boolean;
 		duration: number;
+		position: number;
 	}>;
 }
 
