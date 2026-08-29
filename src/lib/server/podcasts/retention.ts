@@ -2,7 +2,7 @@ import { unlink } from 'node:fs/promises';
 import { and, eq, sql } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable, libraryConfig } from '../db/schema';
 import type { DrizzleDb } from '../db';
-import { downloadEpisode } from './download';
+import { downloadEpisode, pruneEmptyPodcastDir } from './download';
 import { refresh } from './store';
 
 export const KEEP_MIN = 0;
@@ -54,12 +54,19 @@ export async function effectiveKeep(
 	return podcast.keepEpisodes ?? (await getKeepDefault(db));
 }
 
-async function removeDownload(db: DrizzleDb, episodeId: number): Promise<number> {
+async function removeDownload(
+	db: DrizzleDb,
+	episodeId: number,
+	podcastsDir: string
+): Promise<number> {
 	const rows = await db
 		.delete(tracksTable)
 		.where(eq(tracksTable.itemId, episodeId))
 		.returning({ path: tracksTable.path });
-	for (const row of rows) await unlink(row.path).catch(() => undefined);
+	for (const row of rows) {
+		await unlink(row.path).catch(() => undefined);
+		await pruneEmptyPodcastDir(row.path, podcastsDir);
+	}
 	return rows.length;
 }
 
@@ -93,7 +100,7 @@ export async function applyRetention(
 	}
 	for (const episode of surplus) {
 		if (!episode.downloaded) continue;
-		result.freed += await removeDownload(db, episode.id);
+		result.freed += await removeDownload(db, episode.id, podcastsDir);
 	}
 	return result;
 }

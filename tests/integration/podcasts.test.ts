@@ -200,7 +200,50 @@ describe('podcasts store', () => {
 			const result = await downloadEpisode(db, episode.id, dir);
 			expect(result.trackId).toBeTruthy();
 			const [track] = await db.select().from(tracksTable).where(eq(tracksTable.itemId, episode.id));
-			expect(track.path).toBe(join(dir, `${episode.id}.mp3`));
+			expect(track.path).toBe(join(dir, 'P', 'E.mp3')); // <podcastsDir>/<Podcast>/<Folge>.mp3
+		});
+	});
+
+	it('downloadEpisode keeps two episodes with the same title apart', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				body: {},
+				arrayBuffer: async () => new Uint8Array([0, 1, 2, 3]).buffer
+			})
+		);
+		await withTestDb(async (db) => {
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'Der / Podcast', sortTitle: 'der podcast' })
+				.returning();
+			const episodes: { id: number }[] = [];
+			for (const guid of ['g3', 'g4']) {
+				const [episode] = await db
+					.insert(itemsTable)
+					.values({
+						kind: 'episode',
+						parentId: podcast.id,
+						title: 'Folge: eins?',
+						sortTitle: 'folge eins',
+						guid,
+						feedUrl: 'https://x/ep.mp3'
+					})
+					.returning();
+				episodes.push(episode);
+			}
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
+			await downloadEpisode(db, episodes[0].id, dir);
+			await downloadEpisode(db, episodes[1].id, dir);
+
+			const paths = await db
+				.select({ itemId: tracksTable.itemId, path: tracksTable.path })
+				.from(tracksTable);
+			const byItem = new Map(paths.map((row) => [row.itemId, row.path]));
+			const folder = join(dir, 'Der Podcast'); // separators and ':' '?' scrubbed out of both names
+			expect(byItem.get(episodes[0].id)).toBe(join(folder, 'Folge eins.mp3'));
+			expect(byItem.get(episodes[1].id)).toBe(join(folder, `Folge eins (${episodes[1].id}).mp3`));
 		});
 	});
 }, 60_000);

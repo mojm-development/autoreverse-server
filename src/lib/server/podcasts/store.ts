@@ -4,6 +4,7 @@ import { parseFeed } from './feed';
 import { writeCoverBytes } from '../scanner/covers';
 import { relative, resolve } from 'node:path';
 import { unlink } from 'node:fs/promises';
+import { pruneEmptyPodcastDir } from './download';
 import type { DrizzleDb } from '../db';
 
 export class FeedFetchError extends Error {}
@@ -186,6 +187,7 @@ export async function unsubscribe(db: DrizzleDb, podcastId: number, podcastsDir:
 		} catch {
 			filesKept += 1;
 		}
+		await pruneEmptyPodcastDir(path, podcastsDir);
 	}
 	return { episodes: episodeRows.length, filesDeleted, filesKept };
 }
