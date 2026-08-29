@@ -36,7 +36,7 @@
 </script>
 
 {#if current && track && !isFullscreenPlayer}
-	<div class="bar">
+	<div class="bar" data-testid="mini-player">
 		<div class="transport">
 			{#if byTrack}
 				<button

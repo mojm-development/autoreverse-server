@@ -193,6 +193,51 @@
 		<path d="M20 14.6A8.4 8.4 0 1 1 9.4 4a7 7 0 0 0 10.6 10.6z" />
 	</symbol>
 	<symbol
+		id="icon-back"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.6"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d="M19 12H5" /><path d="M11 6l-6 6 6 6" />
+	</symbol>
+	<symbol id="icon-play-filled" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+		<path d="M8 4.8v14.4L19.5 12z" />
+	</symbol>
+	<symbol id="icon-pause-filled" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+		<rect x="7" y="5" width="3.6" height="14" rx="1.2" /><rect
+			x="13.4"
+			y="5"
+			width="3.6"
+			height="14"
+			rx="1.2"
+		/>
+	</symbol>
+	<symbol
+		id="icon-rewind"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.7"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d="M20.5 12a8.5 8.5 0 1 1-8.5-8.5" /><path d="M14.6 1 11.4 3.5l3.2 2.5" />
+	</symbol>
+	<symbol
+		id="icon-forward"
+		viewBox="0 0 24 24"
+		fill="none"
+		stroke="currentColor"
+		stroke-width="1.7"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
+		<path d="M3.5 12a8.5 8.5 0 1 0 8.5-8.5" /><path d="M9.4 1l3.2 2.5-3.2 2.5" />
+	</symbol>
+	<symbol
 		id="icon-previous"
 		viewBox="0 0 24 24"
 		fill="none"

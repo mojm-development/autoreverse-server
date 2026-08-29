@@ -7,6 +7,7 @@
 	import ChapterList from '$lib/components/ChapterList.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import Scrubber from '$lib/components/Scrubber.svelte';
+	import { shortcutFor } from '$lib/playerShortcuts';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
@@ -121,6 +122,47 @@
 		history.back();
 	}
 
+	function togglePlay() {
+		if (player.current?.playing) player.pause();
+		else player.resume();
+	}
+
+	/** Albums have no skip buttons, so the arrows nudge by a track-sized step there. */
+	const TRACK_STEP = 10;
+	const stepBack = $derived(byTrack ? TRACK_STEP : player.preferences.skipBack);
+	const stepForward = $derived(byTrack ? TRACK_STEP : player.preferences.skipForward);
+
+	function nudge(direction: -1 | 1) {
+		const step = direction < 0 ? stepBack : stepForward;
+		if (byTrack) player.seekInTrack(Math.max(0, player.trackOffset() + direction * step));
+		else if (direction < 0) player.skipBack();
+		else player.skipForward();
+	}
+
+	onMount(() => {
+		function onKeydown(event: KeyboardEvent) {
+			const action = shortcutFor({
+				key: event.key,
+				shiftKey: event.shiftKey,
+				ctrlKey: event.ctrlKey,
+				metaKey: event.metaKey,
+				altKey: event.altKey,
+				target: event.target as HTMLElement | null
+			});
+			if (!action) return;
+			// The space bar would scroll the page, the arrows would too.
+			event.preventDefault();
+			if (action === 'toggle') togglePlay();
+			else if (action === 'back') nudge(-1);
+			else if (action === 'forward') nudge(1);
+			else if (action === 'previous') goPrevious();
+			else if (action === 'next') goNext();
+			else close();
+		}
+		window.addEventListener('keydown', onKeydown);
+		return () => window.removeEventListener('keydown', onKeydown);
+	});
+
 	let sleepTimerHandle: ReturnType<typeof setTimeout> | null = null;
 	function setSleepTimer(minutes: string) {
 		if (sleepTimerHandle) clearTimeout(sleepTimerHandle);
@@ -141,7 +183,10 @@
 
 	<div class="left">
 		<div class="status-row">
-			<button class="close" aria-label="Schließen" onclick={close}><Icon name="expand" /></button>
+			<button class="back" onclick={close} title="Zurück (Esc)">
+				<Icon name="back" />
+				<span>Zurück</span>
+			</button>
 			<BrandMark size={26} />
 			<span class="eyebrow">Läuft gerade · {kindLabel}</span>
 			<span class="session mono">Sitzung offen · {elapsedMinutes} Min</span>
@@ -186,63 +231,89 @@
 			</div>
 
 			<div class="transport">
-				<select
-					class="pill speed"
-					aria-label="Geschwindigkeit"
-					value={player.preferences.playbackSpeed}
-					onchange={(e) => setSpeed(Number(e.currentTarget.value))}
-				>
-					{#each SPEEDS as value (value)}
-						<option {value}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2 })}×</option>
-					{/each}
-				</select>
-				{#if !byTrack}
+				<div class="deck">
 					<button
-						class="skip"
-						aria-label="{player.preferences.skipBack} Sekunden zurück"
-						onclick={() => player.skipBack()}>{player.preferences.skipBack}</button
+						class="step"
+						aria-label="{stepBack} Sekunden zurück"
+						title="{stepBack} s zurück (←)"
+						onclick={() => nudge(-1)}
 					>
-				{/if}
-				<button
-					class="icon-btn"
-					aria-label={byTrack ? 'Vorheriger Titel' : 'Vorheriges Kapitel'}
-					disabled={byTrack ? atFirstTrack && player.trackOffset() <= 3 : currentChapterIndex <= 0}
-					onclick={goPrevious}
-				>
-					<Icon name="previous" />
-				</button>
-				<button
-					class="play"
-					aria-label={player.current?.playing ? 'Pause' : 'Abspielen'}
-					onclick={() => (player.current?.playing ? player.pause() : player.resume())}
-				>
-					<Icon name={player.current?.playing ? 'pause' : 'play'} />
-				</button>
-				<button
-					class="icon-btn"
-					aria-label={byTrack ? 'Nächster Titel' : 'Nächstes Kapitel'}
-					disabled={byTrack
-						? atLastTrack
-						: currentChapterIndex < 0 || currentChapterIndex >= data.chapters.length - 1}
-					onclick={goNext}
-				>
-					<Icon name="next" />
-				</button>
-				{#if !byTrack}
+						<Icon name="rewind" />
+						<span class="step-value mono">{stepBack}</span>
+					</button>
 					<button
-						class="skip"
-						aria-label="{player.preferences.skipForward} Sekunden vor"
-						onclick={() => player.skipForward()}>{player.preferences.skipForward}</button
+						class="icon-btn jump"
+						aria-label={byTrack ? 'Vorheriger Titel' : 'Vorheriges Kapitel'}
+						title={byTrack
+							? 'Vorheriger Titel (Shift+Pfeil links)'
+							: 'Vorheriges Kapitel (Shift+Pfeil links)'}
+						disabled={byTrack
+							? atFirstTrack && player.trackOffset() <= 3
+							: currentChapterIndex <= 0}
+						onclick={goPrevious}
 					>
-				{/if}
-				<select class="pill sleep" onchange={(e) => setSleepTimer(e.currentTarget.value)}>
-					<option value="0">Sleep-Timer</option>
-					<option value="15">15 Min</option>
-					<option value="30">30 Min</option>
-					<option value="45">45 Min</option>
-					<option value="60">60 Min</option>
-				</select>
+						<Icon name="previous" />
+					</button>
+					<button
+						class="play"
+						aria-label={player.current?.playing ? 'Pause' : 'Abspielen'}
+						title={player.current?.playing ? 'Pause (Leertaste)' : 'Abspielen (Leertaste)'}
+						onclick={togglePlay}
+					>
+						<Icon name={player.current?.playing ? 'pause-filled' : 'play-filled'} />
+					</button>
+					<button
+						class="icon-btn jump"
+						aria-label={byTrack ? 'Nächster Titel' : 'Nächstes Kapitel'}
+						title={byTrack
+							? 'Nächster Titel (Shift+Pfeil rechts)'
+							: 'Nächstes Kapitel (Shift+Pfeil rechts)'}
+						disabled={byTrack
+							? atLastTrack
+							: currentChapterIndex < 0 || currentChapterIndex >= data.chapters.length - 1}
+						onclick={goNext}
+					>
+						<Icon name="next" />
+					</button>
+					<button
+						class="step"
+						aria-label="{stepForward} Sekunden vor"
+						title="{stepForward} s vor (→)"
+						onclick={() => nudge(1)}
+					>
+						<Icon name="forward" />
+						<span class="step-value mono">{stepForward}</span>
+					</button>
+				</div>
+
+				<div class="options">
+					<select
+						class="pill speed"
+						aria-label="Geschwindigkeit"
+						value={player.preferences.playbackSpeed}
+						onchange={(e) => setSpeed(Number(e.currentTarget.value))}
+					>
+						{#each SPEEDS as value (value)}
+							<option {value}>{value.toLocaleString('de-DE', { minimumFractionDigits: 2 })}×</option
+							>
+						{/each}
+					</select>
+					<select
+						class="pill sleep"
+						aria-label="Sleep-Timer"
+						onchange={(e) => setSleepTimer(e.currentTarget.value)}
+					>
+						<option value="0">Sleep-Timer</option>
+						<option value="15">15 Min</option>
+						<option value="30">30 Min</option>
+						<option value="45">45 Min</option>
+						<option value="60">60 Min</option>
+					</select>
+				</div>
 			</div>
+			<p class="hints mono">
+				Leertaste Play · ← {stepBack} s · → {stepForward} s · Shift+←/→ {listLabel} · Esc zurück
+			</p>
 		</div>
 	</div>
 
@@ -394,13 +465,21 @@
 		align-items: center;
 		gap: 14px;
 	}
-	.close {
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		border: 1px solid var(--line);
-		background: transparent;
+	.back {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		padding: 0 14px 0 11px;
+		font-size: 11.5px;
 		color: var(--dim);
+	}
+	.back:hover {
+		color: var(--text);
+		border-color: var(--a);
+	}
+	.back :global(.icon) {
+		font-size: 15px;
+		flex: none;
 	}
 	.session {
 		margin-left: auto;
@@ -479,31 +558,78 @@
 		--scrubber-thumb: 12px;
 	}
 	.transport {
+		align-self: stretch;
+		width: 100%;
+		max-width: 460px;
 		display: flex;
 		align-items: center;
-		gap: 14px;
-		margin-top: 18px;
+		justify-content: space-between;
+		gap: 18px;
+		margin-top: 16px;
+	}
+	/* Transport first, the two dropdowns as a quieter second group beside it. */
+	.deck {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+	.options {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 	}
 	.transport .pill {
 		font-size: 11px;
 	}
-	.skip {
-		width: 34px;
-		height: 34px;
+	.step {
+		position: relative;
+		width: 40px;
+		height: 40px;
+		padding: 0;
 		border-radius: 50%;
-		border: 1px solid var(--line);
+		border: none;
 		background: transparent;
 		color: var(--dim);
-		font: 600 10px var(--font-mono);
+		display: grid;
+		place-items: center;
+	}
+	.step :global(.icon) {
+		font-size: 30px;
+	}
+	.step-value {
+		position: absolute;
+		font-size: 9.5px;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+	}
+	.step:hover,
+	.jump:hover:not(:disabled) {
+		color: var(--text);
+	}
+	.jump {
+		width: 40px;
+		height: 40px;
+		font-size: 21px;
 	}
 	.play {
-		width: 64px;
-		height: 64px;
+		width: 62px;
+		height: 62px;
 		border-radius: 50%;
 		background: var(--a);
 		border: none;
+		color: var(--bg);
+		font-size: 30px;
 		display: grid;
 		place-items: center;
+		box-shadow: 0 6px 20px -8px var(--a);
+	}
+	.play:hover {
+		filter: brightness(1.08);
+	}
+	.hints {
+		margin: 10px 0 0;
+		font-size: 10.5px;
+		color: var(--faint);
 	}
 
 	.table {
@@ -565,8 +691,7 @@
 		font-size: 11px;
 		color: var(--faint);
 	}
-	.icon-btn:disabled,
-	.skip:disabled {
+	.icon-btn:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
 	}

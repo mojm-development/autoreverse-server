@@ -43,7 +43,7 @@ test('clicking Abspielen starts playback and the mini-player bar appears', async
 	const albumId = await ensureFixtureAlbum();
 	await page.goto(`/library/albums/${albumId}`);
 	await page.getByRole('button', { name: 'Abspielen' }).click();
-	await expect(page.locator('.bar')).toBeVisible();
+	await expect(page.getByTestId('mini-player')).toBeVisible();
 });
 
 test('the currently-playing track row is visually distinguished', async ({ page }) => {

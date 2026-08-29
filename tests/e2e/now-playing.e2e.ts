@@ -61,7 +61,8 @@ async function clientSideGoto(page: Page, url: string) {
 test('the fullscreen player has no sidebar and no mini-player bar', async ({ page }) => {
 	await page.goto('/library/1/player');
 	await expect(page.locator('nav.sidebar')).not.toBeVisible();
-	await expect(page.locator('.bar')).not.toBeVisible();
+	// Not `.bar` — the visualizer's columns carry that class too.
+	await expect(page.getByTestId('mini-player')).not.toBeVisible();
 });
 
 test('closing returns to the previous library page with the mini-player bar restored', async ({
@@ -70,11 +71,11 @@ test('closing returns to the previous library page with the mini-player bar rest
 	const bookId = await ensureNowPlayingBook();
 	await page.goto(`/library/books/${bookId}`);
 	await page.getByRole('button', { name: 'Abspielen' }).click();
-	await expect(page.locator('.bar')).toBeVisible();
+	await expect(page.getByTestId('mini-player')).toBeVisible();
 
 	await clientSideGoto(page, `/library/${bookId}/player`);
-	await page.getByRole('button', { name: 'Schließen' }).click();
+	await page.getByRole('button', { name: 'Zurück' }).click();
 
 	await expect(page).toHaveURL(`/library/books/${bookId}`);
-	await expect(page.locator('.bar')).toBeVisible();
+	await expect(page.getByTestId('mini-player')).toBeVisible();
 });

@@ -111,7 +111,7 @@ test('full journey: login, scan, browse, play, progress persists across reload',
 	await page.getByText('Buch').click();
 	await expect(page).toHaveURL(/\/library\/books\/\d+/);
 	await page.getByRole('button', { name: 'Abspielen' }).click();
-	await expect(page.locator('.bar')).toBeVisible();
+	await expect(page.getByTestId('mini-player')).toBeVisible();
 
 	await page.waitForTimeout(3_000); // let a little real position accumulate
 	await page.reload();
