@@ -71,6 +71,12 @@
 		currentChapterIndex >= 0 ? data.chapters[currentChapterIndex] : null
 	);
 
+	// The album's own title belongs in the second line — the headline is whatever is
+	// actually playing right now.
+	const headline = $derived(
+		byTrack ? (currentTrack?.title ?? data.item.title) : (currentChapter?.title ?? data.item.title)
+	);
+
 	let tab = $state<'chapters' | 'bookmarks'>('chapters');
 	const listLabel = $derived(byTrack ? 'Titel' : 'Kapitel');
 	const playingIndex = $derived(isPlayingThis ? player.current!.trackIndex : -1);
@@ -205,10 +211,11 @@
 					/>
 				</div>
 			</div>
-			<h1>{currentChapter?.title ?? data.item.title}</h1>
+			<h1>{headline}</h1>
 			<p class="subtitle">
-				{#if currentChapter}Kapitel {currentChapterIndex + 1} von {data.chapters.length} · {data
-						.item.title}{/if}
+				{#if byTrack && currentTrack}Titel {playingIndex + 1} von {data.tracks.length} · {data.item
+						.title}{:else if currentChapter}Kapitel {currentChapterIndex + 1} von {data.chapters
+						.length} · {data.item.title}{/if}
 			</p>
 			<p class="byline">
 				{data.item.author ?? data.item.artist ?? ''}{#if data.item.narrator}
@@ -552,7 +559,6 @@
 	.scrubber-wrap {
 		align-self: stretch;
 		width: 100%;
-		max-width: 460px;
 		margin-top: 14px;
 		--scrubber-height: 6px;
 		--scrubber-thumb: 12px;
@@ -560,7 +566,6 @@
 	.transport {
 		align-self: stretch;
 		width: 100%;
-		max-width: 460px;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
