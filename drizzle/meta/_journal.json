@@ -50,6 +50,13 @@
       "when": 1788022611193,
       "tag": "0006_low_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788023418278,
+      "tag": "0007_harsh_metal_master",
+      "breakpoints": true
     }
   ]
 }

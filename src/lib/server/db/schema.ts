@@ -73,6 +73,10 @@ export const items = pgTable(
 		// Podcasting 2.0 <podcast:chapters url=…>: fetched when the episode is downloaded,
 		// since a feed refresh must not pull one JSON file per episode.
 		chaptersUrl: text('chapters_url'),
+		// What the feed claims an episode runs for (<itunes:duration>). The measured
+		// duration lives on `tracks` — but an episode has no tracks until the server
+		// has fetched it, and a list still wants to say how long it is.
+		feedDuration: doublePrecision('feed_duration'),
 		keepEpisodes: integer('keep_episodes'),
 		// Fields a person edited by hand. The scanner reads this and leaves them alone,
 		// otherwise the next scan of a changed folder would undo every correction.

@@ -5,11 +5,14 @@
 	import ListRow from '$lib/components/ListRow.svelte';
 	import ChapterList from '$lib/components/ChapterList.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import MetadataEditor from '$lib/components/MetadataEditor.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 	let tab = $state<'chapters' | 'bookmarks' | 'series'>('chapters');
+	let editing = $state(false);
 
 	const totalDuration = $derived(data.tracks.reduce((sum, t) => sum + t.duration, 0));
 	const isPlayingThis = $derived(player.current?.itemId === data.book.id);
@@ -57,6 +60,19 @@
 
 <PageTitle title={data.book.title} />
 
+{#if editing}
+	<MetadataEditor
+		item={data.book}
+		tracks={data.tracks}
+		trackLabel="Dateien"
+		onClose={() => (editing = false)}
+		onSaved={async () => {
+			editing = false;
+			await invalidateAll();
+		}}
+	/>
+{/if}
+
 <div class="content" style="--a: var(--book)">
 	<div class="hero">
 		<div class="cover">
@@ -86,6 +102,11 @@
 				<button class="outline" onclick={addBookmarkHere}
 					><Icon name="bookmark" /> Lesezeichen setzen</button
 				>
+				{#if data.user?.isAdmin}
+					<button class="outline" onclick={() => (editing = true)}>
+						<Icon name="settings" /> Bearbeiten
+					</button>
+				{/if}
 			</div>
 		</div>
 	</div>

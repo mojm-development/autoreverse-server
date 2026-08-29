@@ -94,6 +94,70 @@ describe('GET /items/{id}/children', () => {
 	});
 });
 
+describe('episode durations before a download', () => {
+	// The whole point of the fallback: a podcast list wants to say how long an episode
+	// runs before anyone has fetched it, and until then there are no tracks to measure.
+	it('falls back to the duration the feed claims', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'Maschinenraum', sortTitle: 'maschinenraum' })
+				.returning({ id: itemsTable.id });
+			const [episode] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'Folge 118',
+					sortTitle: 'folge 118',
+					feedDuration: 1500
+				})
+				.returning({ id: itemsTable.id });
+
+			const res = await callRoute(_itemChildrenGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: String(podcast.id) }
+			});
+
+			expect((await res.json()).durations[String(episode.id)]).toBe(1500);
+		});
+	});
+
+	it('prefers the measured duration once the files are there', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'Maschinenraum', sortTitle: 'maschinenraum' })
+				.returning({ id: itemsTable.id });
+			const [episode] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'episode',
+					parentId: podcast.id,
+					title: 'Folge 118',
+					sortTitle: 'folge 118',
+					// The feed lies by a wide margin — feeds round, or are simply wrong.
+					feedDuration: 1500
+				})
+				.returning({ id: itemsTable.id });
+			await db
+				.insert(tracksTable)
+				.values({ itemId: episode.id, position: 1, path: '/118.mp3', duration: 1234 });
+
+			const res = await callRoute(_itemChildrenGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: String(podcast.id) }
+			});
+
+			expect((await res.json()).durations[String(episode.id)]).toBe(1234);
+		});
+	});
+});
+
 describe('GET /library/more?sort=played', () => {
 	it('puts the most recently played first and keeps the untouched ones', async () => {
 		await withTestDb(async (db) => {

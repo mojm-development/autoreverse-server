@@ -4,11 +4,14 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import MetadataEditor from '$lib/components/MetadataEditor.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 	let isFavorite = $derived(data.isFavorite);
+	let editing = $state(false);
 
 	const totalDuration = $derived(data.tracks.reduce((sum, t) => sum + t.duration, 0));
 
@@ -38,6 +41,18 @@
 
 <PageTitle title={data.album.title} />
 
+{#if editing}
+	<MetadataEditor
+		item={data.album}
+		tracks={data.tracks}
+		onClose={() => (editing = false)}
+		onSaved={async () => {
+			editing = false;
+			await invalidateAll();
+		}}
+	/>
+{/if}
+
 <div class="content" style="--a: var(--music)">
 	<div class="hero">
 		<div class="cover">
@@ -66,6 +81,11 @@
 				>
 					<Icon name={isFavorite ? 'heart-filled' : 'heart'} />
 				</button>
+				{#if data.user?.isAdmin}
+					<button class="outline" onclick={() => (editing = true)}>
+						<Icon name="settings" /> Bearbeiten
+					</button>
+				{/if}
 				<button class="icon-btn" aria-label="Weitere Optionen" disabled>
 					<Icon name="queue" />
 				</button>

@@ -43,7 +43,8 @@ async function syncEpisodes(
 					description: episode.description,
 					feedUrl: episode.mediaUrl,
 					publishedAt: episode.publishedAt,
-					chaptersUrl: episode.chaptersUrl
+					chaptersUrl: episode.chaptersUrl,
+					feedDuration: episode.durationSeconds ?? null
 				})
 				.where(eq(itemsTable.id, existing.id));
 			episodeId = existing.id;
@@ -57,6 +58,7 @@ async function syncEpisodes(
 					title: episode.title,
 					sortTitle: episode.title.toLowerCase(),
 					description: episode.description,
+					feedDuration: episode.durationSeconds ?? null,
 					guid: episode.guid,
 					feedUrl: episode.mediaUrl,
 					publishedAt: episode.publishedAt,

@@ -352,6 +352,28 @@ export async function progressMap(db: DrizzleDb, userId: number, itemIds: number
 	return map;
 }
 
+/**
+ * Duration per item, falling back to what the feed claims.
+ *
+ * `itemDurations` sums the tracks, which only exist once the server has fetched an
+ * episode. Before that a podcast list had nothing to show — so an episode's
+ * `<itunes:duration>` stands in until the real files are there and can correct it.
+ */
+export async function itemDurationsWithFeedFallback(db: DrizzleDb, ids: number[]) {
+	if (ids.length === 0) return {};
+	const measured = await itemDurations(db, ids);
+	const rows = await db
+		.select({ id: itemsTable.id, feedDuration: itemsTable.feedDuration })
+		.from(itemsTable)
+		.where(and(inArray(itemsTable.id, ids), isNotNull(itemsTable.feedDuration)));
+	const result: Record<number, number> = { ...measured };
+	for (const row of rows) {
+		if (result[row.id] === undefined && row.feedDuration !== null)
+			result[row.id] = row.feedDuration;
+	}
+	return result;
+}
+
 export async function itemDurations(
 	db: DrizzleDb,
 	itemIds: number[]

@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable, metadataEdits } from '../db/schema';
 import { ApiError } from '../api/errors';
+import { ITEM_FIELDS, TRACK_FIELDS, type MetadataField } from '$lib/metadataFields';
 import type { DrizzleDb } from '../db';
+
+export { ITEM_FIELDS, TRACK_FIELDS };
 
 /**
  * Hand edits to library metadata.
@@ -13,37 +16,10 @@ import type { DrizzleDb } from '../db';
  * Setting a field locks it; resetting it hands the field back to the scanner.
  */
 
-type FieldType = 'text' | 'int' | 'float';
-
-interface FieldSpec {
-	/** Column name in the Drizzle schema — this is what `locked_fields` stores. */
-	column: string;
-	type: FieldType;
-	max?: number;
-}
-
-/** Wire name (snake_case, like the rest of the API) → column. */
-export const ITEM_FIELDS: Record<string, FieldSpec> = {
-	title: { column: 'title', type: 'text', max: 500 },
-	sort_title: { column: 'sortTitle', type: 'text', max: 500 },
-	author: { column: 'author', type: 'text', max: 300 },
-	artist: { column: 'artist', type: 'text', max: 300 },
-	album_artist: { column: 'albumArtist', type: 'text', max: 300 },
-	narrator: { column: 'narrator', type: 'text', max: 300 },
-	series: { column: 'series', type: 'text', max: 300 },
-	series_index: { column: 'seriesIndex', type: 'float' },
-	year: { column: 'year', type: 'int' }
-};
-
-export const TRACK_FIELDS: Record<string, FieldSpec> = {
-	title: { column: 'title', type: 'text', max: 500 },
-	disc: { column: 'disc', type: 'int' }
-};
-
 /** A title change carries its sort key along, unless that was edited on its own. */
 const DERIVED: Record<string, string> = { title: 'sortTitle' };
 
-function coerce(name: string, spec: FieldSpec, raw: unknown): string | number | null {
+function coerce(name: string, spec: MetadataField, raw: unknown): string | number | null {
 	if (raw === null) return null;
 	if (spec.type === 'text') {
 		if (typeof raw !== 'string') throw new ApiError(422, `${name} muss Text sein`);
@@ -77,7 +53,7 @@ export interface EditRequest {
 
 function parseRequest(
 	body: unknown,
-	fields: Record<string, FieldSpec>
+	fields: Record<string, MetadataField>
 ): { set: Record<string, string | number | null>; reset: string[] } {
 	if (!body || typeof body !== 'object') throw new ApiError(422, 'Ungültige Anfrage');
 	const { set, reset } = body as EditRequest;
