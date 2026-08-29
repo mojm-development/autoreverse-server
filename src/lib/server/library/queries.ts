@@ -17,7 +17,9 @@ const EPISODE_NO = episodeNumber(itemsTable.title);
 const SORTS: Record<string, ReturnType<typeof sql>> = {
 	title: sql`${NATURAL_TITLE}`,
 	added: sql`${itemsTable.addedAt} DESC, ${NATURAL_TITLE}`,
-	series: sql`lower(${itemsTable.author}) NULLS LAST, lower(${itemsTable.series}) NULLS LAST, ${EPISODE_NO} NULLS LAST, ${NATURAL_TITLE}`
+	// The scanner's own volume number wins; the number parsed out of a title stays as
+	// the fallback for anything scanned before series detection existed.
+	series: sql`lower(${itemsTable.author}) NULLS LAST, lower(${itemsTable.series}) NULLS LAST, ${itemsTable.seriesIndex} NULLS LAST, ${EPISODE_NO} NULLS LAST, ${NATURAL_TITLE}`
 };
 export const SORT_LABELS: Record<string, string> = {
 	title: 'Titel A–Z',

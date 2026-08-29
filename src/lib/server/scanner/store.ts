@@ -79,10 +79,24 @@ export async function storeItems(
 							coversDir,
 							existing.coverPath
 						);
-						await tx
-							.update(itemsTable)
-							.set({ missingSince: null, coverPath: cover })
-							.where(eq(itemsTable.id, existing.id));
+						// Backfill only. A folder whose files never change is never read again,
+						// so a library scanned before series detection existed would keep its
+						// empty columns forever — but a series that came from the file's tags
+						// must not be overwritten by a guess from the path.
+						const patch: Partial<typeof itemsTable.$inferInsert> = {
+							missingSince: null,
+							coverPath: cover
+						};
+						if (!existing.series && entry.series) patch.series = entry.series;
+						if (
+							existing.seriesIndex === null &&
+							entry.seriesIndex !== null &&
+							entry.seriesIndex !== undefined &&
+							(existing.series || entry.series)
+						) {
+							patch.seriesIndex = entry.seriesIndex;
+						}
+						await tx.update(itemsTable).set(patch).where(eq(itemsTable.id, existing.id));
 					}
 					return 'unchanged';
 				}
@@ -99,6 +113,7 @@ export async function storeItems(
 							artist: entry.artist ?? null,
 							albumArtist: entry.albumArtist ?? null,
 							series: entry.series ?? null,
+							seriesIndex: entry.seriesIndex ?? null,
 							year: entry.year ?? null,
 							missingSince: null
 						})
@@ -117,6 +132,7 @@ export async function storeItems(
 							artist: entry.artist ?? null,
 							albumArtist: entry.albumArtist ?? null,
 							series: entry.series ?? null,
+							seriesIndex: entry.seriesIndex ?? null,
 							year: entry.year ?? null
 						})
 						.returning({ id: itemsTable.id });

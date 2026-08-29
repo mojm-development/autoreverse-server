@@ -274,6 +274,111 @@ describe('storeItems', () => {
 			expect(track02.position).toBe(1);
 		});
 	});
+
+	it('stores the series and its volume number, and corrects it on a rescan', async () => {
+		await withTestDb(async (db) => {
+			const folder = '/library/books/Eschbach/Perry Rhodan/03 - Der Fluch';
+			await storeItems(
+				db,
+				[
+					fakeScanned({
+						sourcePath: folder,
+						title: 'Der Fluch',
+						series: 'Perry Rhodan',
+						seriesIndex: 3
+					})
+				],
+				'/library/books',
+				'/data/covers'
+			);
+			const [stored] = await db.select().from(itemsTable).where(eq(itemsTable.title, 'Der Fluch'));
+			expect(stored.series).toBe('Perry Rhodan');
+			expect(stored.seriesIndex).toBe(3);
+
+			// A rescan that reads better tags has to be able to correct the number — half
+			// volumes are why the column is not an integer.
+			await storeItems(
+				db,
+				[
+					fakeScanned({
+						sourcePath: folder,
+						title: 'Der Fluch',
+						series: 'Perry Rhodan',
+						seriesIndex: 3.5,
+						tracks: [
+							{
+								path: `${folder}/01.mp3`,
+								position: 1,
+								title: 'T',
+								disc: null,
+								duration: 10,
+								mtime: 101,
+								size: 201
+							}
+						]
+					})
+				],
+				'/library/books',
+				'/data/covers'
+			);
+			const [updated] = await db.select().from(itemsTable).where(eq(itemsTable.title, 'Der Fluch'));
+			expect(updated.seriesIndex).toBe(3.5);
+		});
+	}, 60_000);
+
+	it('backfills a missing series on an unchanged folder, but never overwrites one', async () => {
+		await withTestDb(async (db) => {
+			const folder = '/library/books/Eschbach/Perry Rhodan/03 - Der Fluch';
+			// Scanned before series detection existed: series and volume are empty.
+			await storeItems(
+				db,
+				[fakeScanned({ sourcePath: folder, title: 'Der Fluch' })],
+				'/library/books',
+				'/data/covers'
+			);
+
+			// Nothing on disk changed, so the scanner only sees the tree this time.
+			await storeItems(
+				db,
+				[
+					fakeScanned({
+						sourcePath: folder,
+						title: 'Der Fluch',
+						series: 'Perry Rhodan',
+						seriesIndex: 3,
+						unchanged: true,
+						tracks: []
+					})
+				],
+				'/library/books',
+				'/data/covers'
+			);
+			const [filled] = await db.select().from(itemsTable).where(eq(itemsTable.title, 'Der Fluch'));
+			expect(filled.series).toBe('Perry Rhodan');
+			expect(filled.seriesIndex).toBe(3);
+
+			// A later unchanged pass guessing something else leaves the stored values alone:
+			// they may have come from the file's own tags.
+			await storeItems(
+				db,
+				[
+					fakeScanned({
+						sourcePath: folder,
+						title: 'Der Fluch',
+						series: 'Etwas anderes',
+						seriesIndex: 99,
+						unchanged: true,
+						tracks: []
+					})
+				],
+				'/library/books',
+				'/data/covers'
+			);
+			const [kept] = await db.select().from(itemsTable).where(eq(itemsTable.title, 'Der Fluch'));
+			expect(kept.series).toBe('Perry Rhodan');
+			expect(kept.seriesIndex).toBe(3);
+		});
+	}, 60_000);
 });
 
 describe('removeVanished', () => {

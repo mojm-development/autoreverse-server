@@ -2,6 +2,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, extname, basename, relative, sep } from 'node:path';
 import { readTags, type TrackTags } from './tags';
 import { readChapters, type Chapter } from './chapters';
+import { resolveSeries } from './series';
 import type { ProgressFn } from '../admin/scanState';
 
 export const AUDIO = new Set(['.mp3', '.m4a', '.m4b', '.flac', '.ogg', '.opus', '.wav', '.aac']);
@@ -25,7 +26,7 @@ export interface ScannedItem {
 	albumArtist?: string | null;
 	series?: string | null;
 	year?: number | null;
-	seriesIndex: null;
+	seriesIndex: number | null;
 	tracks: ScannedTrack[];
 	chapters: Chapter[];
 	unchanged: boolean;
@@ -151,17 +152,28 @@ export async function scanFolder(
 
 	const parts = relative(root, dir).split(sep).filter(Boolean);
 	const folderAuthorOrArtist = parts.length >= 2 ? parts[0] : null;
-	const series = kind === 'book' && parts.length >= 3 ? parts[1] : null;
+	const folderName = basename(dir);
+	const parentIsSeries = kind === 'book' && parts.length >= 3;
 
 	if (unchanged) {
+		// No tags are read for an untouched folder, so this pass sees only the tree.
+		const guess =
+			kind === 'book'
+				? resolveSeries({
+						folderName,
+						parentName: parentIsSeries ? parts[1] : null,
+						parentIsSeries,
+						title: folderName
+					})
+				: { series: null, seriesIndex: null, title: folderName };
 		return {
 			sourcePath: dir,
 			kind,
-			title: basename(dir),
+			title: guess.title,
 			author: kind === 'book' ? folderAuthorOrArtist : undefined,
 			artist: kind === 'album' ? folderAuthorOrArtist : undefined,
-			series,
-			seriesIndex: null,
+			series: guess.series,
+			seriesIndex: guess.seriesIndex,
 			tracks: [],
 			chapters: [],
 			unchanged: true
@@ -178,7 +190,21 @@ export async function scanFolder(
 	const tracks = orderTracks(rawTracks, files);
 
 	const firstTags = rawTracks[0].tags;
-	const title = firstTags.album || basename(dir);
+	const titleFromTag = Boolean(firstTags.album);
+	const baseTitle = firstTags.album || folderName;
+	const guess =
+		kind === 'book'
+			? resolveSeries({
+					tagSeries: firstTags.series,
+					tagSeriesIndex: firstTags.seriesIndex,
+					folderName,
+					parentName: parentIsSeries ? parts[1] : null,
+					parentIsSeries,
+					title: baseTitle,
+					titleFromTag
+				})
+			: { series: null, seriesIndex: null, title: baseTitle };
+	const title = guess.title;
 	const author = kind === 'book' ? firstTags.artist || folderAuthorOrArtist : undefined;
 	const artist =
 		kind === 'album'
@@ -211,9 +237,9 @@ export async function scanFolder(
 		author,
 		artist,
 		albumArtist,
-		series,
+		series: guess.series,
 		year,
-		seriesIndex: null,
+		seriesIndex: guess.seriesIndex,
 		tracks,
 		chapters,
 		unchanged: false
