@@ -5,6 +5,7 @@
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from './Icon.svelte';
 	import Scrubber from './Scrubber.svelte';
+	import Visualizer from './Visualizer.svelte';
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 	let audioEl: HTMLAudioElement;
@@ -21,6 +22,10 @@
 			? (track?.duration ?? 0)
 			: (current?.tracks.reduce((sum, t) => sum + t.duration, 0) ?? 0)
 	);
+	// Same accent the library and the fullscreen player use for this kind of item.
+	const accent = $derived(
+		current?.kind === 'book' ? 'book' : current?.kind === 'album' ? 'music' : 'podcast'
+	);
 	const atFirstTrack = $derived(current?.trackIndex === 0);
 	const atLastTrack = $derived(
 		current !== null && current !== undefined && current.trackIndex >= current.tracks.length - 1
@@ -36,7 +41,7 @@
 </script>
 
 {#if current && track && !isFullscreenPlayer}
-	<div class="bar" data-testid="mini-player">
+	<div class="bar" data-testid="mini-player" style="--a: var(--{accent})">
 		<div class="transport">
 			{#if byTrack}
 				<button
@@ -100,6 +105,14 @@
 				onSeek={(seconds) => (byTrack ? player.seekInTrack(seconds) : player.seek(seconds))}
 			/>
 		</div>
+		<span class="mini-viz" aria-hidden="true">
+			<Visualizer
+				bars={14}
+				playing={current.playing}
+				getAnalyser={player.getAnalyser}
+				label="Wiedergabe läuft"
+			/>
+		</span>
 		<div class="extra">
 			<span class="pill mono"
 				>{current.speed.toLocaleString('de-DE', { minimumFractionDigits: 2 })}×</span
@@ -171,6 +184,14 @@
 		place-items: center;
 		border: none;
 	}
+	.mini-viz {
+		display: block;
+		flex: none;
+		width: 92px;
+		height: 30px;
+		--viz-gap: 3px;
+		--viz-segment: 6px;
+	}
 	.cover {
 		width: 42px;
 		height: 42px;
@@ -211,6 +232,9 @@
 		.bar {
 			left: 0;
 			bottom: var(--mobile-nav-height);
+		}
+		.mini-viz {
+			display: none;
 		}
 	}
 </style>

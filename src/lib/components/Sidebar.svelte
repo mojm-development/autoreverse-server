@@ -66,20 +66,24 @@
 	<a href="/library/bookmarks" aria-current={activeHref === '/library/bookmarks'}>Lesezeichen</a>
 
 	<div class="account">
-		<span class="avatar">{initials}</span>
-		<span class="who">
-			<span class="name">{user.name}</span>
-			<span class="role mono">{user.isAdmin ? 'Verwalter' : 'Nutzer'}</span>
-		</span>
-		<ThemeToggle />
-		<a href="/settings" class="settings-link" aria-label="Einstellungen">
-			<Icon name="settings" />
-		</a>
-		<form method="POST" action="/logout" class="logout-form">
-			<button type="submit" class="logout-button" aria-label="Abmelden">
-				<Icon name="logout" />
-			</button>
-		</form>
+		<div class="identity">
+			<span class="avatar">{initials}</span>
+			<span class="who">
+				<span class="name">{user.name}</span>
+				<span class="role mono">{user.isAdmin ? 'Verwalter' : 'Nutzer'}</span>
+			</span>
+		</div>
+		<div class="account-actions">
+			<ThemeToggle />
+			<a href="/settings" class="account-btn" aria-label="Einstellungen" title="Einstellungen">
+				<Icon name="settings" />
+			</a>
+			<form method="POST" action="/logout" class="logout-form">
+				<button type="submit" class="account-btn" aria-label="Abmelden" title="Abmelden">
+					<Icon name="logout" />
+				</button>
+			</form>
+		</div>
 	</div>
 </nav>
 
@@ -149,23 +153,39 @@
 	.badge {
 		margin-left: auto;
 	}
+	/* Name and role get the first line to themselves; the three buttons share the second,
+	   so nothing has to be truncated to fit the sidebar. */
 	.account {
 		margin-top: auto;
 		display: flex;
-		align-items: center;
-		gap: 7px;
-		padding: 9px 10px;
-		border-radius: 8px;
+		flex-direction: column;
+		gap: 10px;
+		padding: 11px;
+		border-radius: var(--radius-md, 12px);
 		border: 1px solid var(--line);
+		background: color-mix(in oklab, var(--a) 6%, var(--panel));
+	}
+	.identity {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		min-width: 0;
+	}
+	.account-actions {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 	}
 	.avatar {
-		width: 24px;
-		height: 24px;
+		width: 30px;
+		height: 30px;
 		border-radius: 50%;
-		background: color-mix(in oklab, var(--a) 30%, transparent);
+		background: color-mix(in oklab, var(--a) 32%, transparent);
+		border: 1px solid color-mix(in oklab, var(--a) 45%, transparent);
 		display: grid;
 		place-items: center;
-		font: 600 10px var(--font-sans);
+		font: 600 11px var(--font-sans);
+		letter-spacing: 0.02em;
 		flex: none;
 	}
 	.who {
@@ -182,7 +202,7 @@
 		white-space: nowrap;
 	}
 	.name {
-		font: 500 12px var(--font-sans);
+		font: 600 12.5px var(--font-sans);
 	}
 	.role {
 		font-size: 10px;
@@ -191,22 +211,21 @@
 	.logout-form {
 		display: contents;
 	}
-	.settings-link,
-	.logout-button {
-		flex: none;
-		width: 26px;
-		height: 26px;
+	.account-btn {
+		flex: 1;
+		height: 30px;
 		display: grid;
 		place-items: center;
 		border-radius: var(--radius-pill, 999px);
 		border: 1px solid var(--line);
 		background: transparent;
 		color: var(--dim);
+		font-size: 15px;
 	}
-	.settings-link:hover,
-	.logout-button:hover {
+	.account-btn:hover {
 		color: var(--text);
-		background: var(--panel);
+		background: var(--panel-hi);
+		border-color: var(--line-strong);
 	}
 
 	@media (max-width: 700px) {
