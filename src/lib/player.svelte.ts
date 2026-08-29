@@ -206,7 +206,10 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 			if (!current) return;
 			const nextIndex = current.trackIndex + 1;
 			if (nextIndex < current.tracks.length) {
-				loadTrack(nextIndex, 0);
+				// Running out of media fires `pause` *before* `ended`, so `playing` is already
+				// false by now — that pause is the track ending, not the user. jumpToTrack puts
+				// it back and starts the next track, the same path the next button takes.
+				jumpToTrack(nextIndex);
 			} else {
 				current.playing = false;
 				void flushProgress(true);

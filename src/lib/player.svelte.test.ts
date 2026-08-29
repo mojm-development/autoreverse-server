@@ -462,6 +462,48 @@ describe('player store', () => {
 		expect(store.current?.playing).toBe(true);
 	});
 
+	it('a track running out plays straight on into the next one', async () => {
+		vi.stubGlobal('fetch', sessionFetch());
+		const store = createPlayerStore();
+		await store.play(42);
+		const play = vi.fn(() => Promise.resolve());
+		const el = fakeAudio(play);
+		store.attachAudioElement(el as unknown as HTMLAudioElement);
+		await vi.waitFor(() => expect(store.current?.playing).toBe(true));
+		play.mockClear();
+
+		// Media running out fires `pause` before `ended` — the store must not read that as
+		// the user stopping, or the next track loads muted behind a play button.
+		(el.onpause as () => void)();
+		(el.onended as () => void)();
+
+		expect(store.current?.trackIndex).toBe(1);
+		expect(el.src).toBe('/tracks/2/stream');
+		expect(store.current?.position).toBe(100);
+		expect(play).toHaveBeenCalled();
+		await vi.waitFor(() => expect(store.current?.playing).toBe(true));
+	});
+
+	it('the end of the last track stops and reports the item as finished', async () => {
+		const fetchMock = sessionFetch();
+		vi.stubGlobal('fetch', fetchMock);
+		const store = createPlayerStore();
+		await store.play(42);
+		const el = fakeAudio(() => Promise.resolve());
+		store.attachAudioElement(el as unknown as HTMLAudioElement);
+		await store.playTrackAt(42, 1); // the last of the two tracks
+
+		(el.onpause as () => void)();
+		(el.onended as () => void)();
+
+		expect(store.current?.trackIndex).toBe(1); // no wrap-around to the top of the album
+		expect(store.current?.playing).toBe(false);
+		await vi.waitFor(() => {
+			const progress = fetchMock.mock.calls.find(([url]) => url === '/progress/42');
+			expect(progress?.[1]?.body).toContain('"finished":true');
+		});
+	});
+
 	it('a position set before the metadata arrives is written again once it does', async () => {
 		vi.stubGlobal('fetch', sessionFetch(150));
 		const store = createPlayerStore();
