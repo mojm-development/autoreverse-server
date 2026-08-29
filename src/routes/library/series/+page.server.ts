@@ -1,21 +1,8 @@
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { requireWebUser } from '$lib/server/auth/session';
-import { items as itemsTable } from '$lib/server/db/schema';
+import { bookSeries } from '$lib/server/library/queries';
 
 export const load = async ({ locals }) => {
-	requireWebUser(locals);
-	const series = await db
-		.select({ series: itemsTable.series, count: sql<number>`count(*)::int` })
-		.from(itemsTable)
-		.where(
-			and(
-				eq(itemsTable.kind, 'book'),
-				isNotNull(itemsTable.series),
-				isNull(itemsTable.missingSince)
-			)
-		)
-		.groupBy(itemsTable.series)
-		.orderBy(sql`lower(${itemsTable.series})`);
-	return { series };
+	const userId = requireWebUser(locals);
+	return { series: await bookSeries(db, userId) };
 };

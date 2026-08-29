@@ -1,17 +1,32 @@
 <script lang="ts">
+	import { getContext } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { SvelteURLSearchParams } from 'svelte/reactivity';
+	import CoverTile from '$lib/components/CoverTile.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import SortToggle from '$lib/components/SortToggle.svelte';
+	import ViewToggle from '$lib/components/ViewToggle.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { humanDuration } from '$lib/dates';
+	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
-	function sortHref(target: string): string {
-		const params = new SvelteURLSearchParams();
-		if (data.q) params.set('q', data.q);
-		params.set('sort', target);
-		return `${resolve('/library/books')}?${params}`;
+	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
+
+	function href(params: Record<string, string>): string {
+		const search = new SvelteURLSearchParams();
+		if (data.q) search.set('q', data.q);
+		if (data.series) search.set('series', data.series);
+		if (data.sort !== 'series') search.set('sort', data.sort);
+		if (data.view !== 'grid') search.set('view', data.view);
+		for (const [key, value] of Object.entries(params)) {
+			if (value) search.set(key, value);
+			else search.delete(key);
+		}
+		const query = search.toString();
+		return query ? `${resolve('/library/books')}?${query}` : resolve('/library/books');
 	}
 
 	type Status = 'listening' | 'unstarted' | 'finished';
@@ -26,16 +41,33 @@
 	const filtered = $derived(
 		filter === 'all' ? data.books : data.books.filter((b) => statusOf(b.id) === filter)
 	);
-
-	function formatDuration(seconds: number): string {
-		const hours = seconds / 3600;
-		return hours >= 1 ? `${hours.toFixed(1)} Std` : `${Math.round(seconds / 60)} min`;
+	function countOf(status: Status): number {
+		return data.books.filter((b) => statusOf(b.id) === status).length;
 	}
+	const FILTERS = $derived([
+		{ key: 'all' as const, label: 'Alle', count: data.books.length },
+		{ key: 'listening' as const, label: 'Wird gehört', count: countOf('listening') },
+		{ key: 'unstarted' as const, label: 'Nicht begonnen', count: countOf('unstarted') },
+		{ key: 'finished' as const, label: 'Beendet', count: countOf('finished') }
+	]);
+
 	function percentOf(bookId: number): number {
 		const p = data.progress[bookId];
 		const total = data.durations[bookId] ?? 0;
 		if (!p || total === 0) return 0;
+		if (p.finished) return 100;
 		return Math.round((p.position / total) * 100);
+	}
+	/** What a listener wants to know mid-book: not the percentage, the time left. */
+	function remainingOf(bookId: number): string {
+		const p = data.progress[bookId];
+		const total = data.durations[bookId] ?? 0;
+		if (!p || p.finished || total === 0) return '';
+		return `noch ${humanDuration(Math.max(0, total - p.position))}`;
+	}
+	function bandOf(book: { series: string | null; seriesIndex: number | null }): string {
+		if (!book.series) return '';
+		return book.seriesIndex ? `${book.series} · Band ${book.seriesIndex}` : book.series;
 	}
 </script>
 
@@ -49,63 +81,126 @@
 		</h1>
 	</header>
 
-	<div class="pills">
-		<button class="pill" class:active={filter === 'all'} onclick={() => (filter = 'all')}
-			>Alle</button
-		>
-		<button
-			class="pill"
-			class:active={filter === 'listening'}
-			onclick={() => (filter = 'listening')}>Wird gehört</button
-		>
-		<button
-			class="pill"
-			class:active={filter === 'unstarted'}
-			onclick={() => (filter = 'unstarted')}>Nicht begonnen</button
-		>
-		<button class="pill" class:active={filter === 'finished'} onclick={() => (filter = 'finished')}
-			>Beendet</button
-		>
-	</div>
-
 	<div class="toolbar">
 		<form method="GET" class="search-form">
 			<input type="hidden" name="sort" value={data.sort} />
-			<input type="search" name="q" value={data.q} placeholder="Bibliothek durchsuchen" />
+			<input type="hidden" name="view" value={data.view} />
+			{#if data.series}<input type="hidden" name="series" value={data.series} />{/if}
+			<span class="search-field">
+				<Icon name="search" />
+				<input type="search" name="q" value={data.q} placeholder="Bibliothek durchsuchen" />
+			</span>
 		</form>
 		{#if data.sortable}
-			<span class="sort-label mono">sortiert:</span>
 			<SortToggle
 				current={data.sort}
-				options={data.sortOptions.map((o) => ({ ...o, href: sortHref(o.key) }))}
+				options={data.sortOptions.map((o) => ({ ...o, href: href({ sort: o.key }) }))}
 			/>
 		{/if}
+		<div class="spacer"></div>
+		<ViewToggle
+			view={data.view}
+			gridHref={href({ view: 'grid' })}
+			listHref={href({ view: 'list' })}
+		/>
 	</div>
 
-	<div class="table" role="table" aria-label="Hörbücher">
-		<div class="table-head" role="row">
-			<span></span><span>Titel</span><span>Autor</span><span>Sprecher</span><span>Fortschritt</span
-			><span>Länge</span>
-		</div>
-		{#each filtered as book (book.id)}
-			<ListRow href="/library/books/{book.id}">
-				<span
-					class="cover-thumb"
-					style={book.coverPath ? `background-image: url(/items/${book.id}/cover)` : ''}
-				></span>
-				<span class="title">{book.title}</span>
-				<span class="cell">{book.author ?? '—'}</span>
-				<span class="cell">{book.narrator ?? '—'}</span>
-				<span class="cell mono">{percentOf(book.id)} %</span>
-				<span class="cell mono">{formatDuration(data.durations[book.id] ?? 0)}</span>
-			</ListRow>
+	<div class="pills" role="group" aria-label="Nach Fortschritt filtern">
+		{#each FILTERS as option (option.key)}
+			<button
+				class="pill"
+				class:active={filter === option.key}
+				aria-pressed={filter === option.key}
+				onclick={() => (filter = option.key)}
+			>
+				{option.label}
+				<span class="pill-count mono">{option.count}</span>
+			</button>
 		{/each}
 	</div>
+
+	{#if data.q || data.series}
+		<div class="chips">
+			{#if data.q}
+				<span class="chip">
+					Suche: {data.q}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+					<a href={href({ q: '' })} aria-label="Suche aufheben">×</a>
+				</span>
+			{/if}
+			{#if data.series}
+				<span class="chip">
+					Serie: {data.series}
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+					<a href={href({ series: '' })} aria-label="Serienfilter aufheben">×</a>
+				</span>
+			{/if}
+		</div>
+	{/if}
+
+	{#if filtered.length === 0}
+		<p class="empty">
+			{data.books.length === 0
+				? data.q
+					? `Nichts gefunden für „${data.q}“.`
+					: 'Noch keine Hörbücher in der Bibliothek.'
+				: 'Kein Hörbuch in diesem Filter.'}
+		</p>
+	{:else if data.view === 'grid'}
+		<div class="grid-6">
+			{#each filtered as book (book.id)}
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+				<a href="/library/books/{book.id}" class="tile-link">
+					<CoverTile
+						kind="book"
+						coverUrl={book.coverPath ? `/items/${book.id}/cover` : null}
+						title={book.title}
+						subtitle={book.author ?? ''}
+						progress={percentOf(book.id)}
+						playLabel="{book.title} {statusOf(book.id) === 'listening'
+							? 'fortsetzen'
+							: 'abspielen'}"
+						onPlay={() => player.play(book.id)}
+					/>
+				</a>
+			{/each}
+		</div>
+	{:else}
+		<div class="table" role="table" aria-label="Hörbücher">
+			<div class="table-head" role="row">
+				<span></span><span>Titel</span><span>Autor</span><span>Fortschritt</span><span>Länge</span>
+			</div>
+			{#each filtered as book (book.id)}
+				<ListRow href="/library/books/{book.id}">
+					<span
+						class="cover-thumb"
+						style={book.coverPath ? `background-image: url(/items/${book.id}/cover)` : ''}
+					></span>
+					<span class="title-cell">
+						<span class="title">{book.title}</span>
+						{#if bandOf(book)}<span class="band">{bandOf(book)}</span>{/if}
+					</span>
+					<span class="cell">{book.author ?? ''}</span>
+					<span class="cell progress-cell">
+						{#if statusOf(book.id) === 'finished'}
+							<span class="done">beendet</span>
+						{:else if percentOf(book.id) > 0}
+							<span class="track"
+								><span class="fill" style="width: {percentOf(book.id)}%"></span></span
+							>
+							<span class="left mono">{remainingOf(book.id)}</span>
+						{/if}
+					</span>
+					<span class="cell mono right">{humanDuration(data.durations[book.id] ?? 0) || '—'}</span>
+				</ListRow>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <style>
 	.content {
-		padding: 24px 32px;
+		padding: 24px 32px 32px;
 	}
 	header {
 		display: flex;
@@ -117,31 +212,100 @@
 		color: var(--faint);
 		font-size: 13px;
 	}
-	.pills {
-		display: flex;
-		gap: 6px;
-		margin-bottom: 16px;
-	}
 	.toolbar {
 		display: flex;
 		align-items: center;
-		gap: 16px;
-		margin-bottom: 20px;
+		gap: 10px;
+		flex-wrap: wrap;
+		margin-bottom: 12px;
 	}
-	.search-form input {
+	.spacer {
+		flex: 1;
+	}
+	.search-field {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		height: 32px;
 		padding: 0 10px;
 		border-radius: var(--radius-md);
 		background: var(--panel);
 		border: 1px solid var(--line);
+		color: var(--faint);
+	}
+	.search-field:focus-within {
+		border-color: var(--line-strong);
+		color: var(--dim);
+	}
+	.search-field input {
+		width: 200px;
+		border: none;
+		background: transparent;
 		color: var(--text);
 		font: 400 12.5px var(--font-sans);
+		outline: none;
 	}
-	.sort-label {
+	.search-field input::-webkit-search-cancel-button {
+		display: none;
+	}
+	.pills {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-bottom: 14px;
+	}
+	.pill-count {
+		margin-left: 6px;
+		font-size: 10.5px;
 		color: var(--faint);
-		font-size: 11px;
-		margin-left: auto;
 	}
+	.pill.active .pill-count {
+		color: inherit;
+		opacity: 0.75;
+	}
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-bottom: 14px;
+	}
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		height: 26px;
+		padding: 0 6px 0 10px;
+		border-radius: var(--radius-pill);
+		border: 1px solid var(--line);
+		background: var(--panel);
+		font-size: 11.5px;
+		color: var(--dim);
+	}
+	.chip a {
+		display: grid;
+		place-items: center;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		color: var(--faint);
+		font-size: 12px;
+		line-height: 1;
+	}
+	.chip a:hover {
+		background: var(--panel-hi);
+		color: var(--text);
+	}
+
+	.grid-6 {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+		gap: 22px 16px;
+	}
+	.tile-link {
+		color: inherit;
+		min-width: 0;
+	}
+
 	.table {
 		display: flex;
 		flex-direction: column;
@@ -161,25 +325,92 @@
 	.table-head span:first-child {
 		width: 36px;
 	}
+	.table-head span:nth-child(2) {
+		flex: 2;
+	}
+	.table-head span:nth-child(3),
+	.table-head span:nth-child(4) {
+		flex: 1;
+	}
+	.table-head span:nth-child(5) {
+		flex: 1;
+		text-align: right;
+	}
 	.cover-thumb {
 		width: 36px;
 		height: 36px;
 		flex: none;
 		border-radius: var(--radius-sm);
-		background-color: var(--tile);
-		background-size: cover;
-		background-position: center;
+		background: var(--tile) center/cover;
 	}
-	.title {
+	.title-cell {
 		flex: 2;
 		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+	.title {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	/* Books are sorted by series by default — say which volume this is. */
+	.band {
+		font-size: 10.5px;
+		color: var(--faint);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 	.cell {
 		flex: 1;
+		min-width: 0;
 		color: var(--dim);
 		font-size: 12px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.progress-cell {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.track {
+		flex: 1;
+		max-width: 90px;
+		height: 3px;
+		border-radius: 2px;
+		background: var(--line);
+		overflow: hidden;
+	}
+	.fill {
+		display: block;
+		height: 100%;
+		background: var(--a);
+	}
+	.left {
+		font-size: 10.5px;
+		color: var(--faint);
+	}
+	.done {
+		font-size: 11px;
+		color: var(--faint);
+	}
+	.right {
+		text-align: right;
+	}
+	.empty {
+		color: var(--faint);
+	}
+
+	@media (max-width: 700px) {
+		.content {
+			padding: 18px 16px 24px;
+		}
+		.search-field input {
+			width: 140px;
+		}
 	}
 </style>

@@ -7,7 +7,8 @@
 		subtitle,
 		size = 100,
 		onPlay,
-		playLabel = 'Abspielen'
+		playLabel = 'Abspielen',
+		progress = 0
 	}: {
 		kind: string;
 		coverUrl: string | null;
@@ -17,6 +18,8 @@
 		/** Given, the artwork carries a play button — hover or focus reveals it. */
 		onPlay?: () => void;
 		playLabel?: string;
+		/** 0–100: how far this item has been listened to, drawn across the artwork. */
+		progress?: number;
 	} = $props();
 </script>
 
@@ -29,6 +32,11 @@
 				class="placeholder"
 				style="--accent: var(--{kind === 'episode' ? 'podcast' : kind})"
 			></div>
+		{/if}
+		{#if progress > 0}
+			<span class="progress" aria-hidden="true">
+				<span class="progress-fill" style="width: {Math.min(100, progress)}%"></span>
+			</span>
 		{/if}
 		{#if onPlay}
 			<button
@@ -76,6 +84,21 @@
 		aspect-ratio: 1 / 1;
 		border-radius: var(--radius-md);
 		object-fit: cover;
+	}
+	.progress {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 4px;
+		background: rgb(0 0 0 / 0.45);
+		border-radius: 0 0 var(--radius-md) var(--radius-md);
+		overflow: hidden;
+	}
+	.progress-fill {
+		display: block;
+		height: 100%;
+		background: var(--a, var(--book));
 	}
 	.play {
 		position: absolute;

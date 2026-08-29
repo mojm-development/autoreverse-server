@@ -23,6 +23,7 @@ export const load = async ({ locals, url }) => {
 	const q = url.searchParams.get('q') ?? undefined;
 	const series = url.searchParams.get('series') ?? undefined;
 	const sort = sortFrom(url);
+	const view: 'grid' | 'list' = url.searchParams.get('view') === 'list' ? 'list' : 'grid';
 
 	let rows, total;
 	if (series) {
@@ -40,6 +41,7 @@ export const load = async ({ locals, url }) => {
 		progressMap(db, userId, ids)
 	]);
 	return {
+		view,
 		q: q ?? '',
 		series: series ?? null,
 		books: rows,

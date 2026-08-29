@@ -345,6 +345,31 @@ export async function newEpisodes(db: DrizzleDb, userId: number, limit = 60) {
 	}>;
 }
 
+export async function bookSeries(db: DrizzleDb, userId: number) {
+	// Cover ids for the first three volumes, the author when the whole series shares one,
+	// and how many volumes this listener finished — a name and a count said nothing.
+	const rows = await db.execute(sql`
+		SELECT item.series,
+		       count(*)::int AS count,
+		       (array_agg(item.id ORDER BY item.series_index NULLS LAST, item.sort_title)
+		           FILTER (WHERE item.cover_path IS NOT NULL))[1:3] AS covers,
+		       CASE WHEN count(DISTINCT item.author) = 1 THEN min(item.author) END AS author,
+		       count(*) FILTER (WHERE progress.finished)::int AS finished_count
+		FROM items AS item
+		LEFT JOIN progress ON progress.item_id = item.id AND progress.user_id = ${userId}
+		WHERE item.kind = 'book' AND item.series IS NOT NULL AND item.missing_since IS NULL
+		GROUP BY item.series
+		ORDER BY lower(item.series)
+	`);
+	return rows as unknown as Array<{
+		series: string;
+		count: number;
+		covers: number[] | null;
+		author: string | null;
+		finished_count: number;
+	}>;
+}
+
 export async function podcastOverview(db: DrizzleDb, userId: number) {
 	const rows = await db.execute(sql`
 		SELECT podcast.*,
