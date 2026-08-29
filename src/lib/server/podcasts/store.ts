@@ -1,5 +1,6 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable } from '../db/schema';
+import { saveEpisodeChapters } from './chapters';
 import { parseFeed } from './feed';
 import { writeCoverBytes } from '../scanner/covers';
 import { unlink } from 'node:fs/promises';
@@ -32,6 +33,7 @@ async function syncEpisodes(
 			.select({ id: itemsTable.id })
 			.from(itemsTable)
 			.where(and(eq(itemsTable.parentId, podcastId), eq(itemsTable.guid, episode.guid)));
+		let episodeId: number;
 		if (existing) {
 			await db
 				.update(itemsTable)
@@ -39,21 +41,33 @@ async function syncEpisodes(
 					title: episode.title,
 					sortTitle: episode.title.toLowerCase(),
 					feedUrl: episode.mediaUrl,
-					publishedAt: episode.publishedAt
+					publishedAt: episode.publishedAt,
+					chaptersUrl: episode.chaptersUrl
 				})
 				.where(eq(itemsTable.id, existing.id));
+			episodeId = existing.id;
 			updatedEpisodes += 1;
 		} else {
-			await db.insert(itemsTable).values({
-				kind: 'episode',
-				parentId: podcastId,
-				title: episode.title,
-				sortTitle: episode.title.toLowerCase(),
-				guid: episode.guid,
-				feedUrl: episode.mediaUrl,
-				publishedAt: episode.publishedAt
-			});
+			const [inserted] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'episode',
+					parentId: podcastId,
+					title: episode.title,
+					sortTitle: episode.title.toLowerCase(),
+					guid: episode.guid,
+					feedUrl: episode.mediaUrl,
+					publishedAt: episode.publishedAt,
+					chaptersUrl: episode.chaptersUrl
+				})
+				.returning({ id: itemsTable.id });
+			episodeId = inserted.id;
 			newEpisodes += 1;
+		}
+		// Podlove chapters ride along in the feed, so they cost nothing to store here.
+		// The file's own chapters, read at download time, take precedence over these.
+		if (episode.chapters.length > 0) {
+			await saveEpisodeChapters(db, episodeId, episode.chapters, episode.durationSeconds ?? 0);
 		}
 	}
 	return { newEpisodes, updatedEpisodes };

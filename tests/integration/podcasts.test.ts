@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { withTestDb } from '../fixtures';
-import { items as itemsTable, tracks as tracksTable } from '../../src/lib/server/db/schema';
+import {
+	items as itemsTable,
+	tracks as tracksTable,
+	chapters as chaptersTable
+} from '../../src/lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import {
 	subscribe,
@@ -37,6 +41,49 @@ describe('podcasts store', () => {
 			expect(episodes).toHaveLength(1); // not duplicated on the second subscribe
 		});
 	});
+
+	it('subscribe stores Podlove chapters from the feed and the 2.0 chapter URL for later', async () => {
+		const feed = `<?xml version="1.0"?><rss version="2.0"
+			xmlns:psc="http://podlove.org/simple-chapters"
+			xmlns:podcast="https://podcastindex.org/namespace/1.0"
+			xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>Maschinenraum</title>
+			<item><title>Mit Kapiteln</title><guid>ep-1</guid><enclosure url="https://x/1.mp3"/>
+				<itunes:duration>00:30:00</itunes:duration>
+				<psc:chapters version="1.2">
+					<psc:chapter start="00:00:00" title="Begrüßung"/>
+					<psc:chapter start="00:10:00" title="Thema"/>
+				</psc:chapters></item>
+			<item><title>Nur URL</title><guid>ep-2</guid><enclosure url="https://x/2.mp3"/>
+				<podcast:chapters url="https://x/2.json" type="application/json+chapters"/></item>
+		</channel></rss>`;
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => feed }));
+		await withTestDb(async (db) => {
+			const podcast = await subscribe(db, 'https://x/feed.xml');
+			const episodes = await db
+				.select()
+				.from(itemsTable)
+				.where(eq(itemsTable.parentId, podcast.id));
+
+			const withChapters = episodes.find((e) => e.title === 'Mit Kapiteln')!;
+			const rows = await db
+				.select()
+				.from(chaptersTable)
+				.where(eq(chaptersTable.itemId, withChapters.id));
+			expect(rows.map((r) => [r.position, r.title, r.start, r.end])).toEqual([
+				[1, 'Begrüßung', 0, 600],
+				// The last chapter runs to the length the feed declared.
+				[2, 'Thema', 600, 1800]
+			]);
+
+			// The JSON document is not fetched on a feed refresh — one HTTP request per
+			// episode would be absurd — so only its address is kept.
+			const urlOnly = episodes.find((e) => e.title === 'Nur URL')!;
+			expect(urlOnly.chaptersUrl).toBe('https://x/2.json');
+			expect(
+				await db.select().from(chaptersTable).where(eq(chaptersTable.itemId, urlOnly.id))
+			).toHaveLength(0);
+		});
+	}, 60_000);
 
 	it('subscribe stores the feed artwork under the covers dir and points cover_path at it', async () => {
 		const FEED_WITH_ART = FEED.replace(

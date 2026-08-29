@@ -3,7 +3,7 @@ import { extname, resolve, relative } from 'node:path';
 import { stat, readFile } from 'node:fs/promises';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
-import { item } from '$lib/server/library/queries';
+import { item, coverPathFor } from '$lib/server/library/queries';
 import { loadConfig } from '$lib/server/config';
 import { getLibraryPaths } from '$lib/server/settings/libraryPaths';
 import { apiError } from '$lib/server/api/error';
@@ -30,24 +30,24 @@ export async function _coverGetHandler(
 		requireApiUser(event.locals);
 		const row = await item(db, Number(event.params.id));
 		if (!row) return apiError(404, 'Unbekanntes Item');
-		if (!row.coverPath) return apiError(404, 'Kein Cover');
+		const coverPath = await coverPathFor(db, row);
+		if (!coverPath) return apiError(404, 'Kein Cover');
 
 		const config = loadConfig(process.env as Record<string, string | undefined>);
 		const paths = await getLibraryPaths(db);
 		const roots = [paths.booksDir, paths.musicDir, config.coverDir].filter(
 			(r): r is string => r !== null
 		);
-		if (!roots.some((root) => isInside(row.coverPath!, root))) return apiError(404, 'Kein Cover');
+		if (!roots.some((root) => isInside(coverPath, root))) return apiError(404, 'Kein Cover');
 
 		let stats;
 		try {
-			stats = await stat(row.coverPath);
+			stats = await stat(coverPath);
 		} catch {
 			return apiError(404, 'Kein Cover');
 		}
-		const contentType =
-			COVER_TYPES[extname(row.coverPath).toLowerCase()] ?? 'application/octet-stream';
-		const data = await readFile(row.coverPath);
+		const contentType = COVER_TYPES[extname(coverPath).toLowerCase()] ?? 'application/octet-stream';
+		const data = await readFile(coverPath);
 		return new Response(data, {
 			headers: {
 				'content-type': contentType,

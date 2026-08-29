@@ -59,6 +59,37 @@ describe('cover streaming', () => {
 		});
 	});
 
+	it("serves the show's artwork for an episode that has none of its own", async () => {
+		await withTestDb(async (db) => {
+			await setLibraryPaths(db, { booksDir, musicDir });
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const coverPath = join(dataDir, 'covers', 'show.png');
+			writeFileSync(coverPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+			const [podcast] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'Apfelfunk', sortTitle: 'apfelfunk', coverPath })
+				.returning();
+			const [episode] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'episode',
+					title: 'Folge 500',
+					sortTitle: 'folge 500',
+					parentId: podcast.id
+				})
+				.returning();
+
+			const res = await callRoute(_coverGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { id: String(episode.id) }
+			});
+			// Without the fallback every episode plays behind an empty square.
+			expect(res.status).toBe(200);
+			expect(res.headers.get('content-type')).toBe('image/png');
+		});
+	});
+
 	it('refuses a cover_path outside the configured roots with 404 "Kein Cover"', async () => {
 		await withTestDb(async (db) => {
 			await setLibraryPaths(db, { booksDir, musicDir });

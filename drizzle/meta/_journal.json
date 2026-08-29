@@ -29,6 +29,13 @@
       "when": 1787955608328,
       "tag": "0003_public_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787988315265,
+      "tag": "0004_wealthy_gideon",
+      "breakpoints": true
     }
   ]
 }

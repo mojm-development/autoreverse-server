@@ -1,7 +1,7 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
-import { item, tracks, chapters, progress } from '$lib/server/library/queries';
+import { item, tracks, chapters, progress, coverPathFor } from '$lib/server/library/queries';
 import { openSession } from '$lib/server/library/playback';
 import { toTrackOut, toChapterOut } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
@@ -26,7 +26,7 @@ export async function _playPostHandler(
 		return json({
 			session_id: sessionId,
 			kind: row.kind,
-			has_cover: Boolean(row.coverPath),
+			has_cover: Boolean(await coverPathFor(db, row)),
 			start_position: startPosition,
 			tracks: trackRows.map(toTrackOut),
 			chapters: chapterRows.map(toChapterOut)

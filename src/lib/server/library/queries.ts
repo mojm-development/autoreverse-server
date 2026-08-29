@@ -78,6 +78,24 @@ export async function item(db: DrizzleDb, id: number) {
 	return row ?? null;
 }
 
+/**
+ * The artwork to show for an item. An episode rarely carries its own, so it falls
+ * back to the podcast it belongs to — without this, every episode plays behind an
+ * empty square.
+ */
+export async function coverPathFor(
+	db: DrizzleDb,
+	row: { coverPath: string | null; parentId: number | null }
+): Promise<string | null> {
+	if (row.coverPath) return row.coverPath;
+	if (!row.parentId) return null;
+	const [parent] = await db
+		.select({ coverPath: itemsTable.coverPath })
+		.from(itemsTable)
+		.where(eq(itemsTable.id, row.parentId));
+	return parent?.coverPath ?? null;
+}
+
 export async function track(db: DrizzleDb, id: number) {
 	const [row] = await db.select().from(tracksTable).where(eq(tracksTable.id, id));
 	return row ?? null;

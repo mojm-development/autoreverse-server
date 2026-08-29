@@ -65,6 +65,9 @@ export const items = pgTable(
 		addedAt: timestamp('added_at', { withTimezone: true }).notNull().defaultNow(),
 		missingSince: timestamp('missing_since', { withTimezone: true }),
 		guid: text('guid'),
+		// Podcasting 2.0 <podcast:chapters url=…>: fetched when the episode is downloaded,
+		// since a feed refresh must not pull one JSON file per episode.
+		chaptersUrl: text('chapters_url'),
 		keepEpisodes: integer('keep_episodes')
 	},
 	(t) => [

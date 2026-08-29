@@ -1,6 +1,8 @@
 import { dirname } from 'node:path';
 import { rename, unlink, mkdir, writeFile } from 'node:fs/promises';
 import { readTags } from '../scanner/tags';
+import { readChapters } from '../scanner/chapters';
+import { fetchChaptersJson, saveEpisodeChapters } from './chapters';
 import { and, eq } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable } from '../db/schema';
 import { episodeDestination, suffixFor } from './paths';
@@ -9,6 +11,39 @@ import type { DrizzleDb } from '../db';
 export class EpisodeNotDownloadableError extends Error {}
 export class EpisodeFetchError extends Error {}
 export class EpisodeStorageError extends Error {}
+
+/**
+ * Chapters, best source first: the file's own marks (ID3 CHAP or an MP4 chapter
+ * track), then the Podcasting 2.0 JSON the feed pointed at. Podlove chapters from
+ * the feed were already stored at sync time and stay if neither turns up — but the
+ * file's are re-timed against its real length, which the feed only estimated.
+ */
+async function storeChapters(
+	db: DrizzleDb,
+	episodeId: number,
+	path: string,
+	chaptersUrl: string | null,
+	duration: number
+): Promise<void> {
+	try {
+		const fromFile = await readChapters(path);
+		if (fromFile.length > 0) {
+			await saveEpisodeChapters(
+				db,
+				episodeId,
+				fromFile.map((c) => ({ start: c.start, title: c.title })),
+				duration
+			);
+			return;
+		}
+		if (chaptersUrl) {
+			const fetched = await fetchChaptersJson(chaptersUrl);
+			if (fetched.length > 0) await saveEpisodeChapters(db, episodeId, fetched, duration);
+		}
+	} catch {
+		// A missing or broken chapter source never costs the listener the episode.
+	}
+}
 
 export async function downloadEpisode(
 	db: DrizzleDb,
@@ -56,6 +91,7 @@ export async function downloadEpisode(
 	}
 
 	const tags = await readTags(destination);
+	await storeChapters(db, episode.id, destination, episode.chaptersUrl, tags.duration);
 	const [track] = await db
 		.insert(tracksTable)
 		.values({
