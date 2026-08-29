@@ -8,12 +8,38 @@
 	import ViewToggle from '$lib/components/ViewToggle.svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import SelectionBar from '$lib/components/SelectionBar.svelte';
+	import BulkEditor from '$lib/components/BulkEditor.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { humanDuration } from '$lib/dates';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
+
+	let selected = $state<number[]>([]);
+	let bulkOpen = $state(false);
+	let lastPicked = $state<number | null>(null);
+
+	function pick(id: number, event: MouseEvent) {
+		const index = filtered.findIndex((book) => book.id === id);
+		if (event.shiftKey && lastPicked !== null) {
+			const from = filtered.findIndex((book) => book.id === lastPicked);
+			if (from >= 0 && index >= 0) {
+				const [start, end] = from < index ? [from, index] : [index, from];
+				selected = [...new Set([...selected, ...filtered.slice(start, end + 1).map((b) => b.id)])];
+				lastPicked = id;
+				return;
+			}
+		}
+		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+		lastPicked = id;
+	}
+	function clearSelection() {
+		selected = [];
+		lastPicked = null;
+	}
 
 	function href(params: Record<string, string>): string {
 		const search = new SvelteURLSearchParams();
@@ -164,6 +190,9 @@
 						title={book.title}
 						subtitle={book.author ?? ''}
 						progress={percentOf(book.id)}
+						selected={selected.includes(book.id)}
+						selectLabel="{book.title} auswählen"
+						onSelect={data.user?.isAdmin ? (event) => pick(book.id, event) : undefined}
 						playLabel="{book.title} {statusOf(book.id) === 'listening'
 							? 'fortsetzen'
 							: 'abspielen'}"
@@ -204,6 +233,23 @@
 		</div>
 	{/if}
 </div>
+
+{#if data.user?.isAdmin}
+	<SelectionBar count={selected.length} onClear={clearSelection} onEdit={() => (bulkOpen = true)} />
+{/if}
+
+{#if bulkOpen}
+	<BulkEditor
+		kind="book"
+		ids={selected}
+		count={selected.length}
+		onClose={() => (bulkOpen = false)}
+		onApplied={async () => {
+			clearSelection();
+			await invalidateAll();
+		}}
+	/>
+{/if}
 
 <style>
 	.content {

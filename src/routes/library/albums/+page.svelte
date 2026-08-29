@@ -9,12 +9,50 @@
 	import ViewToggle from '$lib/components/ViewToggle.svelte';
 	import InfiniteScroll from '$lib/components/InfiniteScroll.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import SelectionBar from '$lib/components/SelectionBar.svelte';
+	import BulkEditor from '$lib/components/BulkEditor.svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { humanDuration } from '$lib/dates';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
+
+	// Bulk selection. `allMatching` means "everything this filter finds", which is sent
+	// to the API as the filter itself rather than as 1599 ids.
+	let selected = $state<number[]>([]);
+	let allMatching = $state(false);
+	let bulkOpen = $state(false);
+	let lastPicked = $state<number | null>(null);
+
+	function pick(id: number, event: MouseEvent) {
+		const index = albums.findIndex((album) => album.id === id);
+		if (event.shiftKey && lastPicked !== null) {
+			const from = albums.findIndex((album) => album.id === lastPicked);
+			if (from >= 0 && index >= 0) {
+				const [start, end] = from < index ? [from, index] : [index, from];
+				const range = albums.slice(start, end + 1).map((album) => album.id);
+				selected = [...new Set([...selected, ...range])];
+				lastPicked = id;
+				return;
+			}
+		}
+		selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+		allMatching = false;
+		lastPicked = id;
+	}
+	function clearSelection() {
+		selected = [];
+		allMatching = false;
+		lastPicked = null;
+	}
+	const bulkFilter = $derived({
+		kind: 'album',
+		q: data.q || undefined,
+		artist: data.artist || undefined,
+		missing: data.missing || undefined
+	});
 
 	type Album = PageData['albums'][number];
 	interface Loaded {
@@ -172,6 +210,9 @@
 						subtitle={album.artist ?? ''}
 						playLabel="{album.title} abspielen"
 						onPlay={() => player.play(album.id)}
+						selected={allMatching || selected.includes(album.id)}
+						selectLabel="{album.title} auswählen"
+						onSelect={data.user?.isAdmin ? (event) => pick(album.id, event) : undefined}
 					/>
 				</a>
 			{/each}
@@ -213,6 +254,31 @@
 
 	<InfiniteScroll {done} {loading} onLoadMore={loadMore} label="Weitere Alben werden geladen" />
 </div>
+
+{#if data.user?.isAdmin}
+	<SelectionBar
+		count={selected.length}
+		total={data.total}
+		{allMatching}
+		onSelectAll={() => (allMatching = true)}
+		onClear={clearSelection}
+		onEdit={() => (bulkOpen = true)}
+	/>
+{/if}
+
+{#if bulkOpen}
+	<BulkEditor
+		kind="album"
+		ids={allMatching ? undefined : selected}
+		filter={allMatching ? bulkFilter : undefined}
+		count={allMatching ? data.total : selected.length}
+		onClose={() => (bulkOpen = false)}
+		onApplied={async () => {
+			clearSelection();
+			await invalidateAll();
+		}}
+	/>
+{/if}
 
 <style>
 	.content {

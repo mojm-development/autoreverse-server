@@ -8,7 +8,10 @@
 		size = 100,
 		onPlay,
 		playLabel = 'Abspielen',
-		progress = 0
+		progress = 0,
+		selected,
+		onSelect,
+		selectLabel = 'Auswählen'
 	}: {
 		kind: string;
 		coverUrl: string | null;
@@ -20,6 +23,10 @@
 		playLabel?: string;
 		/** 0–100: how far this item has been listened to, drawn across the artwork. */
 		progress?: number;
+		/** Given, the tile can be picked for a bulk edit. */
+		selected?: boolean;
+		onSelect?: (event: MouseEvent) => void;
+		selectLabel?: string;
 	} = $props();
 </script>
 
@@ -32,6 +39,22 @@
 				class="placeholder"
 				style="--accent: var(--{kind === 'episode' ? 'podcast' : kind})"
 			></div>
+		{/if}
+		{#if onSelect}
+			<button
+				class="pick"
+				class:on={selected}
+				aria-pressed={selected}
+				aria-label={selectLabel}
+				title={selectLabel}
+				onclick={(event) => {
+					event.preventDefault();
+					event.stopPropagation();
+					onSelect(event);
+				}}
+			>
+				{#if selected}<Icon name="heart-filled" />{/if}
+			</button>
 		{/if}
 		{#if progress > 0}
 			<span class="progress" aria-hidden="true">
@@ -99,6 +122,33 @@
 		display: block;
 		height: 100%;
 		background: var(--a, var(--book));
+	}
+	/* The picker sits opposite the play button and only shows itself on hover —
+	   until something is picked, at which point every tile shows its state. */
+	.pick {
+		position: absolute;
+		left: 8px;
+		top: 8px;
+		width: 22px;
+		height: 22px;
+		padding: 0;
+		display: grid;
+		place-items: center;
+		border-radius: 6px;
+		border: 1.5px solid rgb(255 255 255 / 0.7);
+		background: rgb(0 0 0 / 0.45);
+		color: var(--bg);
+		font-size: 12px;
+		opacity: 0;
+	}
+	figure:hover .pick,
+	.pick:focus-visible,
+	.pick.on {
+		opacity: 1;
+	}
+	.pick.on {
+		background: var(--a, var(--music));
+		border-color: var(--a, var(--music));
 	}
 	.play {
 		position: absolute;
