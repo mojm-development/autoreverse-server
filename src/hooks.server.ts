@@ -4,8 +4,9 @@ import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { SESSION_COOKIE, tokenFromRequest } from '$lib/server/auth/session';
 import { userForToken } from '$lib/server/auth/tokens';
 import { ensureFirstAdmin } from '$lib/server/auth/bootstrap';
-import { loadConfig } from '$lib/server/config';
+import { loadConfig, type Config } from '$lib/server/config';
 import { refreshAllAndRetain } from '$lib/server/podcasts/retention';
+import { relocateLegacyDownloads } from '$lib/server/podcasts/relocate';
 import { db } from '$lib/server/db';
 
 export const init: ServerInit = async () => {
@@ -13,11 +14,23 @@ export const init: ServerInit = async () => {
 		await migrate(db, { migrationsFolder: 'drizzle' });
 	}
 	await ensureFirstAdmin(db, env);
-	startPodcastRefresh();
+	const config = loadConfig(process.env as Record<string, string | undefined>);
+	// Old downloads move before the refresh loop starts, never alongside it: a retention sweep
+	// running at the same time would delete or re-download the files being renamed. Not awaited,
+	// so a large podcast folder does not hold up the first request.
+	void relocateLegacyDownloads(db, config.podcastsDir)
+		.then((result) => {
+			if (result.moved || result.failed)
+				console.log(
+					`[podcasts] moved ${result.moved} old downloads into their podcast folder` +
+						(result.failed ? `, ${result.failed} could not be moved` : '')
+				);
+		})
+		.catch((e) => console.error('[podcasts] moving old downloads failed', e))
+		.finally(() => startPodcastRefresh(config));
 };
 
-function startPodcastRefresh() {
-	const config = loadConfig(process.env as Record<string, string | undefined>);
+function startPodcastRefresh(config: Config) {
 	if (config.podcastRefreshHours <= 0) return;
 	const dirs = { coversDir: config.coverDir, podcastsDir: config.podcastsDir };
 	let running = false;

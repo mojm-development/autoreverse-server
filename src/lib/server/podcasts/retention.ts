@@ -2,7 +2,8 @@ import { unlink } from 'node:fs/promises';
 import { and, eq, sql } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable, libraryConfig } from '../db/schema';
 import type { DrizzleDb } from '../db';
-import { downloadEpisode, pruneEmptyPodcastDir } from './download';
+import { downloadEpisode } from './download';
+import { pruneEmptyPodcastDir } from './paths';
 import { refresh } from './store';
 
 export const KEEP_MIN = 0;

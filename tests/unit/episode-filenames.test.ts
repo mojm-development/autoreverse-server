@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { safeFileName } from '../../src/lib/server/podcasts/download';
+import { safeFileName } from '../../src/lib/server/podcasts/paths';
 
 describe('safeFileName', () => {
 	it('keeps a plain title unchanged', () => {

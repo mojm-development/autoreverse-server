@@ -12,7 +12,8 @@ import {
 	downloadEpisode,
 	EpisodeNotDownloadableError
 } from '../../src/lib/server/podcasts/download';
-import { mkdtempSync } from 'node:fs';
+import { relocateLegacyDownloads } from '../../src/lib/server/podcasts/relocate';
+import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -244,6 +245,89 @@ describe('podcasts store', () => {
 			const folder = join(dir, 'Der Podcast'); // separators and ':' '?' scrubbed out of both names
 			expect(byItem.get(episodes[0].id)).toBe(join(folder, 'Folge eins.mp3'));
 			expect(byItem.get(episodes[1].id)).toBe(join(folder, `Folge eins (${episodes[1].id}).mp3`));
+		});
+	});
+
+	/** An episode with its old-style flat download already on disk and in the tracks table. */
+	async function legacyDownload(
+		db: Parameters<Parameters<typeof withTestDb>[0]>[0],
+		dir: string,
+		titles: { podcast: string; episode: string },
+		guid: string
+	) {
+		const [podcast] = await db
+			.insert(itemsTable)
+			.values({ kind: 'podcast', title: titles.podcast, sortTitle: titles.podcast.toLowerCase() })
+			.returning();
+		const [episode] = await db
+			.insert(itemsTable)
+			.values({
+				kind: 'episode',
+				parentId: podcast.id,
+				title: titles.episode,
+				sortTitle: titles.episode.toLowerCase(),
+				guid,
+				feedUrl: 'https://x/ep.mp3'
+			})
+			.returning();
+		const path = join(dir, `${episode.id}.mp3`);
+		writeFileSync(path, 'audio');
+		const [track] = await db
+			.insert(tracksTable)
+			.values({ itemId: episode.id, position: 1, path, duration: 10, title: titles.episode })
+			.returning();
+		return { podcast, episode, track, path };
+	}
+
+	it('relocateLegacyDownloads moves an old flat download into its podcast folder', async () => {
+		await withTestDb(async (db) => {
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
+			const { episode, path } = await legacyDownload(
+				db,
+				dir,
+				{ podcast: 'Maschinenraum', episode: 'Folge 118' },
+				'ep-118'
+			);
+
+			const result = await relocateLegacyDownloads(db, dir);
+
+			expect(result).toEqual({ moved: 1, skipped: 0, failed: 0 });
+			const moved = join(dir, 'Maschinenraum', 'Folge 118.mp3');
+			expect(existsSync(moved)).toBe(true);
+			expect(existsSync(path)).toBe(false); // the old flat file is gone, not copied
+			const [track] = await db.select().from(tracksTable).where(eq(tracksTable.itemId, episode.id));
+			expect(track.path).toBe(moved);
+		});
+	});
+
+	it('relocateLegacyDownloads has nothing left to do on a second run', async () => {
+		await withTestDb(async (db) => {
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
+			await legacyDownload(db, dir, { podcast: 'P', episode: 'E' }, 'ep-1');
+
+			expect(await relocateLegacyDownloads(db, dir)).toEqual({ moved: 1, skipped: 0, failed: 0 });
+			expect(await relocateLegacyDownloads(db, dir)).toEqual({ moved: 0, skipped: 1, failed: 0 });
+			expect(existsSync(join(dir, 'P', 'E.mp3'))).toBe(true);
+		});
+	});
+
+	it('relocateLegacyDownloads leaves a file outside the podcasts root where it is', async () => {
+		await withTestDb(async (db) => {
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-podcasts-'));
+			const elsewhere = mkdtempSync(join(tmpdir(), 'autoreverse-library-'));
+			const { episode, track } = await legacyDownload(
+				db,
+				elsewhere,
+				{ podcast: 'P', episode: 'E' },
+				'ep-2'
+			);
+
+			const result = await relocateLegacyDownloads(db, dir);
+
+			expect(result).toEqual({ moved: 0, skipped: 1, failed: 0 });
+			expect(existsSync(track.path)).toBe(true);
+			const [row] = await db.select().from(tracksTable).where(eq(tracksTable.itemId, episode.id));
+			expect(row.path).toBe(track.path);
 		});
 	});
 }, 60_000);

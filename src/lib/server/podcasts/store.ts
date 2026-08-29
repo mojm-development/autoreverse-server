@@ -2,9 +2,8 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { items as itemsTable, tracks as tracksTable } from '../db/schema';
 import { parseFeed } from './feed';
 import { writeCoverBytes } from '../scanner/covers';
-import { relative, resolve } from 'node:path';
 import { unlink } from 'node:fs/promises';
-import { pruneEmptyPodcastDir } from './download';
+import { isInside, pruneEmptyPodcastDir } from './paths';
 import type { DrizzleDb } from '../db';
 
 export class FeedFetchError extends Error {}
@@ -149,11 +148,6 @@ export async function refresh(db: DrizzleDb, podcastId: number, opts: { coversDi
 		coverPath = await storeFeedCover(db, podcast.id, parsed.imageUrl, opts.coversDir);
 	}
 	return { ...podcast, coverPath, newEpisodes, updatedEpisodes };
-}
-
-function isInside(path: string, root: string): boolean {
-	const rel = relative(resolve(root), resolve(path));
-	return !rel.startsWith('..');
 }
 
 export async function unsubscribe(db: DrizzleDb, podcastId: number, podcastsDir: string) {
