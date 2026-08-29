@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { basename, relative, sep } from 'node:path';
 import { and, eq, inArray, isNull, isNotNull, sql } from 'drizzle-orm';
 import { items as itemsTable, metadataEdits } from '../db/schema';
 import { ApiError } from '../api/errors';
 import { ITEM_FIELDS } from '$lib/metadataFields';
 import { likePattern } from './like';
+import { resolveSeries } from '../scanner/series';
+import { getLibraryPaths } from '../settings/libraryPaths';
 import { asText, coerce, diffToEdits, nextLocks, LOCK_FIELD } from './metadata';
 import type { DrizzleDb } from '../db';
 
@@ -143,20 +146,22 @@ function buildReplacer(replace: BulkRequest['replace']) {
 	return { column: spec.column, apply: (value: string) => value.split(replace.from).join(to) };
 }
 
-export async function bulkEdit(db: DrizzleDb, userId: number, body: unknown): Promise<BulkResult> {
-	if (!body || typeof body !== 'object') throw new ApiError(422, 'Ungültige Anfrage');
-	const request = body as BulkRequest;
-	const set = parseSet(request.set);
-	const reset = parseReset(request.reset);
-	const replacer = buildReplacer(request.replace);
-	if (Object.keys(set).length === 0 && reset.length === 0 && !replacer) {
-		throw new ApiError(422, 'Keine Änderungen angegeben');
-	}
+type ItemRow = typeof itemsTable.$inferSelect;
 
-	const rows = await resolveTargets(db, request);
-	const dryRun = request.dry_run !== false;
+/**
+ * The shared write path: turn a per-item patch into a preview or a batch of writes.
+ * Both the field editor and the series planner go through here, so locking, the
+ * change log and the undo behave the same whichever produced the patch.
+ */
+async function applyPatches(
+	db: DrizzleDb,
+	userId: number,
+	rows: ItemRow[],
+	patchFor: (row: ItemRow) => Record<string, unknown>,
+	options: { reset?: string[]; dryRun: boolean }
+): Promise<BulkResult> {
+	const reset = options.reset ?? [];
 	const batchId = randomUUID();
-
 	const changes: ItemChange[] = [];
 	let lockedOnly = 0;
 	const writes: { id: number; patch: Record<string, unknown>; locked: string[] }[] = [];
@@ -164,21 +169,13 @@ export async function bulkEdit(db: DrizzleDb, userId: number, body: unknown): Pr
 
 	for (const row of rows) {
 		const current = row as unknown as Record<string, unknown>;
-		const patch: Record<string, unknown> = { ...set };
-		if (replacer) {
-			const before = current[replacer.column];
-			if (typeof before === 'string') {
-				const after = replacer.apply(before);
-				if (after !== before) patch[replacer.column] = after.trim() === '' ? null : after;
-			}
-		}
+		const patch = patchFor(row);
 		// A changed title takes its sort key with it, exactly as a single edit does.
 		if ('title' in patch && !('sortTitle' in patch)) {
 			patch.sortTitle = String(patch.title ?? row.title).toLowerCase();
 		}
 
-		const touched = Object.keys(patch);
-		const locked = nextLocks(row.lockedFields ?? [], touched, reset);
+		const locked = nextLocks(row.lockedFields ?? [], Object.keys(patch), reset);
 		const diff = diffToEdits(current, patch, {
 			batchId,
 			itemId: row.id,
@@ -223,7 +220,7 @@ export async function bulkEdit(db: DrizzleDb, userId: number, body: unknown): Pr
 		);
 	}
 
-	if (dryRun) {
+	if (options.dryRun) {
 		return {
 			matched: rows.length,
 			changed: changes.length,
@@ -252,6 +249,121 @@ export async function bulkEdit(db: DrizzleDb, userId: number, body: unknown): Pr
 		truncated: changes.length > PREVIEW_ROWS,
 		batch_id: writes.length > 0 ? batchId : null
 	};
+}
+
+export async function bulkEdit(db: DrizzleDb, userId: number, body: unknown): Promise<BulkResult> {
+	if (!body || typeof body !== 'object') throw new ApiError(422, 'Ungültige Anfrage');
+	const request = body as BulkRequest;
+	const set = parseSet(request.set);
+	const reset = parseReset(request.reset);
+	const replacer = buildReplacer(request.replace);
+	if (Object.keys(set).length === 0 && reset.length === 0 && !replacer) {
+		throw new ApiError(422, 'Keine Änderungen angegeben');
+	}
+
+	const rows = await resolveTargets(db, request);
+	return applyPatches(
+		db,
+		userId,
+		rows,
+		(row) => {
+			const patch: Record<string, unknown> = { ...set };
+			if (replacer) {
+				const before = (row as unknown as Record<string, unknown>)[replacer.column];
+				if (typeof before === 'string') {
+					const after = replacer.apply(before);
+					if (after !== before) patch[replacer.column] = after.trim() === '' ? null : after;
+				}
+			}
+			return patch;
+		},
+		{ reset, dryRun: request.dry_run !== false }
+	);
+}
+
+export interface SeriesRequest {
+	ids?: number[];
+	filter?: BulkFilter;
+	/**
+	 * 'detect' reads folder and title, the way the scanner does.
+	 * 'assign' puts everything into one series and numbers it in the shown order.
+	 */
+	mode?: 'detect' | 'assign';
+	series?: string;
+	start?: number;
+	dry_run?: boolean;
+}
+
+/**
+ * The series assistant. Books whose folders never change again are invisible to the
+ * scanner's own detection — this runs the same rules on demand, and shows what it
+ * would write before it writes anything.
+ */
+export async function planSeries(
+	db: DrizzleDb,
+	userId: number,
+	body: unknown
+): Promise<BulkResult> {
+	if (!body || typeof body !== 'object') throw new ApiError(422, 'Ungültige Anfrage');
+	const request = body as SeriesRequest;
+	const mode = request.mode ?? 'detect';
+	const rows = (await resolveTargets(db, request)).filter((row) => row.kind === 'book');
+	if (rows.length === 0) throw new ApiError(422, 'Keine Hörbücher ausgewählt');
+
+	if (mode === 'assign') {
+		const series = typeof request.series === 'string' ? request.series.trim() : '';
+		if (series === '') throw new ApiError(422, 'Serienname fehlt');
+		const start = request.start ?? 1;
+		if (!Number.isFinite(start)) throw new ApiError(422, 'Startnummer muss eine Zahl sein');
+		// Numbered in the order the list is shown in, which is the order someone sees
+		// when they pick the volumes.
+		const ordered = [...rows].sort(
+			(a, b) =>
+				(a.seriesIndex ?? Number.MAX_SAFE_INTEGER) - (b.seriesIndex ?? Number.MAX_SAFE_INTEGER) ||
+				a.sortTitle.localeCompare(b.sortTitle, 'de')
+		);
+		const numbers = new Map(ordered.map((row, index) => [row.id, start + index]));
+		return applyPatches(
+			db,
+			userId,
+			rows,
+			(row) => ({ series, seriesIndex: numbers.get(row.id) ?? null }),
+			{ dryRun: request.dry_run !== false }
+		);
+	}
+
+	// The tree only means something relative to the library root: an absolute path
+	// counts its own leading folders as an author and a series otherwise.
+	const { booksDir } = await getLibraryPaths(db);
+	return applyPatches(
+		db,
+		userId,
+		rows,
+		(row) => {
+			const folderName = row.sourcePath ? basename(row.sourcePath) : row.title;
+			const inRoot =
+				booksDir && row.sourcePath && !relative(booksDir, row.sourcePath).startsWith('..');
+			const parts =
+				inRoot && row.sourcePath
+					? relative(booksDir, row.sourcePath).split(sep).filter(Boolean)
+					: [];
+			// Autor/Serie/Buch: the series folder is one above the book's own.
+			const parentIsSeries = parts.length >= 3;
+			const guess = resolveSeries({
+				folderName,
+				parentName: parentIsSeries ? parts[parts.length - 2] : null,
+				parentIsSeries,
+				title: row.title,
+				titleFromTag: true
+			});
+			if (!guess.series) return {};
+			return {
+				series: guess.series,
+				...(guess.seriesIndex !== null ? { seriesIndex: guess.seriesIndex } : {})
+			};
+		},
+		{ dryRun: request.dry_run !== false }
+	);
 }
 
 export interface UndoResult {

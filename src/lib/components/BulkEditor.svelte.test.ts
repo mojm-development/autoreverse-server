@@ -178,4 +178,57 @@ describe('BulkEditor.svelte', () => {
 			)
 		);
 	});
+
+	it('the series assistant posts to its own endpoint, books only', async () => {
+		const calls = stubFetch([{ ...PREVIEW, changed: 2 }]);
+		render(BulkEditor, {
+			kind: 'book',
+			ids: [4, 5],
+			count: 2,
+			onClose: () => {},
+			onApplied: () => {}
+		});
+
+		const detect = Array.from(document.querySelectorAll('.series .check')).find((el) =>
+			el.textContent!.includes('erkennen')
+		)!;
+		detect.querySelector<HTMLInputElement>('input')!.click();
+		await tick();
+		expect(button('Vorschau').disabled).toBe(false);
+		button('Vorschau').click();
+
+		await vi.waitFor(() => expect(calls).toHaveLength(1));
+		expect(calls[0].url).toBe('/items/series');
+		expect(calls[0].body).toMatchObject({ ids: [4, 5], mode: 'detect', dry_run: true });
+	});
+
+	it('assigning a series needs a name before it can be previewed', async () => {
+		render(BulkEditor, {
+			kind: 'book',
+			ids: [4],
+			count: 1,
+			onClose: () => {},
+			onApplied: () => {}
+		});
+		const assign = Array.from(document.querySelectorAll('.series .check')).find((el) =>
+			el.textContent!.includes('zuweisen')
+		)!;
+		assign.querySelector<HTMLInputElement>('input')!.click();
+		await tick();
+		expect(button('Vorschau').disabled).toBe(true);
+
+		await type(document.querySelector<HTMLInputElement>('.series-name')!, 'Perry Rhodan');
+		expect(button('Vorschau').disabled).toBe(false);
+	});
+
+	it('an album never sees the series assistant', async () => {
+		render(BulkEditor, {
+			kind: 'album',
+			ids: [1],
+			count: 1,
+			onClose: () => {},
+			onApplied: () => {}
+		});
+		expect(document.querySelector('.series')).toBeNull();
+	});
 });

@@ -50,13 +50,24 @@
 	let replaceTo = $state('');
 	let useRegex = $state(false);
 
+	// The series assistant is a second way to produce a batch: same preview, same
+	// apply, same undo, only the endpoint and the payload differ.
+	let seriesMode = $state<'off' | 'detect' | 'assign'>('off');
+	let seriesName = $state('');
+	let seriesStart = $state(1);
+
 	let preview = $state<BulkResult | null>(null);
 	let applied = $state<BulkResult | null>(null);
 	let busy = $state(false);
 	let error = $state<string | null>(null);
 	let undone = $state<{ restored: number; skipped: number } | null>(null);
 
-	const hasWork = $derived(active.length > 0 || replaceFrom.trim() !== '');
+	const hasWork = $derived(
+		seriesMode === 'detect' ||
+			(seriesMode === 'assign' && seriesName.trim() !== '') ||
+			(seriesMode === 'off' && (active.length > 0 || replaceFrom.trim() !== ''))
+	);
+	const endpoint = $derived(seriesMode === 'off' ? '/items/bulk' : '/items/series');
 
 	function toggleField(field: MetadataField) {
 		active = active.includes(field.wire)
@@ -66,6 +77,15 @@
 	}
 
 	function body(dryRun: boolean) {
+		const target = ids ? { ids } : { filter };
+		if (seriesMode !== 'off') {
+			return {
+				...target,
+				mode: seriesMode,
+				...(seriesMode === 'assign' ? { series: seriesName.trim(), start: seriesStart } : {}),
+				dry_run: dryRun
+			};
+		}
 		const set: Record<string, string | number | null> = {};
 		for (const field of fields) {
 			if (!active.includes(field.wire)) continue;
@@ -98,7 +118,7 @@
 		busy = true;
 		error = null;
 		try {
-			const result = (await post('/items/bulk', body(dryRun))) as BulkResult;
+			const result = (await post(endpoint, body(dryRun))) as BulkResult;
 			if (dryRun) preview = result;
 			else {
 				applied = result;
@@ -173,7 +193,7 @@
 				überschreibt es nicht mehr.
 			</p>
 
-			<div class="fields">
+			<div class="fields" class:dimmed={seriesMode !== 'off'}>
 				{#each fields as field (field.wire)}
 					<div class="field" class:on={active.includes(field.wire)}>
 						<label class="check">
@@ -213,6 +233,68 @@
 					Regex
 				</label>
 			</div>
+
+			{#if kind === 'book'}
+				<h3>Serie &amp; Band</h3>
+				<div class="series">
+					<label class="check">
+						<input
+							type="radio"
+							checked={seriesMode === 'off'}
+							onchange={() => {
+								seriesMode = 'off';
+								preview = null;
+							}}
+						/>
+						Aus
+					</label>
+					<label class="check">
+						<input
+							type="radio"
+							checked={seriesMode === 'detect'}
+							onchange={() => {
+								seriesMode = 'detect';
+								preview = null;
+							}}
+						/>
+						Aus Ordnernamen erkennen
+					</label>
+					<label class="check">
+						<input
+							type="radio"
+							checked={seriesMode === 'assign'}
+							onchange={() => {
+								seriesMode = 'assign';
+								preview = null;
+							}}
+						/>
+						Serie zuweisen
+					</label>
+					{#if seriesMode === 'assign'}
+						<input
+							class="series-name"
+							placeholder="Serienname"
+							bind:value={seriesName}
+							oninput={() => (preview = null)}
+						/>
+						<input
+							class="series-start"
+							type="number"
+							min="0"
+							bind:value={seriesStart}
+							oninput={() => (preview = null)}
+							aria-label="Erste Bandnummer"
+						/>
+					{/if}
+				</div>
+				{#if seriesMode !== 'off'}
+					<p class="lead">
+						{seriesMode === 'detect'
+							? 'Liest Serie und Band aus Ordner- und Dateinamen, wie der Scanner es täte — nur eben jetzt.'
+							: 'Nummeriert die Auswahl in der angezeigten Reihenfolge durch.'}
+					</p>
+				{/if}
+			{/if}
 
 			{#if preview}
 				<h3>Vorschau</h3>
@@ -330,6 +412,10 @@
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 		gap: 12px 14px;
 	}
+	.fields.dimmed {
+		opacity: 0.4;
+		pointer-events: none;
+	}
 	.field {
 		display: flex;
 		flex-direction: column;
@@ -359,11 +445,34 @@
 		color: var(--text);
 		font: 400 13px var(--font-sans);
 	}
-	.replace {
+	.replace,
+	.series {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px;
+	}
+	.series-name {
+		flex: 1;
+		min-width: 160px;
+	}
+	.series-start {
+		width: 90px;
+	}
+	.series input:not([type='radio']) {
+		height: 32px;
+		padding: 0 10px;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--line);
+		background: var(--panel);
+		color: var(--text);
+		font: 400 13px var(--font-sans);
+	}
+	.check input[type='radio'] {
+		width: 14px;
+		height: 14px;
+		flex: none;
+		margin: 0;
 	}
 	.replace input:not([type='checkbox']) {
 		flex: 1;
