@@ -5,6 +5,7 @@
 	import PodcastSearch from '$lib/components/PodcastSearch.svelte';
 	import PodcastRail from '$lib/components/PodcastRail.svelte';
 	import Icon from '$lib/components/Icon.svelte';
+	import EpisodeCard from '$lib/components/EpisodeCard.svelte';
 	import { invalidateAll } from '$app/navigation';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import { relativeDay } from '$lib/dates';
@@ -26,21 +27,6 @@
 		return '';
 	}
 
-	function formatDuration(seconds: number): string {
-		if (!seconds) return '';
-		const hours = Math.floor(seconds / 3600);
-		const minutes = Math.round((seconds % 3600) / 60);
-		return hours >= 1 ? `${hours} Std ${minutes} min` : `${minutes} min`;
-	}
-	/** What is left of an episode someone already started. */
-	function remaining(duration: number, position: number): string {
-		const left = Math.max(0, duration - position);
-		return `noch ${formatDuration(left) || '<1 min'}`;
-	}
-	function progressOf(episode: { duration: number; position: number }): number {
-		if (!episode.duration || !episode.position) return 0;
-		return Math.min(100, (episode.position / episode.duration) * 100);
-	}
 	async function download(episodeId: number) {
 		downloading = episodeId;
 		try {
@@ -80,63 +66,21 @@
 			{:else}
 				<ul class="episodes">
 					{#each data.episodes as episode (episode.id)}
-						{@const started = episode.position > 0}
-						<li class="episode">
-							<a
-								class="cover"
-								href={resolve('/library/podcasts/[id]', { id: String(episode.podcast_id) })}
-								aria-label={episode.podcast_title}
-								style={coverStyle(episode)}
-							></a>
-							<div class="body">
-								<h2 class="title">{episode.title}</h2>
-								<p class="meta">
-									<a
-										class="show"
-										href={resolve('/library/podcasts/[id]', { id: String(episode.podcast_id) })}
-										>{episode.podcast_title}</a
-									>
-									<span class="dot">·</span>
-									<span class="mono">{relativeDay(episode.published_at)}</span>
-									{#if episode.duration}
-										<span class="dot">·</span>
-										<span class="mono">{formatDuration(episode.duration)}</span>
-									{/if}
-									{#if episode.downloaded}
-										<span class="badge-soft">geladen</span>
-									{/if}
-								</p>
-								{#if started}
-									<p class="progress-line">
-										<span class="track"
-											><span class="fill" style="width: {progressOf(episode)}%"></span></span
-										>
-										<span class="left mono">{remaining(episode.duration, episode.position)}</span>
-									</p>
-								{/if}
-							</div>
-							<div class="actions">
-								{#if !episode.downloaded}
-									<button
-										class="ghost-btn"
-										aria-label="Folge herunterladen"
-										title="Folge herunterladen"
-										disabled={downloading === episode.id}
-										onclick={() => download(episode.id)}
-									>
-										<Icon name="download" />
-									</button>
-								{/if}
-								<button
-									class="play"
-									aria-label="{episode.title} {started ? 'fortsetzen' : 'abspielen'}"
-									title={started ? 'Fortsetzen' : 'Abspielen'}
-									onclick={() => player.play(episode.id)}
-								>
-									<Icon name="play-filled" />
-								</button>
-							</div>
-						</li>
+						<EpisodeCard
+							title={episode.title}
+							date={relativeDay(episode.published_at)}
+							duration={episode.duration}
+							downloaded={episode.downloaded}
+							position={episode.position}
+							coverStyle={coverStyle(episode)}
+							show={{
+								title: episode.podcast_title,
+								href: resolve('/library/podcasts/[id]', { id: String(episode.podcast_id) })
+							}}
+							downloading={downloading === episode.id}
+							onPlay={() => player.play(episode.id)}
+							onDownload={() => download(episode.id)}
+						/>
 					{/each}
 				</ul>
 			{/if}
@@ -193,137 +137,9 @@
 		flex-direction: column;
 		gap: 8px;
 	}
-	.episode {
-		display: flex;
-		align-items: center;
-		gap: 14px;
-		padding: 12px 14px;
-		border-radius: var(--radius-md, 12px);
-		border: 1px solid var(--line);
-		background: var(--panel);
-	}
-	.episode:hover {
-		border-color: color-mix(in oklab, var(--a) 40%, var(--line));
-		background: var(--panel-hi, var(--panel));
-	}
-	.cover {
-		width: 56px;
-		height: 56px;
-		flex: none;
-		border-radius: 8px;
-		background: var(--tile) center/cover;
-	}
-	.body {
-		flex: 1;
-		min-width: 0;
-	}
-	.title {
-		margin: 0;
-		font: 600 14px/1.35 var(--font-sans);
-		/* Two lines, then ellipsis: podcast titles are long and cutting at one loses the point. */
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-	.meta {
-		margin: 4px 0 0;
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 6px;
-		font-size: 11.5px;
-		color: var(--faint);
-	}
-	.show {
-		color: var(--dim);
-		max-width: 220px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.show:hover {
-		color: var(--a);
-	}
-	.dot {
-		opacity: 0.5;
-	}
-	.badge-soft {
-		padding: 1px 7px;
-		border-radius: var(--radius-pill, 999px);
-		background: color-mix(in oklab, var(--a) 16%, transparent);
-		color: color-mix(in oklab, var(--a) 70%, var(--text));
-		font-size: 10.5px;
-	}
-	.progress-line {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		margin: 7px 0 0;
-	}
-	.track {
-		flex: 1;
-		max-width: 260px;
-		height: 3px;
-		border-radius: 2px;
-		background: var(--line);
-		overflow: hidden;
-	}
-	.fill {
-		display: block;
-		height: 100%;
-		background: var(--a);
-	}
-	.left {
-		font-size: 10.5px;
-		color: var(--faint);
-	}
-	.actions {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		flex: none;
-	}
-	.ghost-btn {
-		width: 34px;
-		height: 34px;
-		padding: 0;
-		display: grid;
-		place-items: center;
-		border-radius: 50%;
-		border: 1px solid var(--line);
-		background: transparent;
-		color: var(--dim);
-		font-size: 16px;
-	}
-	.ghost-btn:hover:not(:disabled) {
-		color: var(--text);
-		border-color: var(--line-strong);
-	}
-	.ghost-btn:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-	.play {
-		width: 40px;
-		height: 40px;
-		padding: 0;
-		border: none;
-		border-radius: 50%;
-		background: var(--a);
-		color: var(--bg);
-		font-size: 20px;
-		display: grid;
-		place-items: center;
-	}
-	.play:hover {
-		filter: brightness(1.08);
-	}
-
 	.blank {
 		border: 1px dashed var(--line);
-		border-radius: var(--radius-md, 12px);
+		border-radius: var(--radius-lg);
 		padding: 32px 24px;
 		text-align: center;
 	}
@@ -353,7 +169,7 @@
 	.add-feed {
 		margin-top: 28px;
 		padding: 18px;
-		border-radius: var(--radius-md, 12px);
+		border-radius: var(--radius-lg);
 		border: 1px solid var(--line);
 		background: var(--panel);
 	}
@@ -370,10 +186,6 @@
 	@media (max-width: 700px) {
 		.content {
 			padding: 18px 16px 24px;
-		}
-		.cover {
-			width: 46px;
-			height: 46px;
 		}
 	}
 </style>

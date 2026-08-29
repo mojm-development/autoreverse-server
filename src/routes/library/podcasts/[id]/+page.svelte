@@ -3,14 +3,17 @@
 	import { getContext } from 'svelte';
 	import { PLAYER_CONTEXT_KEY, type PlayerStore } from '$lib/player.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import ListRow from '$lib/components/ListRow.svelte';
+	import EpisodeCard from '$lib/components/EpisodeCard.svelte';
 	import PodcastRail from '$lib/components/PodcastRail.svelte';
 	import PageTitle from '$lib/components/PageTitle.svelte';
+	import { relativeDay } from '$lib/dates';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 	let feedUrl = $state('');
+	let confirmingUnsubscribe = $state(false);
+	let refreshing = $state(false);
 
 	type Filter = 'all' | 'unheard' | 'started' | 'downloaded';
 	let filter = $state<Filter>('all');
@@ -23,24 +26,33 @@
 		data.episodes.filter((e) => {
 			if (filter === 'all') return true;
 			if (filter === 'downloaded') return e.id in data.durations;
-			if (filter === 'unheard') return statusOf(e.id) === 'unheard';
-			if (filter === 'started') return statusOf(e.id) === 'started';
-			return true;
+			return statusOf(e.id) === filter;
 		})
 	);
 	const unheardCount = $derived(data.episodes.filter((e) => statusOf(e.id) === 'unheard').length);
+	const startedCount = $derived(data.episodes.filter((e) => statusOf(e.id) === 'started').length);
 	const downloadedCount = $derived(data.episodes.filter((e) => e.id in data.durations).length);
+	const FILTERS: { key: Filter; label: string; count: () => number }[] = [
+		{ key: 'all', label: 'Alle', count: () => data.episodes.length },
+		{ key: 'unheard', label: 'Ungehört', count: () => unheardCount },
+		{ key: 'started', label: 'Angefangen', count: () => startedCount },
+		{ key: 'downloaded', label: 'Geladen', count: () => downloadedCount }
+	];
 
-	function formatDuration(seconds: number): string {
-		const hours = seconds / 3600;
-		return hours >= 1 ? `${hours.toFixed(1)} Std` : `${Math.round(seconds / 60)} min`;
-	}
+	// Feed order is newest first, so the oldest episode is number one.
+	const numbers = $derived(new Map(data.episodes.map((e, i) => [e.id, data.episodes.length - i])));
+
+	/** Where to pick up: the newest episode already started, else the newest unheard one. */
+	const continueEpisode = $derived(
+		data.episodes.find((e) => statusOf(e.id) === 'started') ??
+			data.episodes.find((e) => statusOf(e.id) === 'unheard') ??
+			null
+	);
+
 	function relativeTime(iso: Date | string | null): string {
 		if (!iso) return 'nie';
-		const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-		if (days <= 0) return 'heute';
-		if (days === 1) return 'gestern';
-		return `vor ${days} Tagen`;
+		const label = relativeDay(typeof iso === 'string' ? iso : iso.toISOString());
+		return label ? label.toLowerCase() : 'nie';
 	}
 
 	async function subscribe() {
@@ -53,15 +65,21 @@
 		location.reload();
 	}
 	async function refresh() {
-		await fetch(`/podcasts/${data.podcast.id}/refresh`, { method: 'POST' });
-		location.reload();
+		refreshing = true;
+		try {
+			await fetch(`/podcasts/${data.podcast.id}/refresh`, { method: 'POST' });
+			location.reload();
+		} finally {
+			refreshing = false;
+		}
 	}
 	async function unsubscribe() {
 		await fetch(`/podcasts/${data.podcast.id}`, { method: 'DELETE' });
 		location.href = '/library/podcasts';
 	}
 	function playLatest() {
-		if (data.episodes.length > 0) void player.play(data.episodes[0].id);
+		const episode = continueEpisode ?? data.episodes[0];
+		if (episode) void player.play(episode.id);
 	}
 </script>
 
@@ -84,81 +102,107 @@
 	</PodcastRail>
 
 	<div class="content">
-		<div class="hero">
+		<header class="hero">
 			<div
 				class="cover-lg"
 				style={data.podcast.coverPath
 					? `background-image: url(/items/${data.podcast.id}/cover)`
 					: ''}
 			></div>
-			<div class="meta">
+			<div class="hero-meta">
 				<span class="eyebrow">Podcast</span>
 				<h1>{data.podcast.title}</h1>
 				<p class="subline">
-					{data.episodes.length} Folgen · zuletzt geprüft {relativeTime(data.podcast.lastChecked)}
+					{data.episodes.length}
+					{data.episodes.length === 1 ? 'Folge' : 'Folgen'}
+					{#if unheardCount > 0}<span class="dot">·</span> {unheardCount} ungehört{/if}
+					<span class="dot">·</span> zuletzt geprüft {relativeTime(data.podcast.lastChecked)}
 				</p>
 				<div class="actions">
-					<button class="primary" onclick={playLatest}
-						><Icon name="play" /> Neueste abspielen</button
-					>
+					<button class="primary" onclick={playLatest} disabled={data.episodes.length === 0}>
+						<Icon name="play-filled" />
+						{continueEpisode && statusOf(continueEpisode.id) === 'started'
+							? 'Fortsetzen'
+							: 'Neueste abspielen'}
+					</button>
 					{#if data.user?.isAdmin}
-						<button class="outline" onclick={refresh}><Icon name="download" /> Aktualisieren</button
-						>
-						<button class="outline" onclick={unsubscribe}>Abo kündigen</button>
+						<button class="outline" onclick={refresh} disabled={refreshing}>
+							<Icon name="download" />
+							{refreshing ? 'Wird geprüft …' : 'Aktualisieren'}
+						</button>
+						{#if confirmingUnsubscribe}
+							<button class="danger" onclick={unsubscribe}>Wirklich kündigen</button>
+							<button class="outline" onclick={() => (confirmingUnsubscribe = false)}
+								>Abbrechen</button
+							>
+						{:else}
+							<button class="outline" onclick={() => (confirmingUnsubscribe = true)}>
+								Abo kündigen
+							</button>
+						{/if}
 					{/if}
 				</div>
-				{#if data.user?.isAdmin}
-					<form class="keep" method="POST" action="?/keep" use:enhance>
-						<label for="keep">Folgen vorhalten</label>
-						<input
-							id="keep"
-							name="keep"
-							type="number"
-							min="0"
-							max={data.keepMax}
-							placeholder="Standard ({data.keepDefault})"
-							value={data.podcast.keepEpisodes ?? ''}
-						/>
-						<button type="submit" class="secondary">Übernehmen</button>
-						<span class="keep-hint">leer = Standard ({data.keepDefault})</span>
-					</form>
-				{/if}
 			</div>
-		</div>
+		</header>
 
-		<div class="pills">
-			<button class="pill" class:active={filter === 'all'} onclick={() => (filter = 'all')}
-				>Alle</button
-			>
-			<button class="pill" class:active={filter === 'unheard'} onclick={() => (filter = 'unheard')}
-				>Ungehört · {unheardCount}</button
-			>
-			<button class="pill" class:active={filter === 'started'} onclick={() => (filter = 'started')}
-				>Angefangen</button
-			>
-			<button
-				class="pill"
-				class:active={filter === 'downloaded'}
-				onclick={() => (filter = 'downloaded')}>Geladen · {downloadedCount}</button
-			>
-		</div>
+		{#if data.user?.isAdmin}
+			<form class="keep" method="POST" action="?/keep" use:enhance>
+				<label for="keep">Folgen vorhalten</label>
+				<input
+					id="keep"
+					name="keep"
+					type="number"
+					min="0"
+					max={data.keepMax}
+					placeholder="Standard ({data.keepDefault})"
+					value={data.podcast.keepEpisodes ?? ''}
+				/>
+				<button type="submit" class="secondary">Übernehmen</button>
+				<span class="keep-hint">
+					Ältere Folgen werden gelöscht, sobald mehr geladen sind. Leer = Standard ({data.keepDefault}).
+				</span>
+			</form>
+		{/if}
 
-		<div class="table" role="table" aria-label="Folgen">
-			{#each filtered as episode (episode.id)}
-				{@const downloaded = episode.id in data.durations}
-				<ListRow label="{episode.title} abspielen" onclick={() => player.play(episode.id)}>
-					<Icon name={statusOf(episode.id) === 'finished' ? 'heart-filled' : 'play'} />
-					<span class="title">{episode.title}</span>
-					<span class="cell mono"
-						>{episode.publishedAt
-							? new Date(episode.publishedAt).toLocaleDateString('de-DE')
-							: ''}</span
-					>
-					<span class="cell mono">{formatDuration(data.durations[episode.id] ?? 0)}</span>
-					<span class="cell status">{downloaded ? 'geladen' : 'streamen'}</span>
-				</ListRow>
+		<div class="pills" role="group" aria-label="Folgen filtern">
+			{#each FILTERS as option (option.key)}
+				<button
+					class="pill"
+					class:active={filter === option.key}
+					aria-pressed={filter === option.key}
+					onclick={() => (filter = option.key)}
+				>
+					{option.label}
+					<span class="pill-count mono">{option.count()}</span>
+				</button>
 			{/each}
 		</div>
+
+		{#if filtered.length === 0}
+			<p class="empty">
+				{data.episodes.length === 0
+					? 'Dieser Feed hat noch keine Folgen geliefert.'
+					: 'Keine Folge passt zu diesem Filter.'}
+			</p>
+		{:else}
+			<ul class="episodes">
+				{#each filtered as episode (episode.id)}
+					{@const progress = data.progress[episode.id]}
+					<EpisodeCard
+						title={episode.title}
+						index={numbers.get(episode.id)}
+						date={relativeDay(
+							episode.publishedAt ? new Date(episode.publishedAt).toISOString() : null
+						)}
+						duration={data.durations[episode.id] ?? progress?.duration ?? 0}
+						downloaded={episode.id in data.durations}
+						position={progress?.position ?? 0}
+						finished={progress?.finished ?? false}
+						onPlay={() => player.play(episode.id)}
+					/>
+				{/each}
+			</ul>
+		{/if}
 	</div>
 </div>
 
@@ -195,30 +239,35 @@
 	}
 	.content {
 		flex: 1;
-		padding: 24px 32px;
+		min-width: 0;
+		padding: 24px 32px 32px;
+		max-width: 980px;
 	}
 	.hero {
 		display: flex;
 		gap: 20px;
-		margin-bottom: 24px;
+		align-items: flex-end;
+		padding-bottom: 20px;
+		margin-bottom: 18px;
+		border-bottom: 1px solid var(--line);
 	}
 	.cover-lg {
-		width: 104px;
-		height: 104px;
+		width: 136px;
+		height: 136px;
 		flex: none;
 		border-radius: var(--radius-lg);
-		background: var(--tile);
-		background-size: cover;
-		background-position: center;
+		background: var(--tile) center/cover;
+		box-shadow: 0 12px 30px -18px rgb(0 0 0 / 0.7);
 	}
-	.meta {
+	.hero-meta {
 		display: flex;
 		flex-direction: column;
 		justify-content: flex-end;
 		gap: 5px;
+		min-width: 0;
 	}
 	h1 {
-		font: 600 22px/1.2 var(--font-sans);
+		font: 600 26px/1.15 var(--font-sans);
 		margin: 0;
 	}
 	.subline {
@@ -226,12 +275,63 @@
 		font-size: 12.5px;
 		margin: 0;
 	}
+	.dot {
+		opacity: 0.5;
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 12px;
+	}
+	.primary,
+	.outline,
+	.danger {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		height: 34px;
+		padding: 0 16px;
+		border-radius: var(--radius-pill);
+		font: 500 12.5px var(--font-sans);
+		border: none;
+	}
+	.primary {
+		background: var(--a);
+		color: var(--bg);
+		font-size: 15px;
+	}
+	.primary:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
+	.primary:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+	.outline {
+		background: transparent;
+		border: 1px solid var(--line-strong);
+		color: var(--text);
+	}
+	.outline:hover:not(:disabled) {
+		background: var(--panel);
+	}
+	/* Cancelling a subscription deletes downloaded episodes — it asks first. */
+	.danger {
+		background: var(--danger);
+		color: #fff;
+	}
+
 	.keep {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		margin-top: 12px;
+		gap: 10px;
 		flex-wrap: wrap;
+		margin-bottom: 18px;
+		padding: 12px 14px;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--line);
+		background: var(--panel);
 	}
 	.keep label {
 		font-size: 12px;
@@ -241,56 +341,52 @@
 		width: 130px;
 	}
 	.keep-hint {
+		flex: 1;
+		min-width: 220px;
 		font-size: 11px;
 		color: var(--faint);
 	}
-	.actions {
-		display: flex;
-		gap: 10px;
-		margin-top: 10px;
-	}
-	.primary,
-	.outline {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		height: 32px;
-		padding: 0 14px;
-		border-radius: var(--radius-pill);
-		font: 500 12.5px var(--font-sans);
-		border: none;
-	}
-	.primary {
-		background: var(--a);
-		color: var(--bg);
-	}
-	.outline {
-		background: transparent;
-		border: 1px solid var(--line-strong);
-		color: var(--text);
-	}
+
 	.pills {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 6px;
-		margin-bottom: 16px;
+		margin-bottom: 14px;
 	}
-	.table {
+	.pill-count {
+		margin-left: 6px;
+		font-size: 10.5px;
+		color: var(--faint);
+	}
+	.pill.active .pill-count {
+		color: inherit;
+		opacity: 0.75;
+	}
+	.episodes {
+		list-style: none;
+		margin: 0;
+		padding: 0;
 		display: flex;
 		flex-direction: column;
+		gap: 8px;
 	}
-	.title {
-		flex: 2;
-		min-width: 0;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.cell {
-		flex: 1;
-		color: var(--dim);
-		font-size: 12px;
-	}
-	.status {
+	.empty {
 		color: var(--faint);
+	}
+
+	@media (max-width: 700px) {
+		.content {
+			padding: 18px 16px 24px;
+		}
+		.hero {
+			gap: 14px;
+		}
+		.cover-lg {
+			width: 92px;
+			height: 92px;
+		}
+		h1 {
+			font-size: 20px;
+		}
 	}
 </style>

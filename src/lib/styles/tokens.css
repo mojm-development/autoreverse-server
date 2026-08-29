@@ -16,6 +16,8 @@
 	--music: #e05a4e;
 	--book: #2fb08c;
 	--podcast: #9b6ff0;
+	/* Destructive actions only — deliberately not the music accent. */
+	--danger: #ef4b4b;
 
 	--font-sans: 'Helvetica Neue', Helvetica, system-ui, sans-serif;
 	--font-mono: ui-monospace, Menlo, monospace;
@@ -47,6 +49,7 @@
 	--track: rgb(20 20 26 / 0.12);
 	--track-tick: rgb(20 20 26 / 0.28);
 	color-scheme: light;
+	--danger: #c62f2f;
 }
 
 @media (prefers-color-scheme: light) {
