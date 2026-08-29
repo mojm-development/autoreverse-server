@@ -8,6 +8,7 @@
 	import ListRow from '$lib/components/ListRow.svelte';
 	import Scrubber from '$lib/components/Scrubber.svelte';
 	import { bindPlayerShortcuts } from '$lib/playerShortcuts';
+	import { chapterLabels } from '$lib/chapterTitles';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
@@ -71,11 +72,21 @@
 	const currentChapter = $derived(
 		currentChapterIndex >= 0 ? data.chapters[currentChapterIndex] : null
 	);
+	// Chapter titles out of an m4b repeat the book's name; the headline says the book
+	// underneath anyway.
+	const chapterNames = $derived(
+		chapterLabels(
+			data.chapters.map((c) => c.title),
+			data.item.title
+		)
+	);
 
 	// The album's own title belongs in the second line — the headline is whatever is
 	// actually playing right now.
 	const headline = $derived(
-		byTrack ? (currentTrack?.title ?? data.item.title) : (currentChapter?.title ?? data.item.title)
+		byTrack
+			? (currentTrack?.title ?? data.item.title)
+			: (chapterNames[currentChapterIndex] ?? currentChapter?.title ?? data.item.title)
 	);
 
 	let tab = $state<'chapters' | 'bookmarks'>('chapters');
@@ -326,6 +337,7 @@
 					{currentPosition}
 					{isPlayingThis}
 					onSelect={playFrom}
+					itemTitle={data.item.title}
 				/>
 			{/if}
 		{:else}

@@ -139,7 +139,13 @@
 	</div>
 
 	{#if tab === 'chapters'}
-		<ChapterList chapters={data.chapters} {currentPosition} {isPlayingThis} onSelect={playFrom} />
+		<ChapterList
+			chapters={data.chapters}
+			{currentPosition}
+			{isPlayingThis}
+			onSelect={playFrom}
+			itemTitle={data.book.title}
+		/>
 	{:else if tab === 'bookmarks'}
 		<div class="table" role="table" aria-label="Lesezeichen">
 			{#each data.bookmarks as b (b.id)}
