@@ -355,6 +355,55 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 		jumpToTrack(current.trackIndex - 1);
 	}
 
+	/** Album: 10 s, the way music players step. Book or podcast: the user's own values. */
+	function nudgeStep(direction: -1 | 1): number {
+		if (current?.kind === 'album') return 10;
+		return direction < 0 ? preferences.skipBack : preferences.skipForward;
+	}
+
+	function nudge(direction: -1 | 1) {
+		if (!current) return;
+		const step = nudgeStep(direction) * direction;
+		if (current.kind === 'album') seekInTrack(Math.max(0, trackOffset() + step));
+		else seek(current.position + step);
+	}
+
+	function chapterIndexAt(position: number): number {
+		if (!current) return -1;
+		return current.chapters.findIndex((c) => position >= c.start && position < c.end);
+	}
+
+	/**
+	 * One step back: the track for an album, the chapter otherwise — and, past three
+	 * seconds in, the start of the current one first, like every other player.
+	 */
+	function jumpPrevious() {
+		if (!current) return;
+		if (current.kind === 'album' || current.chapters.length === 0) {
+			previousTrack();
+			return;
+		}
+		const index = chapterIndexAt(current.position);
+		const chapter = current.chapters[index];
+		if (chapter && current.position - chapter.start > 3) {
+			seek(chapter.start);
+			return;
+		}
+		const previous = current.chapters[index - 1];
+		if (previous) seek(previous.start);
+		else if (chapter) seek(chapter.start);
+	}
+
+	function jumpNext() {
+		if (!current) return;
+		if (current.kind === 'album' || current.chapters.length === 0) {
+			nextTrack();
+			return;
+		}
+		const next = current.chapters[chapterIndexAt(current.position) + 1];
+		if (next) seek(next.start);
+	}
+
 	function reloadCurrentTrack() {
 		if (!current) return;
 		loadTrack(current.trackIndex, 0);
@@ -396,6 +445,10 @@ export function createPlayerStore(initial?: Partial<PlayerPreferences>) {
 		skipForward,
 		nextTrack,
 		previousTrack,
+		nudge,
+		nudgeStep,
+		jumpPrevious,
+		jumpNext,
 		seekInTrack,
 		trackOffset,
 		close,

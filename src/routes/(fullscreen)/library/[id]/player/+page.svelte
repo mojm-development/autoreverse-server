@@ -7,7 +7,7 @@
 	import ChapterList from '$lib/components/ChapterList.svelte';
 	import ListRow from '$lib/components/ListRow.svelte';
 	import Scrubber from '$lib/components/Scrubber.svelte';
-	import { shortcutFor } from '$lib/playerShortcuts';
+	import { bindPlayerShortcuts } from '$lib/playerShortcuts';
 	import PageTitle from '$lib/components/PageTitle.svelte';
 	import type { PageData } from './$types';
 	let { data }: { data: PageData } = $props();
@@ -102,28 +102,10 @@
 		return `${h}:${pad(m)}:${pad(s)}`;
 	}
 
-	function goPrevious() {
-		if (byTrack) {
-			player.previousTrack();
-			return;
-		}
-		const chapter = data.chapters[currentChapterIndex];
-		if (chapter && currentPosition - chapter.start > 3) {
-			playFrom(chapter.start);
-			return;
-		}
-		const previous = data.chapters[currentChapterIndex - 1];
-		if (previous) playFrom(previous.start);
-	}
-
-	function goNext() {
-		if (byTrack) {
-			player.nextTrack();
-			return;
-		}
-		const next = data.chapters[currentChapterIndex + 1];
-		if (next) playFrom(next.start);
-	}
+	// Track versus chapter, and the three-second rule, live in the store so the mini
+	// player's keys and buttons behave identically.
+	const goPrevious = () => player.jumpPrevious();
+	const goNext = () => player.jumpNext();
 
 	function close() {
 		history.back();
@@ -134,41 +116,20 @@
 		else player.resume();
 	}
 
-	/** Albums have no skip buttons, so the arrows nudge by a track-sized step there. */
-	const TRACK_STEP = 10;
-	const stepBack = $derived(byTrack ? TRACK_STEP : player.preferences.skipBack);
-	const stepForward = $derived(byTrack ? TRACK_STEP : player.preferences.skipForward);
+	const stepBack = $derived(player.nudgeStep(-1));
+	const stepForward = $derived(player.nudgeStep(1));
+	const nudge = (direction: -1 | 1) => player.nudge(direction);
 
-	function nudge(direction: -1 | 1) {
-		const step = direction < 0 ? stepBack : stepForward;
-		if (byTrack) player.seekInTrack(Math.max(0, player.trackOffset() + direction * step));
-		else if (direction < 0) player.skipBack();
-		else player.skipForward();
-	}
-
-	onMount(() => {
-		function onKeydown(event: KeyboardEvent) {
-			const action = shortcutFor({
-				key: event.key,
-				shiftKey: event.shiftKey,
-				ctrlKey: event.ctrlKey,
-				metaKey: event.metaKey,
-				altKey: event.altKey,
-				target: event.target as HTMLElement | null
-			});
-			if (!action) return;
-			// The space bar would scroll the page, the arrows would too.
-			event.preventDefault();
+	onMount(() =>
+		bindPlayerShortcuts((action) => {
 			if (action === 'toggle') togglePlay();
 			else if (action === 'back') nudge(-1);
 			else if (action === 'forward') nudge(1);
 			else if (action === 'previous') goPrevious();
 			else if (action === 'next') goNext();
 			else close();
-		}
-		window.addEventListener('keydown', onKeydown);
-		return () => window.removeEventListener('keydown', onKeydown);
-	});
+		})
+	);
 
 	let sleepTimerHandle: ReturnType<typeof setTimeout> | null = null;
 	function setSleepTimer(minutes: string) {

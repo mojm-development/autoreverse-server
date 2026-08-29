@@ -476,6 +476,102 @@ describe('player store', () => {
 		expect(el.currentTime).toBe(50);
 	});
 
+	it('jumpPrevious()/jumpNext() step by chapter for a book', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					session_id: 's1',
+					kind: 'book',
+					start_position: 130,
+					tracks: [{ id: 1, position: 1, title: 'T1', duration: 600 }],
+					chapters: [
+						{ title: 'K1', start: 0, end: 100 },
+						{ title: 'K2', start: 100, end: 200 },
+						{ title: 'K3', start: 200, end: 600 }
+					]
+				})
+			})
+		);
+		const store = createPlayerStore();
+		await store.play(42);
+
+		// More than three seconds in: back to the start of this chapter first.
+		store.jumpPrevious();
+		expect(store.current?.position).toBe(100);
+		store.jumpPrevious();
+		expect(store.current?.position).toBe(0);
+		store.jumpNext();
+		expect(store.current?.position).toBe(100);
+	});
+
+	it('jumpNext() steps by track for an album', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					session_id: 's1',
+					kind: 'album',
+					start_position: 0,
+					tracks: [
+						{ id: 1, position: 1, title: 'T1', duration: 100 },
+						{ id: 2, position: 2, title: 'T2', duration: 100 }
+					],
+					chapters: []
+				})
+			})
+		);
+		const store = createPlayerStore();
+		await store.play(42);
+		store.jumpNext();
+		expect(store.current?.trackIndex).toBe(1);
+	});
+
+	it('nudge() steps 10 s inside the track for albums and by the preferences otherwise', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					session_id: 's1',
+					kind: 'album',
+					start_position: 130,
+					tracks: [
+						{ id: 1, position: 1, title: 'T1', duration: 100 },
+						{ id: 2, position: 2, title: 'T2', duration: 100 }
+					],
+					chapters: []
+				})
+			})
+		);
+		const album = createPlayerStore({ skipBack: 30, skipForward: 15 });
+		await album.play(42);
+		expect(album.nudgeStep(-1)).toBe(10);
+		album.nudge(1);
+		expect(album.current?.position).toBe(140);
+
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({
+					session_id: 's2',
+					kind: 'book',
+					start_position: 130,
+					tracks: [{ id: 1, position: 1, title: 'T1', duration: 600 }],
+					chapters: []
+				})
+			})
+		);
+		const book = createPlayerStore({ skipBack: 30, skipForward: 15 });
+		await book.play(43);
+		expect(book.nudgeStep(-1)).toBe(30);
+		book.nudge(-1);
+		expect(book.current?.position).toBe(100);
+	});
+
 	it('a second call after an element swap does not reuse the old graph', async () => {
 		const store = createPlayerStore();
 		const first = document.createElement('audio');

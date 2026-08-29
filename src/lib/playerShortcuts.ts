@@ -52,3 +52,33 @@ export function shortcutFor(event: ShortcutEvent): PlayerAction | null {
 			return null;
 	}
 }
+
+/**
+ * Wires the shortcuts to a keyboard target (the window, normally). Returns the
+ * teardown, so an `$effect` can hand it straight back. Only one binding should be
+ * live at a time — the fullscreen player replaces the mini player's.
+ */
+export function bindPlayerShortcuts(
+	run: (action: PlayerAction) => void,
+	target: {
+		addEventListener: (type: 'keydown', handler: (event: KeyboardEvent) => void) => void;
+		removeEventListener: (type: 'keydown', handler: (event: KeyboardEvent) => void) => void;
+	} = window
+): () => void {
+	function onKeydown(event: KeyboardEvent) {
+		const action = shortcutFor({
+			key: event.key,
+			shiftKey: event.shiftKey,
+			ctrlKey: event.ctrlKey,
+			metaKey: event.metaKey,
+			altKey: event.altKey,
+			target: event.target as { tagName?: string; isContentEditable?: boolean } | null
+		});
+		if (!action) return;
+		// The space bar would scroll the page, the arrows would too.
+		event.preventDefault();
+		run(action);
+	}
+	target.addEventListener('keydown', onKeydown);
+	return () => target.removeEventListener('keydown', onKeydown);
+}

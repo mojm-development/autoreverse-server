@@ -6,6 +6,7 @@
 	import Icon from './Icon.svelte';
 	import Scrubber from './Scrubber.svelte';
 	import Visualizer from './Visualizer.svelte';
+	import { bindPlayerShortcuts } from '$lib/playerShortcuts';
 
 	const player = getContext<PlayerStore>(PLAYER_CONTEXT_KEY);
 	let audioEl: HTMLAudioElement;
@@ -31,6 +32,25 @@
 		current !== null && current !== undefined && current.trackIndex >= current.tracks.length - 1
 	);
 
+	function togglePlay() {
+		if (!current) return;
+		if (current.playing) player.pause();
+		else player.resume();
+	}
+
+	// The same keys as the fullscreen player, wherever the mini bar is the visible player.
+	// Exactly one binding is live: the fullscreen route hides this bar and binds its own.
+	$effect(() => {
+		if (isFullscreenPlayer || !current) return;
+		return bindPlayerShortcuts((action) => {
+			if (action === 'toggle') togglePlay();
+			else if (action === 'back') player.nudge(-1);
+			else if (action === 'forward') player.nudge(1);
+			else if (action === 'previous') player.jumpPrevious();
+			else if (action === 'next') player.jumpNext();
+		});
+	});
+
 	function formatTime(seconds: number): string {
 		const h = Math.floor(seconds / 3600);
 		const m = Math.floor((seconds % 3600) / 60);
@@ -48,7 +68,7 @@
 					class="icon-btn"
 					aria-label="Vorheriger Titel"
 					disabled={atFirstTrack && player.trackOffset() <= 3}
-					onclick={() => player.previousTrack()}
+					onclick={() => player.jumpPrevious()}
 				>
 					<Icon name="previous" />
 				</button>
@@ -64,7 +84,7 @@
 			<button
 				class="play"
 				aria-label={current.playing ? 'Pause' : 'Abspielen'}
-				onclick={() => (current.playing ? player.pause() : player.resume())}
+				onclick={togglePlay}
 			>
 				<Icon name={current.playing ? 'pause' : 'play'} />
 			</button>
@@ -73,7 +93,7 @@
 					class="icon-btn"
 					aria-label="Nächster Titel"
 					disabled={atLastTrack}
-					onclick={() => player.nextTrack()}
+					onclick={() => player.jumpNext()}
 				>
 					<Icon name="next" />
 				</button>

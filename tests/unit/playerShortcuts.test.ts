@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shortcutFor } from '../../src/lib/playerShortcuts';
+import { shortcutFor, bindPlayerShortcuts } from '../../src/lib/playerShortcuts';
 
 describe('shortcutFor', () => {
 	it('maps the space bar to play/pause', () => {
@@ -31,5 +31,35 @@ describe('shortcutFor', () => {
 		expect(shortcutFor({ key: ' ', metaKey: true })).toBeNull();
 		expect(shortcutFor({ key: 'ArrowRight', ctrlKey: true })).toBeNull();
 		expect(shortcutFor({ key: 'x' })).toBeNull();
+	});
+
+	it('binds and unbinds a keyboard target, swallowing the key it acted on', () => {
+		let handler: ((event: KeyboardEvent) => void) | null = null;
+		const target = {
+			addEventListener: (_type: 'keydown', fn: (event: KeyboardEvent) => void) => {
+				handler = fn;
+			},
+			removeEventListener: () => {
+				handler = null;
+			}
+		};
+		const seen: string[] = [];
+		const stop = bindPlayerShortcuts((action) => seen.push(action), target);
+
+		let prevented = 0;
+		const press = (key: string) =>
+			handler?.({
+				key,
+				target: null,
+				preventDefault: () => (prevented += 1)
+			} as unknown as KeyboardEvent);
+
+		press(' ');
+		press('x');
+		expect(seen).toEqual(['toggle']);
+		expect(prevented).toBe(1);
+
+		stop();
+		expect(handler).toBeNull();
 	});
 });
