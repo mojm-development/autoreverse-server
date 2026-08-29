@@ -270,6 +270,7 @@ throttle applies.
 | `POST`                 | `/auth/login`                                     | Exchange credentials for a token                                       |
 | `POST`                 | `/auth/logout`                                    | Revoke the current token                                               |
 | `GET`                  | `/me`                                             | Current user                                                           |
+| `GET`                  | `/me/stats`                                       | Listening time per day — `?days=` (default 30)                         |
 | `POST`                 | `/me/password`                                    | Change own password                                                    |
 | `GET` `PUT`            | `/me/playback`                                    | Playback preferences                                                   |
 | `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?missing=` |
@@ -292,6 +293,7 @@ throttle applies.
 | `GET` `PATCH` `DELETE` | `/playlists/{id}`                                 | Read / rename / delete                                                 |
 | `POST` `PUT` `DELETE`  | `/playlists/{id}/entries[/{entryId}]`             | Playlist entries                                                       |
 | `GET`                  | `/podcasts/search`                                | Directory search by name                                               |
+| `POST`                 | `/podcasts/preview`                               | Read a feed without subscribing                                        |
 | `POST`                 | `/podcasts`                                       | Subscribe to a feed                                                    |
 | `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Refresh / unsubscribe                                                  |
 | `POST`                 | `/episodes/{id}/download`                         | Download an episode to the server                                      |

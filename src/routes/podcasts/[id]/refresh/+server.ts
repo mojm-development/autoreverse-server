@@ -1,6 +1,6 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
-import { requireApiAdmin } from '$lib/server/auth/session';
+import { requireApiUser } from '$lib/server/auth/session';
 import { refresh, FeedFetchError, InvalidFeedError } from '$lib/server/podcasts/store';
 import { retainForPodcast } from '$lib/server/podcasts/retention';
 import { loadConfig } from '$lib/server/config';
@@ -12,7 +12,7 @@ export async function _podcastRefreshPostHandler(
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
 	try {
-		await requireApiAdmin(event.locals, db);
+		requireApiUser(event.locals);
 		const { coverDir, podcastsDir } = loadConfig(process.env as Record<string, string | undefined>);
 		const podcast = await refresh(db, Number(event.params.id), { coversDir: coverDir });
 		const retention = await retainForPodcast(db, podcast.id, podcastsDir);

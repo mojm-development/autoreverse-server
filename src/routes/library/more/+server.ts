@@ -19,7 +19,7 @@ export async function _libraryMoreGetHandler(
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
 	try {
-		requireApiUser(event.locals);
+		const userId = requireApiUser(event.locals);
 		const url = event.url;
 		const kind = url.searchParams.get('kind') ?? '';
 		if (!KINDS.includes(kind)) throw new ApiError(422, 'Unbekannte Art');
@@ -33,7 +33,17 @@ export async function _libraryMoreGetHandler(
 		const offset = intParam(url, 'offset', { def: 0, min: 0, max: Number.MAX_SAFE_INTEGER });
 		const limit = intParam(url, 'limit', { def: PAGE_SIZE, min: 1, max: PAGE_SIZE });
 
-		const rows = await items(db, { kind, sort, q, missing, limit, offset });
+		// `played` orders by this user's progress rows, so the join needs to know who
+		// is asking; for every other sort the join would only cost time.
+		const rows = await items(db, {
+			kind,
+			sort,
+			q,
+			missing,
+			limit,
+			offset,
+			playedBy: sort === 'played' ? userId : undefined
+		});
 		const durations = await itemDurations(
 			db,
 			rows.map((r) => r.id)

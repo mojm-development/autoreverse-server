@@ -23,6 +23,15 @@ export function toItemSummary(row: ItemRow) {
 	};
 }
 
+/**
+ * The description belongs to a single item, never to a list: blurbs run long, and a
+ * library page would carry megabytes of prose for rows that show a title and a cover.
+ * `toItemSummary` therefore leaves it out and this adds it back on top.
+ */
+export function toItemDetail(row: ItemRow) {
+	return { ...toItemSummary(row), description: row.description ?? null };
+}
+
 export function toTrackOut(row: TrackRow) {
 	return { id: row.id, position: row.position, title: row.title ?? null, duration: row.duration };
 }

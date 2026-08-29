@@ -275,6 +275,7 @@ Feld `detail` zurück, bei Drosselung zusätzlich mit `retryAfter`.
 | `POST`                 | `/auth/login`                                     | Zugangsdaten gegen ein Token tauschen                                       |
 | `POST`                 | `/auth/logout`                                    | Aktuelles Token widerrufen                                                  |
 | `GET`                  | `/me`                                             | Angemeldeter Benutzer                                                       |
+| `GET`                  | `/me/stats`                                       | Hörzeit je Tag — `?days=` (Vorgabe 30)                                      |
 | `POST`                 | `/me/password`                                    | Eigenes Passwort ändern                                                     |
 | `GET` `PUT`            | `/me/playback`                                    | Wiedergabeeinstellungen                                                     |
 | `GET`                  | `/items`                                          | Titel auflisten — `?kind=book\|album\|podcast\|episode`, `?q=`, `?missing=` |
@@ -297,6 +298,7 @@ Feld `detail` zurück, bei Drosselung zusätzlich mit `retryAfter`.
 | `GET` `PATCH` `DELETE` | `/playlists/{id}`                                 | Lesen / umbenennen / löschen                                                |
 | `POST` `PUT` `DELETE`  | `/playlists/{id}/entries[/{entryId}]`             | Einträge einer Wiedergabeliste                                              |
 | `GET`                  | `/podcasts/search`                                | Verzeichnissuche nach Namen                                                 |
+| `POST`                 | `/podcasts/preview`                               | Feed ansehen, ohne zu abonnieren                                            |
 | `POST`                 | `/podcasts`                                       | Feed abonnieren                                                             |
 | `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Aktualisieren / Abo beenden                                                 |
 | `POST`                 | `/episodes/{id}/download`                         | Episode auf den Server laden                                                |

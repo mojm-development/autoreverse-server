@@ -12,6 +12,8 @@ export interface TrackTags {
 	series: string | null;
 	/** Volume number from MVIN or TXXX:SERIES-PART. */
 	seriesIndex: number | null;
+	/** Blurb from the comment tag — where audiobook tools put the description. */
+	description: string | null;
 	duration: number;
 	readable: boolean;
 }
@@ -26,6 +28,7 @@ const UNREADABLE: TrackTags = {
 	year: null,
 	series: null,
 	seriesIndex: null,
+	description: null,
 	duration: 0,
 	readable: false
 };
@@ -37,6 +40,13 @@ const UNREADABLE: TrackTags = {
  */
 const SERIES_KEYS = ['series', 'book series', 'series-name', 'mvnm', 'show'];
 const SERIES_PART_KEYS = ['series-part', 'series_index', 'part', 'mvin', 'movement'];
+/**
+ * Blurbs hide in as many places as series do. `common.comment` covers the standard
+ * frames (ID3 COMM, Vorbis COMMENT, MP4 ©cmt), but plenty of files carry the text in a
+ * free-form `TXXX:comment` instead — ffmpeg writes exactly that when asked for
+ * `-metadata comment=…`, and it never reaches `common.comment`.
+ */
+const DESCRIPTION_KEYS = ['comment', 'comm', 'description', 'desc'];
 
 function nativeTag(meta: IAudioMetadata, wanted: string[]): string | null {
 	for (const frames of Object.values(meta.native ?? {})) {
@@ -56,6 +66,22 @@ function nativeTag(meta: IAudioMetadata, wanted: string[]): string | null {
 		}
 	}
 	return null;
+}
+
+function firstComment(comments: IAudioMetadata['common']['comment']): string | null {
+	for (const entry of comments ?? []) {
+		const text = typeof entry === 'string' ? entry : (entry?.text ?? null);
+		if (text && text.trim()) return text.trim();
+	}
+	return null;
+}
+
+function description(meta: IAudioMetadata): string | null {
+	return (
+		firstComment(meta.common.comment) ??
+		(meta.common.description?.[0]?.trim() || null) ??
+		nativeTag(meta, DESCRIPTION_KEYS)
+	);
 }
 
 function toNumber(value: string | null): number | null {
@@ -87,6 +113,9 @@ export async function readTags(path: string): Promise<TrackTags> {
 			year: common.year ?? null,
 			series: common.movement ?? nativeTag(meta, SERIES_KEYS) ?? (common.grouping || null) ?? null,
 			seriesIndex: common.movementIndex?.no ?? toNumber(nativeTag(meta, SERIES_PART_KEYS)) ?? null,
+			// `common.comment` is a list of entries, each either a plain string or a
+			// {text} object depending on the container. Take the first that has text.
+			description: description(meta),
 			duration,
 			readable: true
 		};

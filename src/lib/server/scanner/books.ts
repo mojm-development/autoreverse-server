@@ -24,6 +24,7 @@ export interface ScannedItem {
 	author?: string | null;
 	artist?: string | null;
 	albumArtist?: string | null;
+	description?: string | null;
 	series?: string | null;
 	year?: number | null;
 	seriesIndex: number | null;
@@ -212,6 +213,7 @@ export async function scanFolder(
 			: undefined;
 	const albumArtist = kind === 'album' ? firstTags.albumArtist : undefined;
 	const year = kind === 'album' ? firstTags.year : undefined;
+	const description = firstTags.description;
 
 	let chapters: Chapter[] = [];
 	if (kind === 'book') {
@@ -237,6 +239,7 @@ export async function scanFolder(
 		author,
 		artist,
 		albumArtist,
+		description,
 		series: guess.series,
 		year,
 		seriesIndex: guess.seriesIndex,

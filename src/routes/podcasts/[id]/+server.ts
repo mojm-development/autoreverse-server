@@ -1,6 +1,6 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
-import { requireApiAdmin } from '$lib/server/auth/session';
+import { requireApiUser } from '$lib/server/auth/session';
 import { unsubscribe } from '$lib/server/podcasts/store';
 import { loadConfig } from '$lib/server/config';
 import { apiError } from '$lib/server/api/error';
@@ -11,7 +11,7 @@ export async function _podcastDeleteHandler(
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
 	try {
-		await requireApiAdmin(event.locals, db);
+		requireApiUser(event.locals);
 		const config = loadConfig(process.env as Record<string, string | undefined>);
 		const report = await unsubscribe(db, Number(event.params.id), config.podcastsDir);
 		return json({

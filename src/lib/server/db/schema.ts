@@ -57,6 +57,11 @@ export const items = pgTable(
 		year: integer('year'),
 		author: text('author'),
 		narrator: text('narrator'),
+		// Free text about the item: a podcast's or episode's feed description, or the
+		// comment tag of a book or album. Only ever sent with a single item, never in
+		// a list — descriptions run long, and a library page would carry megabytes of
+		// prose nobody is reading yet.
+		description: text('description'),
 		series: text('series'),
 		seriesIndex: doublePrecision('series_index'),
 		feedUrl: text('feed_url'),
@@ -68,7 +73,13 @@ export const items = pgTable(
 		// Podcasting 2.0 <podcast:chapters url=…>: fetched when the episode is downloaded,
 		// since a feed refresh must not pull one JSON file per episode.
 		chaptersUrl: text('chapters_url'),
-		keepEpisodes: integer('keep_episodes')
+		keepEpisodes: integer('keep_episodes'),
+		// Fields a person edited by hand. The scanner reads this and leaves them alone,
+		// otherwise the next scan of a changed folder would undo every correction.
+		lockedFields: text('locked_fields')
+			.array()
+			.notNull()
+			.default(sql`'{}'::text[]`)
 	},
 	(t) => [
 		check('kind_check', sql`${t.kind} IN ('book','album','podcast','episode')`),
@@ -98,7 +109,11 @@ export const tracks = pgTable(
 		title: text('title'),
 		disc: integer('disc'),
 		mtime: doublePrecision('mtime'),
-		size: integer('size')
+		size: integer('size'),
+		lockedFields: text('locked_fields')
+			.array()
+			.notNull()
+			.default(sql`'{}'::text[]`)
 	},
 	(t) => [uniqueIndex('track_item_position').on(t.itemId, t.position)]
 );
@@ -229,6 +244,31 @@ export const artistCovers = pgTable(
 		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => [check('artist_cover_xor', sql`(${t.itemId} IS NULL) <> (${t.imagePath} IS NULL)`)]
+);
+
+/**
+ * Every hand edit, with the value it replaced. One batch id per request, so a bulk
+ * change can be undone in one go — and so it is possible to see what the editor did
+ * to a library of a few thousand items.
+ */
+export const metadataEdits = pgTable(
+	'metadata_edits',
+	{
+		id: integer('id').generatedByDefaultAsIdentity().primaryKey(),
+		batchId: text('batch_id').notNull(),
+		itemId: integer('item_id').references(() => items.id, { onDelete: 'cascade' }),
+		trackId: integer('track_id').references(() => tracks.id, { onDelete: 'cascade' }),
+		field: text('field').notNull(),
+		oldValue: text('old_value'),
+		newValue: text('new_value'),
+		userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => [
+		index('metadata_edit_batch').on(t.batchId),
+		index('metadata_edit_item').on(t.itemId),
+		check('metadata_edit_target', sql`(${t.itemId} IS NULL) <> (${t.trackId} IS NULL)`)
+	]
 );
 
 export const playlistEntries = pgTable(

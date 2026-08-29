@@ -13,6 +13,7 @@ function tags(overrides: Partial<TrackTags> = {}): TrackTags {
 		year: null,
 		series: null,
 		seriesIndex: null,
+		description: null,
 		duration: 10,
 		readable: true,
 		...overrides

@@ -1,6 +1,6 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
-import { requireApiAdmin } from '$lib/server/auth/session';
+import { requireApiUser } from '$lib/server/auth/session';
 import {
 	searchDirectory,
 	DirectorySearchError,
@@ -16,7 +16,7 @@ export async function _podcastsSearchGetHandler(
 	event: Pick<RequestEvent, 'locals' | 'url'>
 ): Promise<Response> {
 	try {
-		await requireApiAdmin(event.locals, db);
+		requireApiUser(event.locals);
 		const q = event.url.searchParams.get('q') ?? '';
 		if (q.length < 1 || q.length > 200) throw new ApiError(422, 'q muss 1–200 Zeichen haben');
 		const limit = intParam(event.url, 'limit', { def: DEFAULT_LIMIT, min: 1, max: 50 });

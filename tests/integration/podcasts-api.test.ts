@@ -92,7 +92,11 @@ describe('podcasts API routes', () => {
 		});
 	});
 
-	it('non-admin gets 403 from POST /podcasts', async () => {
+	// Subscribing is an ordinary user action, not administration. Admin rights guard
+	// the library scan and user management; a podcast someone adds for themselves is
+	// neither, and the native clients offer it on every account.
+	it('a non-admin may subscribe via POST /podcasts', async () => {
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: async () => FEED }));
 		await withTestDb(async (db) => {
 			await createUser(db, 'admin', 'hunter2hunter2', true); // first user is always admin — throwaway
 			const userId = await createUser(db, 'oliver', 'hunter2hunter2', false);
@@ -101,7 +105,7 @@ describe('podcasts API routes', () => {
 				locals: { userId, token: null },
 				body: { feed_url: 'https://x/feed.xml' }
 			});
-			expect(res.status).toBe(403);
+			expect(res.status).toBe(200);
 		});
 	});
 

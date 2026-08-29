@@ -1,6 +1,6 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
-import { requireApiAdmin } from '$lib/server/auth/session';
+import { requireApiUser } from '$lib/server/auth/session';
 import {
 	downloadEpisode,
 	EpisodeNotDownloadableError,
@@ -16,7 +16,7 @@ export async function _episodeDownloadPostHandler(
 	event: Pick<RequestEvent, 'locals' | 'params'>
 ): Promise<Response> {
 	try {
-		await requireApiAdmin(event.locals, db);
+		requireApiUser(event.locals);
 		const config = loadConfig(process.env as Record<string, string | undefined>);
 		const result = await downloadEpisode(db, Number(event.params.id), config.podcastsDir);
 		return json({ track_id: result.trackId, duration: result.duration });

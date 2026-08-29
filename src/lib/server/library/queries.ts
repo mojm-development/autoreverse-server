@@ -4,7 +4,8 @@ import {
 	tracks as tracksTable,
 	chapters as chaptersTable,
 	favorites,
-	progress as progressTable
+	progress as progressTable,
+	listenEvents
 } from '../db/schema';
 import { likePattern } from './like';
 import { naturalKey, episodeNumber } from './sorting';
@@ -19,16 +20,20 @@ const SORTS: Record<string, ReturnType<typeof sql>> = {
 	added: sql`${itemsTable.addedAt} DESC, ${NATURAL_TITLE}`,
 	// The scanner's own volume number wins; the number parsed out of a title stays as
 	// the fallback for anything scanned before series detection existed.
-	series: sql`lower(${itemsTable.author}) NULLS LAST, lower(${itemsTable.series}) NULLS LAST, ${itemsTable.seriesIndex} NULLS LAST, ${EPISODE_NO} NULLS LAST, ${NATURAL_TITLE}`
+	series: sql`lower(${itemsTable.author}) NULLS LAST, lower(${itemsTable.series}) NULLS LAST, ${itemsTable.seriesIndex} NULLS LAST, ${EPISODE_NO} NULLS LAST, ${NATURAL_TITLE}`,
+	// Only meaningful together with `playedBy` — without that join every row has a
+	// NULL timestamp and the order collapses to the title.
+	played: sql`${progressTable.updatedAt} DESC NULLS LAST, ${NATURAL_TITLE}`
 };
 export const SORT_LABELS: Record<string, string> = {
 	title: 'Titel A–Z',
 	added: 'Zuletzt dazu',
-	series: 'Serie & Folge'
+	series: 'Serie & Folge',
+	played: 'Zuletzt gehört'
 };
 export const PAGE_SIZE = 100;
-export const BOOK_SORTS = ['series', 'title', 'added'] as const;
-export type SortKey = 'title' | 'added' | 'series';
+export const BOOK_SORTS = ['series', 'title', 'added', 'played'] as const;
+export type SortKey = 'title' | 'added' | 'series' | 'played';
 
 export interface ItemsFilter {
 	kind?: string;
@@ -38,6 +43,12 @@ export interface ItemsFilter {
 	missing?: boolean;
 	sort?: SortKey;
 	favoritesOf?: number;
+	/**
+	 * Join this user's progress rows so `sort: 'played'` has a timestamp to order by.
+	 * A LEFT join on purpose: sorting by "last played" must not hide everything the
+	 * user has never started.
+	 */
+	playedBy?: number;
 }
 
 function itemConditions(filter: { kind?: string; q?: string; missing?: boolean }) {
@@ -62,6 +73,12 @@ export async function items(db: DrizzleDb, filter: ItemsFilter) {
 		query = query.innerJoin(
 			favorites,
 			and(eq(favorites.itemId, itemsTable.id), eq(favorites.userId, filter.favoritesOf))
+		);
+	}
+	if (filter.playedBy !== undefined) {
+		query = query.leftJoin(
+			progressTable,
+			and(eq(progressTable.itemId, itemsTable.id), eq(progressTable.userId, filter.playedBy))
 		);
 	}
 	const order = SORTS[filter.sort ?? 'title'] ?? SORTS.title;
@@ -274,6 +291,38 @@ export async function continueListening(db: DrizzleDb, userId: number, limit = 2
 		position: number;
 		duration: number;
 	}>;
+}
+
+/**
+ * Listening time per day, plus the total over the whole window.
+ *
+ * Source is `listen_events`, which `closeSession` writes one row into whenever a
+ * playback session ends — that is the only place the server learns how long something
+ * actually ran. Days without a single event are absent rather than zero: the caller
+ * draws a bar chart, and a missing day and a day with no listening look the same there.
+ */
+export async function listeningStats(db: DrizzleDb, userId: number, days: number) {
+	const rows = await db
+		.select({
+			day: sql<string>`to_char(${listenEvents.at} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`,
+			seconds: sql<number>`sum(${listenEvents.seconds})::double precision`
+		})
+		.from(listenEvents)
+		.where(
+			and(
+				eq(listenEvents.userId, userId),
+				sql`${listenEvents.at} >= now() - make_interval(days => ${days})`
+			)
+		)
+		.groupBy(sql`1`);
+
+	const byDay: Record<string, number> = {};
+	let total = 0;
+	for (const row of rows) {
+		byDay[row.day] = row.seconds;
+		total += row.seconds;
+	}
+	return { total_seconds: total, days: byDay };
 }
 
 export async function progress(db: DrizzleDb, userId: number, itemId: number) {

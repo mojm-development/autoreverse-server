@@ -40,6 +40,7 @@ async function syncEpisodes(
 				.set({
 					title: episode.title,
 					sortTitle: episode.title.toLowerCase(),
+					description: episode.description,
 					feedUrl: episode.mediaUrl,
 					publishedAt: episode.publishedAt,
 					chaptersUrl: episode.chaptersUrl
@@ -55,6 +56,7 @@ async function syncEpisodes(
 					parentId: podcastId,
 					title: episode.title,
 					sortTitle: episode.title.toLowerCase(),
+					description: episode.description,
 					guid: episode.guid,
 					feedUrl: episode.mediaUrl,
 					publishedAt: episode.publishedAt,
@@ -128,13 +130,17 @@ export async function subscribe(db: DrizzleDb, feedUrl: string, opts: { coversDi
 				kind: 'podcast',
 				title: parsed.title,
 				sortTitle: parsed.title.toLowerCase(),
+				description: parsed.description,
 				feedUrl,
 				lastChecked: new Date()
 			})
 			.returning();
 	}
 	const { newEpisodes, updatedEpisodes } = await syncEpisodes(db, podcast.id, parsed.episodes);
-	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
+	await db
+		.update(itemsTable)
+		.set({ lastChecked: new Date(), description: parsed.description })
+		.where(eq(itemsTable.id, podcast.id));
 	let coverPath = podcast.coverPath;
 	if (opts.coversDir && !coverPath && parsed.imageUrl) {
 		coverPath = await storeFeedCover(db, podcast.id, parsed.imageUrl, opts.coversDir);
@@ -156,7 +162,10 @@ export async function refresh(db: DrizzleDb, podcastId: number, opts: { coversDi
 		throw new InvalidFeedError(e instanceof Error ? e.message : String(e));
 	}
 	const { newEpisodes, updatedEpisodes } = await syncEpisodes(db, podcast.id, parsed.episodes);
-	await db.update(itemsTable).set({ lastChecked: new Date() }).where(eq(itemsTable.id, podcast.id));
+	await db
+		.update(itemsTable)
+		.set({ lastChecked: new Date(), description: parsed.description })
+		.where(eq(itemsTable.id, podcast.id));
 	let coverPath = podcast.coverPath;
 	if (opts.coversDir && !coverPath && parsed.imageUrl) {
 		coverPath = await storeFeedCover(db, podcast.id, parsed.imageUrl, opts.coversDir);

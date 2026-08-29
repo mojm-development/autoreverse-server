@@ -10,6 +10,23 @@ import type { ScannedItem, ScanFailure } from './books';
 import type { DrizzleDb } from '../db';
 import type { StoreProgressFn } from '../admin/scanState';
 
+/**
+ * Drops the fields a person edited by hand. The scanner is the source of truth for
+ * everything else, but a correction has to outlive the next scan of that folder.
+ * A locked title keeps its sort key too — that key is derived from the title.
+ */
+function withoutLocked<T extends Record<string, unknown>>(values: T, lockedFields: string[]): T {
+	if (!lockedFields || lockedFields.length === 0) return values;
+	const locked = new Set(lockedFields);
+	const kept: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(values)) {
+		if (locked.has(key)) continue;
+		if (key === 'sortTitle' && locked.has('title')) continue;
+		kept[key] = value;
+	}
+	return kept as T;
+}
+
 export async function knownFiles(db: DrizzleDb): Promise<Record<string, [number, number]>> {
 	const rows = await db
 		.select({ path: tracksTable.path, mtime: tracksTable.mtime, size: tracksTable.size })
@@ -87,11 +104,15 @@ export async function storeItems(
 							missingSince: null,
 							coverPath: cover
 						};
-						if (!existing.series && entry.series) patch.series = entry.series;
+						const locked = new Set(existing.lockedFields ?? []);
+						if (!existing.series && entry.series && !locked.has('series')) {
+							patch.series = entry.series;
+						}
 						if (
 							existing.seriesIndex === null &&
 							entry.seriesIndex !== null &&
 							entry.seriesIndex !== undefined &&
+							!locked.has('seriesIndex') &&
 							(existing.series || entry.series)
 						) {
 							patch.seriesIndex = entry.seriesIndex;
@@ -104,19 +125,20 @@ export async function storeItems(
 				let itemId: number;
 				let outcome: Outcome;
 				if (existing) {
+					const fromFiles = {
+						title: entry.title,
+						sortTitle: entry.title.toLowerCase(),
+						author: entry.author ?? null,
+						artist: entry.artist ?? null,
+						albumArtist: entry.albumArtist ?? null,
+						description: entry.description ?? null,
+						series: entry.series ?? null,
+						seriesIndex: entry.seriesIndex ?? null,
+						year: entry.year ?? null
+					};
 					await tx
 						.update(itemsTable)
-						.set({
-							title: entry.title,
-							sortTitle: entry.title.toLowerCase(),
-							author: entry.author ?? null,
-							artist: entry.artist ?? null,
-							albumArtist: entry.albumArtist ?? null,
-							series: entry.series ?? null,
-							seriesIndex: entry.seriesIndex ?? null,
-							year: entry.year ?? null,
-							missingSince: null
-						})
+						.set({ ...withoutLocked(fromFiles, existing.lockedFields), missingSince: null })
 						.where(eq(itemsTable.id, existing.id));
 					itemId = existing.id;
 					outcome = 'updated';
@@ -131,6 +153,7 @@ export async function storeItems(
 							author: entry.author ?? null,
 							artist: entry.artist ?? null,
 							albumArtist: entry.albumArtist ?? null,
+							description: entry.description ?? null,
 							series: entry.series ?? null,
 							seriesIndex: entry.seriesIndex ?? null,
 							year: entry.year ?? null

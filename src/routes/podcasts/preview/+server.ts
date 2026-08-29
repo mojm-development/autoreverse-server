@@ -1,15 +1,17 @@
 import { json, type RequestHandler, type RequestEvent } from '@sveltejs/kit';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser } from '$lib/server/auth/session';
-import { subscribe, FeedFetchError, InvalidFeedError } from '$lib/server/podcasts/store';
+import { previewFeed, FeedFetchError, InvalidFeedError } from '$lib/server/podcasts/store';
+import { toIso } from '$lib/server/api/serialize';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 import { readJson } from '$lib/server/api/validate';
-import { loadConfig } from '$lib/server/config';
-import { retainForPodcast } from '$lib/server/podcasts/retention';
 
-export async function _podcastsPostHandler(
-	db: DrizzleDb,
+/** How many episodes a preview carries. Enough to judge a show, not a whole archive. */
+const PREVIEW_EPISODES = 15;
+
+export async function _podcastsPreviewPostHandler(
+	_db: DrizzleDb,
 	event: Pick<RequestEvent, 'locals' | 'request'>
 ): Promise<Response> {
 	try {
@@ -17,15 +19,17 @@ export async function _podcastsPostHandler(
 		const { feed_url } = await readJson<{ feed_url?: unknown }>(event.request);
 		if (typeof feed_url !== 'string' || feed_url.length < 1)
 			return apiError(422, 'feed_url muss eine nicht-leere Zeichenkette sein');
-		const { coverDir, podcastsDir } = loadConfig(process.env as Record<string, string | undefined>);
-		const podcast = await subscribe(db, feed_url, { coversDir: coverDir });
-		void retainForPodcast(db, podcast.id, podcastsDir);
+
+		const parsed = await previewFeed(feed_url);
 		return json({
-			id: podcast.id,
-			title: podcast.title,
-			feed_url: podcast.feedUrl,
-			new_episodes: podcast.newEpisodes,
-			updated_episodes: podcast.updatedEpisodes
+			title: parsed.title,
+			description: parsed.description,
+			image_url: parsed.imageUrl,
+			episodes: parsed.episodes.slice(0, PREVIEW_EPISODES).map((episode) => ({
+				title: episode.title,
+				published_at: toIso(episode.publishedAt),
+				duration: episode.durationSeconds
+			}))
 		});
 	} catch (e) {
 		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
@@ -35,4 +39,4 @@ export async function _podcastsPostHandler(
 	}
 }
 
-export const POST: RequestHandler = (event) => _podcastsPostHandler(defaultDb, event);
+export const POST: RequestHandler = (event) => _podcastsPreviewPostHandler(defaultDb, event);

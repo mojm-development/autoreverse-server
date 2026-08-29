@@ -36,6 +36,20 @@
       "when": 1787988315265,
       "tag": "0004_wealthy_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787996436468,
+      "tag": "0005_calm_fabian_cortez",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788022611193,
+      "tag": "0006_low_roland_deschain",
+      "breakpoints": true
     }
   ]
 }
