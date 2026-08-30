@@ -82,6 +82,16 @@ db-reset: ## Wirft die Datenbank samt Inhalt weg und legt sie neu an
 	if [ "$$answer" != "j" ]; then echo "Abgebrochen."; exit 0; fi; \
 	$(COMPOSE) down -v && $(MAKE) --no-print-directory db && $(MAKE) --no-print-directory push
 
+# `ensureFirstAdmin` legt den Admin nur an, solange die Nutzertabelle leer ist —
+# eine Datenbank mit vergessenem Passwort ließe sich sonst nur per SQL retten.
+# NAME statt USER: USER ist im Make immer belegt (der angemeldete Systemnutzer),
+# ein vergessenes NAME= würde sonst still am falschen Konto arbeiten.
+password: db ## Passwort setzen oder Verwalter anlegen: make password NAME=admin PASS=geheim123
+	@if [ -z "$(NAME)" ] || [ -z "$(PASS)" ]; then \
+		echo "Aufruf: make password NAME=admin PASS=mindestens8zeichen" >&2; exit 2; \
+	fi; \
+	$(ENV) && bun run scripts/set-password.ts "$(NAME)" "$(PASS)" --admin
+
 db-shell: ## psql in der laufenden Datenbank
 	@$(COMPOSE) exec $(DB_SERVICE) psql -U $(DB_USER) -d autoreverse
 
