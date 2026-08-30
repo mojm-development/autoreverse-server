@@ -27,11 +27,17 @@
 </script>
 
 <nav class="sidebar" style="--a: var(--{accent})">
-	<div class="brand">
+	<a href="/library" class="brand" aria-label="Zur Startseite">
 		<BrandMark size={30} />
 		<span class="wordmark">Autoreverse</span>
-	</div>
+	</a>
 	<a href="/library/search" class="search-shortcut">Alles durchsuchen</a>
+
+	<!-- Ohne diesen Eintrag führte kein Weg zurück auf die Startseite: die Marke war
+	     kein Link, und jede andere Zeile zeigt auf eine Unterseite. -->
+	<a href="/library" class="home" aria-current={activeHref === '/library'}>
+		<Icon name="home" /> Start
+	</a>
 
 	<div class="eyebrow" style="color: var(--music)">Musik</div>
 	<a href="/library/albums" aria-current={activeHref === '/library/albums'}
@@ -110,6 +116,20 @@
 		align-items: center;
 		gap: 9px;
 		padding: 0 10px 18px;
+		color: inherit;
+	}
+	.brand:hover .wordmark {
+		color: var(--a);
+	}
+	.home {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		margin-bottom: 6px;
+	}
+	.home :global(.icon) {
+		font-size: 15px;
+		flex: none;
 	}
 	.wordmark {
 		font: 600 16px/1 var(--font-sans);
