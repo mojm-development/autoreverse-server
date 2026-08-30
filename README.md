@@ -265,6 +265,9 @@ Web-UI requests are authenticated by the `autoreverse_session` cookie instead; b
 to the same user. Errors come back as JSON with a `detail` field, and `retryAfter` where a
 throttle applies.
 
+`/progress/continue` returns `duration` (the summed track durations) and `has_cover` alongside
+each entry, so a client can draw a progress bar without fetching the whole item.
+
 | Method                 | Path                                              | Purpose                                                                |
 | ---------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
 | `POST`                 | `/auth/login`                                     | Exchange credentials for a token                                       |

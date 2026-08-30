@@ -270,6 +270,9 @@ Anfragen aus der Weboberfläche authentifizieren sich stattdessen über das Cook
 `autoreverse_session`; beide Wege landen beim selben Benutzer. Fehler kommen als JSON mit einem
 Feld `detail` zurück, bei Drosselung zusätzlich mit `retryAfter`.
 
+`/progress/continue` liefert zu jedem Eintrag zusätzlich `duration` (die Summe der Trackdauern)
+und `has_cover` — damit lässt sich ein Fortschrittsbalken zeichnen, ohne das ganze Item zu laden.
+
 | Methode                | Pfad                                              | Zweck                                                                       |
 | ---------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
 | `POST`                 | `/auth/login`                                     | Zugangsdaten gegen ein Token tauschen                                       |
