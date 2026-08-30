@@ -273,6 +273,9 @@ Feld `detail` zurück, bei Drosselung zusätzlich mit `retryAfter`.
 `/progress/continue` liefert zu jedem Eintrag zusätzlich `duration` (die Summe der Trackdauern)
 und `has_cover` — damit lässt sich ein Fortschrittsbalken zeichnen, ohne das ganze Item zu laden.
 
+`/items` nimmt `?sort=title|added|series|played` (Vorgabe `title`); `played` ordnet nach dem
+Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller Rückfall.
+
 | Methode                | Pfad                                              | Zweck                                                                       |
 | ---------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
 | `POST`                 | `/auth/login`                                     | Zugangsdaten gegen ein Token tauschen                                       |

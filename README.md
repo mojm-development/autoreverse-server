@@ -268,6 +268,9 @@ throttle applies.
 `/progress/continue` returns `duration` (the summed track durations) and `has_cover` alongside
 each entry, so a client can draw a progress bar without fetching the whole item.
 
+`/items` takes `?sort=title|added|series|played` (default `title`); `played` orders by the asking
+user's own progress. An unknown value is a 422 rather than a silent fallback.
+
 | Method                 | Path                                              | Purpose                                                                |
 | ---------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
 | `POST`                 | `/auth/login`                                     | Exchange credentials for a token                                       |
