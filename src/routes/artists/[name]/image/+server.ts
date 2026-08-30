@@ -4,13 +4,47 @@ import { stat, readFile } from 'node:fs/promises';
 import { db as defaultDb, type DrizzleDb } from '$lib/server/db';
 import { requireApiUser, requireApiAdmin } from '$lib/server/auth/session';
 import { loadConfig } from '$lib/server/config';
-import { chosenCover, storeImage, imageContentType } from '$lib/server/library/artistCovers';
+import {
+	chosenCover,
+	fallbackCovers,
+	storeImage,
+	imageContentType
+} from '$lib/server/library/artistCovers';
+import { items as itemsTable } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 import { apiError } from '$lib/server/api/error';
 import { ApiError } from '$lib/server/api/errors';
 
 function isInside(path: string, root: string): boolean {
 	const rel = relative(resolve(root), resolve(path));
 	return rel !== '' && !rel.startsWith('..') && !resolve(rel).includes('..');
+}
+
+// Das Cover eines Albums unter der Adresse des Interpreten ausliefern. Kein
+// Weiterleiten auf `/items/{id}/cover`: Ein Redirect zwänge jeden Client zu einem
+// zweiten Aufruf, und die Adresse des Bildes soll die des Interpreten bleiben —
+// wechselt seine Auswahl, wechselt der Inhalt, nicht der Ort.
+async function itemCover(db: DrizzleDb, itemId: number): Promise<Response> {
+	const [row] = await db
+		.select({ coverPath: itemsTable.coverPath })
+		.from(itemsTable)
+		.where(eq(itemsTable.id, itemId));
+	if (!row?.coverPath) return apiError(404, 'Kein Bild');
+
+	let stats;
+	try {
+		stats = await stat(row.coverPath);
+	} catch {
+		return apiError(404, 'Kein Bild');
+	}
+	const data = await readFile(row.coverPath);
+	return new Response(data, {
+		headers: {
+			'content-type': imageContentType(row.coverPath),
+			'content-length': String(stats.size),
+			'cache-control': 'private, max-age=300'
+		}
+	});
 }
 
 export async function _artistImageGetHandler(
@@ -21,7 +55,17 @@ export async function _artistImageGetHandler(
 		requireApiUser(event.locals);
 		const artist = event.params.name ?? '';
 		const cover = await chosenCover(db, artist);
-		if (!cover?.imagePath) return apiError(404, 'Kein Bild');
+
+		// Ein Interpret hat sein Bild aus einer von drei Quellen, und diese Route
+		// liefert es aus allen dreien statt nur aus der ersten. Vorher gab sie bei
+		// einer **Albumauswahl** 404 zurück: Die Weboberfläche löst die Auswahl in
+		// ihrem Seitenlader selbst auf und merkte davon nichts, aber ein Client, der
+		// nur diese Route kennt, sah eine getroffene Auswahl schlicht nicht.
+		if (!cover?.imagePath) {
+			const itemId = cover?.itemId ?? (await fallbackCovers(db)).get(artist);
+			if (!itemId) return apiError(404, 'Kein Bild');
+			return itemCover(db, itemId);
+		}
 
 		const config = loadConfig(process.env as Record<string, string | undefined>);
 		if (!isInside(cover.imagePath, config.artistsDir)) return apiError(404, 'Kein Bild');

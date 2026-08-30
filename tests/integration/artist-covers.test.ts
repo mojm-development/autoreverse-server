@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +18,10 @@ import {
 } from '../../src/lib/server/library/artistCovers';
 import { ApiError } from '../../src/lib/server/api/errors';
 import type { DrizzleDb } from '../../src/lib/server/db';
+import { createUser } from '../../src/lib/server/auth/passwords';
+import { callRoute } from './_callRoute';
+import { _artistImageGetHandler } from '../../src/routes/artists/[name]/image/+server';
+import { _artistCoverGetHandler } from '../../src/routes/artists/[name]/cover/+server';
 
 async function seedAlbum(db: DrizzleDb, artist: string, title: string, withCover = true) {
 	const [row] = await db
@@ -189,5 +193,132 @@ describe('imageContentType', () => {
 		expect(imageContentType('/data/artists/abc.png')).toBe('image/png');
 		expect(imageContentType('/data/artists/abc.jpg')).toBe('image/jpeg');
 		expect(imageContentType('/data/artists/abc.txt')).toBe('application/octet-stream');
+	});
+});
+
+describe('the artist image route', () => {
+	// Die Route hieß immer schon „image", lieferte aber nur hochgeladene Dateien: Wer
+	// ein Album ausgewählt hatte, bekam 404. Das fiel erst auf, als ein Client kam,
+	// der die Auswahl nicht selbst auflösen kann — die Weboberfläche tut das in ihrem
+	// Seitenlader und merkte davon nichts.
+	it('serves the chosen album cover, not just an uploaded file', async () => {
+		await withTestDb(async (db) => {
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-cover-'));
+			const coverPath = join(dir, 'album.png');
+			writeFileSync(coverPath, Buffer.from(PNG));
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const [album] = await db
+				.insert(itemsTable)
+				.values({
+					kind: 'album',
+					title: 'Autobahn',
+					sortTitle: 'autobahn',
+					artist: 'Kraftwerk',
+					coverPath
+				})
+				.returning();
+			await selectAlbum(db, 'Kraftwerk', album.id);
+
+			const res = await callRoute(_artistImageGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { name: 'Kraftwerk' }
+			});
+			expect(res.status).toBe(200);
+			expect(res.headers.get('content-type')).toBe('image/png');
+		});
+	});
+
+	it('falls back to the derived album when nothing was chosen', async () => {
+		await withTestDb(async (db) => {
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-cover-'));
+			const coverPath = join(dir, 'album.png');
+			writeFileSync(coverPath, Buffer.from(PNG));
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			await db.insert(itemsTable).values({
+				kind: 'album',
+				title: 'Autobahn',
+				sortTitle: 'autobahn',
+				artist: 'Kraftwerk',
+				coverPath
+			});
+
+			const res = await callRoute(_artistImageGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { name: 'Kraftwerk' }
+			});
+			expect(res.status).toBe(200);
+		});
+	});
+
+	it('still says 404 for an artist without any cover at all', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			await seedAlbum(db, 'Kraftwerk', 'Autobahn', false);
+			const res = await callRoute(_artistImageGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { name: 'Kraftwerk' }
+			});
+			expect(res.status).toBe(404);
+		});
+	});
+});
+
+describe('reading back the choice', () => {
+	// Ohne diese Route sieht ein Client zwar das Bild, aber nicht seine Herkunft — und
+	// könnte im Auswahlbildschirm nicht zeigen, welches Album gerade gilt.
+	it('names the chosen album', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const album = await seedAlbum(db, 'Kraftwerk', 'Autobahn');
+			await selectAlbum(db, 'Kraftwerk', album.id);
+			const res = await callRoute(_artistCoverGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { name: 'Kraftwerk' }
+			});
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({
+				artist: 'Kraftwerk',
+				item_id: album.id,
+				has_image: false
+			});
+		});
+	});
+
+	it('reports an uploaded image without an album id', async () => {
+		await withTestDb(async (db) => {
+			const dir = mkdtempSync(join(tmpdir(), 'autoreverse-artists-'));
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			await storeImage(db, 'Kraftwerk', { type: 'image/png', size: PNG.length, bytes: PNG }, dir);
+			const res = await callRoute(_artistCoverGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { name: 'Kraftwerk' }
+			});
+			expect(await res.json()).toEqual({
+				artist: 'Kraftwerk',
+				item_id: null,
+				has_image: true
+			});
+		});
+	});
+
+	it('says nothing is chosen when nothing is', async () => {
+		await withTestDb(async (db) => {
+			const userId = await createUser(db, 'oliver', 'hunter2hunter2');
+			const res = await callRoute(_artistCoverGetHandler, {
+				db,
+				locals: { userId, token: null },
+				params: { name: 'Kraftwerk' }
+			});
+			expect(await res.json()).toEqual({
+				artist: 'Kraftwerk',
+				item_id: null,
+				has_image: false
+			});
+		});
 	});
 });
