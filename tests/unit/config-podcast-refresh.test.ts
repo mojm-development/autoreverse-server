@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { loadConfig } from '../../src/lib/server/config';
 
 describe('podcast refresh interval', () => {
-	it('defaults to six hours', () => {
-		expect(loadConfig({}).podcastRefreshHours).toBe(6);
+	it('defaults to every hour', () => {
+		expect(loadConfig({}).podcastRefreshHours).toBe(1);
 	});
 
 	it('is turned off by zero, and by anything that is not a number', () => {

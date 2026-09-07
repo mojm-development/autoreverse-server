@@ -170,7 +170,7 @@ Then, still in the web UI:
 | `AUTOREVERSE_ADMIN_USER`            | first boot only | —                                                                 | Username of the first admin account.                                                                            |
 | `AUTOREVERSE_ADMIN_PASSWORD`        | first boot only | —                                                                 | Password of that account.                                                                                       |
 | `AUTOREVERSE_AUTO_MIGRATE`          | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.                  |
-| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | no              | `6`                                                               | How often the server refreshes every feed and applies the download retention. `0` turns the background job off. |
+| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | no              | `1`                                                               | How often the server refreshes every feed and applies the download retention. `0` turns the background job off. |
 | `ORIGIN`                            | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).            |
 
 See [`.env.example`](.env.example) for a copy-paste starting point.

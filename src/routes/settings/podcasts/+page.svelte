@@ -28,7 +28,9 @@
 	<p class="hint">
 		0 schaltet das Vorhalten ab. Ältere Downloads über dieser Zahl werden beim Aktualisieren wieder
 		gelöscht; ein einzelnes Abo kann den Wert auf seiner Seite überschreiben.
-		{#if data.refreshHours > 0}
+		{#if data.refreshHours === 1}
+			Der Server aktualisiert alle Feeds jede Stunde von selbst.
+		{:else if data.refreshHours > 0}
 			Der Server aktualisiert alle Feeds alle {data.refreshHours} Stunden von selbst.
 		{:else}
 			Die automatische Aktualisierung ist abgeschaltet (AUTOREVERSE_PODCAST_REFRESH_HOURS=0).

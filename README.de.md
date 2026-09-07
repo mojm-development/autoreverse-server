@@ -169,7 +169,7 @@ Danach, weiterhin in der Weboberfläche:
 | `AUTOREVERSE_ADMIN_USER`            | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                      |
 | `AUTOREVERSE_ADMIN_PASSWORD`        | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                       |
 | `AUTOREVERSE_AUTO_MIGRATE`          | nein                  | ungesetzt (`1` im Docker-Image)                                   | Ausstehende Datenbankmigrationen beim Start einspielen. Für Dev-Datenbanken aus `db:push` ungesetzt lassen.   |
-| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | nein                  | `6`                                                               | Wie oft der Server alle Feeds aktualisiert und die Downloads nachhält. `0` schaltet den Hintergrundlauf ab.   |
+| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | nein                  | `1`                                                               | Wie oft der Server alle Feeds aktualisiert und die Downloads nachhält. `0` schaltet den Hintergrundlauf ab.   |
 | `ORIGIN`                            | hinter einem Proxy    | aus dem `Host`-Header abgeleitet, Protokoll als `http` angenommen | Öffentliche URL des Servers. Siehe [Betrieb hinter einem Reverse Proxy](#betrieb-hinter-einem-reverse-proxy). |
 
 Eine Vorlage zum Kopieren liegt in [`.env.example`](.env.example).
