@@ -30,22 +30,38 @@ export const init: ServerInit = async () => {
 		.finally(() => startPodcastRefresh(config));
 };
 
+// Every path through this says something in the log. A loop that starts, runs and finds nothing
+// looks exactly like a loop that never started, and the only way to tell them apart after the
+// fact is a line per run.
 function startPodcastRefresh(config: Config) {
-	if (config.podcastRefreshHours <= 0) return;
+	const hours = config.podcastRefreshHours;
+	if (hours <= 0) {
+		console.log('[podcasts] automatic refresh is off (AUTOREVERSE_PODCAST_REFRESH_HOURS=0)');
+		return;
+	}
 	const dirs = { coversDir: config.coverDir, podcastsDir: config.podcastsDir };
 	let running = false;
 	const tick = async () => {
-		if (running) return;
+		if (running) {
+			console.warn('[podcasts] previous refresh still running, skipping this run');
+			return;
+		}
 		running = true;
 		try {
-			await refreshAllAndRetain(db, dirs);
+			const run = await refreshAllAndRetain(db, dirs);
+			console.log(
+				`[podcasts] refreshed ${run.podcasts} feeds: ${run.newEpisodes} new episodes, ` +
+					`${run.downloaded} downloaded, ${run.freed} removed, ${run.failed} failed`
+			);
+			for (const error of run.errors) console.error(`[podcasts] ${error}`);
 		} catch (e) {
 			console.error('[podcasts] refresh failed', e);
 		} finally {
 			running = false;
 		}
 	};
-	const timer = setInterval(tick, config.podcastRefreshHours * 60 * 60 * 1000);
+	console.log(`[podcasts] refreshing every ${hours} hour${hours === 1 ? '' : 's'}`);
+	const timer = setInterval(tick, hours * 60 * 60 * 1000);
 	timer.unref?.();
 	void tick();
 }

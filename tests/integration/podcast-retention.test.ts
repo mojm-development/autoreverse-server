@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -16,7 +16,8 @@ import {
 	setKeepDefault,
 	setKeepForPodcast,
 	effectiveKeep,
-	retainForPodcast
+	retainForPodcast,
+	refreshAllAndRetain
 } from '../../src/lib/server/podcasts/retention';
 import type { DrizzleDb } from '../../src/lib/server/db';
 
@@ -158,6 +159,55 @@ describe('podcast retention', () => {
 				freed: 0,
 				failed: 0
 			});
+		});
+	});
+});
+
+const ONE_EPISODE_RSS = `<?xml version="1.0"?>
+<rss version="2.0"><channel>
+<title>Maschinenraum</title>
+<description>Ein Podcast</description>
+<item>
+  <title>Neue Folge</title>
+  <guid>ep-1</guid>
+  <pubDate>Mon, 01 Jan 2026 10:00:00 GMT</pubDate>
+  <enclosure url="https://example.com/1.mp3" type="audio/mpeg" length="123"/>
+</item>
+</channel></rss>`;
+
+describe('the scheduled refresh run', () => {
+	it('counts the new episodes and names the feed that failed', async () => {
+		await withTestDb(async (db) => {
+			const reachable = await seedPodcast(db);
+			const [unreachable] = await db
+				.insert(itemsTable)
+				.values({ kind: 'podcast', title: 'Weg', sortTitle: 'weg', feedUrl: 'https://y/feed' })
+				.returning();
+
+			vi.stubGlobal('fetch', async (input: unknown) => {
+				if (String(input) === 'https://x/feed') return new Response(ONE_EPISODE_RSS);
+				throw new Error('getaddrinfo ENOTFOUND y');
+			});
+			try {
+				const result = await refreshAllAndRetain(db, {
+					coversDir: '/tmp',
+					podcastsDir: '/tmp'
+				});
+				expect(result.podcasts).toBe(2);
+				expect(result.newEpisodes).toBe(1);
+				expect(result.failed).toBe(1);
+				expect(result.errors).toHaveLength(1);
+				expect(result.errors[0]).toContain(String(unreachable.id));
+				expect(result.errors[0]).toContain('ENOTFOUND');
+			} finally {
+				vi.unstubAllGlobals();
+			}
+
+			const episodes = await db
+				.select()
+				.from(itemsTable)
+				.where(eq(itemsTable.parentId, reachable.id));
+			expect(episodes).toHaveLength(1);
 		});
 	});
 });

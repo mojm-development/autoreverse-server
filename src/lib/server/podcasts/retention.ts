@@ -120,22 +120,46 @@ export async function retainForPodcast(
 	return applyRetention(db, podcast.id, keep, podcastsDir);
 }
 
+export interface RefreshRunResult {
+	podcasts: number;
+	newEpisodes: number;
+	downloaded: number;
+	freed: number;
+	failed: number;
+	errors: string[];
+}
+
+/**
+ * One feed that is gone must not take the whole run down, so every podcast is caught on its own —
+ * but the reason travels back to the caller in `errors` instead of being dropped. A silent run is
+ * indistinguishable from a run that never happened, and telling those two apart is the whole
+ * question when someone reports that new episodes are not showing up.
+ */
 export async function refreshAllAndRetain(
 	db: DrizzleDb,
 	dirs: { coversDir: string; podcastsDir: string }
-): Promise<{ podcasts: number; downloaded: number; freed: number; failed: number }> {
+): Promise<RefreshRunResult> {
 	const podcasts = await db
 		.select({ id: itemsTable.id })
 		.from(itemsTable)
 		.where(eq(itemsTable.kind, 'podcast'));
 
-	const totals = { podcasts: 0, downloaded: 0, freed: 0, failed: 0 };
+	const totals: RefreshRunResult = {
+		podcasts: 0,
+		newEpisodes: 0,
+		downloaded: 0,
+		freed: 0,
+		failed: 0,
+		errors: []
+	};
 	for (const podcast of podcasts) {
 		totals.podcasts += 1;
 		try {
-			await refresh(db, podcast.id, { coversDir: dirs.coversDir });
-		} catch {
+			const refreshed = await refresh(db, podcast.id, { coversDir: dirs.coversDir });
+			totals.newEpisodes += refreshed.newEpisodes;
+		} catch (e) {
 			totals.failed += 1;
+			totals.errors.push(`Podcast ${podcast.id}: ${e instanceof Error ? e.message : String(e)}`);
 			continue;
 		}
 		const result = await retainForPodcast(db, podcast.id, dirs.podcastsDir);
