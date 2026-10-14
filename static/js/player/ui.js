@@ -108,7 +108,14 @@ export function renderMiniPlayer(store, onFullscreenPage) {
 		paintScrubber(scrubber, elapsed, total, formatTime);
 	}
 	setText(bar.querySelector('[data-mini-speed]'), formatSpeed(current.speed));
-	bar.querySelector('[data-mini-expand]')?.setAttribute('href', `/library/${current.itemId}/player`);
+	const expand = bar.querySelector('[data-mini-expand]');
+	const playerHref = `/library/${current.itemId}/player`;
+	if (expand && expand.getAttribute('href') !== playerHref) {
+		expand.setAttribute('href', playerHref);
+		// htmx reads a boosted link's href once, when it processes the element; without processing it
+		// again the link keeps requesting the href it had at page load (/library).
+		globalThis.htmx?.process(expand);
+	}
 }
 
 export function renderFullscreen(store, root) {
