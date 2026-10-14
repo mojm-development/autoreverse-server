@@ -69,3 +69,30 @@ INSERT INTO tracks (item_id, position, path, duration, title)
 SELECT i.id, 1, '/test/paths/Zzz-Test-Track-Only-9182.mp3', 300, 'Zzz-Test-Track-Only-9182'
 FROM items i WHERE i.title = 'Zzz-Test-Album-9182-NoMatch'
 ON CONFLICT (path) DO NOTHING;
+
+-- playlists: Oliver's playlist of three single tracks, each from its own album, in this order
+-- (the reorder spec drags the first onto the third). Fresh on every run: the database is.
+INSERT INTO items (kind, title, sort_title, artist)
+SELECT 'album', t.title, lower(t.title), 'E2E Fixture Artist'
+FROM (VALUES ('Erster Titel'), ('Zweiter Titel'), ('Dritter Titel'),
+	('E2E-Fixture-Album-Playlist')) AS t (title)
+WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.title = t.title);
+
+INSERT INTO tracks (item_id, position, path, duration, title)
+SELECT i.id, 1, '/fixtures/playlist/' || i.title || '.mp3', 200,
+	CASE WHEN i.title = 'E2E-Fixture-Album-Playlist' THEN 'Track One' ELSE i.title END
+FROM items i
+WHERE i.title IN ('Erster Titel', 'Zweiter Titel', 'Dritter Titel', 'E2E-Fixture-Album-Playlist')
+ON CONFLICT (path) DO NOTHING;
+
+INSERT INTO playlists (user_id, name)
+SELECT u.id, 'E2E-Fixture-Playlist' FROM users u
+WHERE u.name = 'Oliver' AND NOT EXISTS (SELECT 1 FROM playlists WHERE name = 'E2E-Fixture-Playlist');
+
+INSERT INTO playlist_entries (playlist_id, track_id, position)
+SELECT p.id, t.id, o.position
+FROM playlists p, tracks t JOIN items i ON i.id = t.item_id
+	JOIN (VALUES ('Erster Titel', 1), ('Zweiter Titel', 2), ('Dritter Titel', 3)) AS o (title, position)
+	ON o.title = i.title
+WHERE p.name = 'E2E-Fixture-Playlist'
+ON CONFLICT (playlist_id, position) DO NOTHING;

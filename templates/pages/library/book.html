@@ -21,6 +21,7 @@
 				<button class="outline" data-action="restart">{% call ui::icon("previous") %}{% endcall %} Von vorn</button>
 				{% include "partials/bookmark_button.html" %}
 				{% call ui::favorite("items", book.id, favorite, "Zu Favoriten hinzufügen", "Aus Favoriten entfernen", "") %}{% endcall %}
+				<button type="button" class="outline" data-playlist-pick data-pick-item="{{ book.id }}">{% call ui::icon("playlist-add") %}{% endcall %} Zur Playlist hinzufügen</button>
 			</div>
 		</div>
 	</div>
@@ -66,5 +67,6 @@
 		</div>
 		{% endif %}
 	</div>
+	{% include "partials/playlist_picker.html" %}
 </div>
 {% endblock %}

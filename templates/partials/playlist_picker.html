@@ -1,0 +1,19 @@
+{#- "Zur Playlist hinzufügen" (album and book pages): one dialog per page, opened by any
+    [data-playlist-pick] button with the item or track it adds. static/js/playlists.js sends
+    POST /playlists/{id}/entries, and for "Anlegen" POST /playlists first. Needs `playlists`. -#}
+<dialog class="playlist-picker" data-playlist-picker aria-labelledby="playlist-picker-title">
+	<h2 id="playlist-picker-title">Zur Playlist hinzufügen</h2>
+	<ul class="choices" data-playlist-choices>
+		{% for choice in playlists %}
+		<li><button type="button" class="choice" data-playlist-target="{{ choice.id }}">{% call ui::icon("playlist") %}{% endcall %} <span>{{ choice.name }}</span></button></li>
+		{% endfor %}
+	</ul>
+	<form class="new-playlist" data-playlist-new hx-boost="false">
+		<input name="name" placeholder="Neue Playlist" aria-label="Name der neuen Playlist" maxlength="100" required />
+		<button type="submit" class="primary">Anlegen</button>
+	</form>
+	<p class="status" role="status" data-playlist-status></p>
+	<div class="dialog-actions">
+		<button type="button" data-playlist-close>Schließen</button>
+	</div>
+</dialog>

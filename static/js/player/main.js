@@ -24,7 +24,15 @@ function pagePreferences() {
 
 if (audio) {
 	let lastServerPreferences = pagePreferences();
-	const store = createPlayerStore({ preferences: lastServerPreferences ?? undefined });
+	/**
+	 * The playlist being played: its entries (`{itemId, trackId, kind}`, `trackId` null for a
+	 * whole item) and which one plays. Playing anything else outside it ends it.
+	 */
+	let queue = null;
+	const store = createPlayerStore({
+		preferences: lastServerPreferences ?? undefined,
+		onEnded: (ended) => onTrackEnded(ended)
+	});
 	store.attachAudioElement(audio);
 	const visualizers = createVisualizers({
 		isPlaying: () => Boolean(store.current?.playing),
@@ -91,6 +99,55 @@ if (audio) {
 		else store.seek(seconds);
 	});
 
+	/** Plays entry `index` of the queue; past the end the queue is over. */
+	async function playQueueAt(index) {
+		const entry = queue?.entries[index];
+		if (!entry) {
+			queue = null;
+			return;
+		}
+		queue.index = index;
+		if (entry.trackId) await store.playTrackById(entry.itemId, entry.trackId);
+		// A whole album plays from its first track; a book or episode where it was left.
+		else if (entry.kind === 'album') await store.play(entry.itemId, 0);
+		else await store.play(entry.itemId);
+	}
+
+	/** The rows of the playlist page around `element`, in their current order. */
+	function startPlaylist(element, index) {
+		const page = element.closest('[data-playlist-id]');
+		if (!page) return;
+		const entries = [...page.querySelectorAll('[data-entry-id]')].map((row) => ({
+			itemId: Number(row.dataset.entryItem),
+			trackId: row.dataset.entryTrack ? Number(row.dataset.entryTrack) : null,
+			kind: row.dataset.entryKind
+		}));
+		if (!entries.length) return;
+		queue = { entries, index: 0 };
+		void playQueueAt(index);
+	}
+
+	/**
+	 * A track ran out. Inside a playlist: a single-track entry is done right away, a whole item
+	 * once its last track is; then the next entry plays. True when the queue took over.
+	 */
+	function onTrackEnded({ itemId, trackId, last }) {
+		const entry = queue?.entries[queue.index];
+		if (!entry || entry.itemId !== itemId || (entry.trackId && entry.trackId !== trackId)) {
+			queue = null;
+			return false;
+		}
+		if (!entry.trackId && !last) return false;
+		if (queue.index + 1 < queue.entries.length) {
+			void playQueueAt(queue.index + 1);
+			return true;
+		}
+		queue = null;
+		// The playlist is over: a single track must not run on into the rest of its album.
+		if (!last) store.pause();
+		return true;
+	}
+
 	async function restart(itemId) {
 		if (await store.play(itemId)) store.seek(0);
 	}
@@ -153,8 +210,12 @@ if (audio) {
 		'play-track': (el) => void store.playTrackById(pageItemId(el), Number(el.dataset.trackId)),
 		'play-from': (el) => void store.playFrom(pageItemId(el), Number(el.dataset.position)),
 		bookmark: (el) => void addBookmark(el),
+		'play-playlist': (el) => startPlaylist(el, 0),
+		'play-entry': (el) => startPlaylist(el, Number(el.dataset.entryIndex) || 0),
 		close: () => history.back()
 	};
+
+	const QUEUE_ENDING = new Set(['play', 'restart', 'shuffle', 'play-track', 'play-from']);
 
 	// Capture phase: a play button inside a tile link must act before htmx follows the link.
 	document.addEventListener(
@@ -165,6 +226,8 @@ if (audio) {
 			if (!action || element.disabled) return;
 			event.preventDefault();
 			event.stopPropagation();
+			// Playing something else leaves the playlist; transport buttons do not.
+			if (QUEUE_ENDING.has(element.dataset.action)) queue = null;
 			action(element);
 		},
 		true

@@ -1,11 +1,19 @@
 import { expect, test } from '@playwright/test';
+import { itemId } from './_fixtures';
 
-// Scheibe 6 (Playlists): /library/playlists gibt es im Rust-Server noch nicht. Mit der Scheibe
-// wandert die Fixture-Playlist (drei Alben „Erster/Zweiter/Dritter Titel“ mit je einem Track,
-// Reihenfolge bei jedem Lauf zurückgesetzt) nach e2e/seed.sql; legacy legte sie per drizzle an.
-test.fixme();
+// Fixtures from e2e/seed.sql, in a fresh database per run: Oliver's "E2E-Fixture-Playlist" with
+// three single tracks "Erster/Zweiter/Dritter Titel", and "E2E-Fixture-Album-Playlist" to add.
+// Legacy created the playlist through drizzle and reset its order before each run.
 
 const PLAYLIST_NAME = 'E2E-Fixture-Playlist';
+
+async function playlistId(page: import('@playwright/test').Page, name: string): Promise<number> {
+	const res = await page.request.get('/playlists');
+	const { playlists } = (await res.json()) as { playlists: { id: number; name: string }[] };
+	const playlist = playlists.find((p) => p.name === name);
+	if (!playlist) throw new Error(`Playlist "${name}" fehlt`);
+	return playlist.id;
+}
 
 test('only the "Eigene" filter pill is rendered — no non-functional Automatisch/Geteilt pills', async ({
 	page
@@ -17,33 +25,85 @@ test('only the "Eigene" filter pill is rendered — no non-functional Automatisc
 });
 
 test('reordering a playlist entry persists the new order after reload', async ({ page }) => {
-	const res = await page.request.get('/playlists');
-	const { playlists } = (await res.json()) as { playlists: { id: number; name: string }[] };
-	const playlistId = playlists.find((p) => p.name === PLAYLIST_NAME)!.id;
-	await page.goto(`/library/playlists/${playlistId}`);
+	const id = await playlistId(page, PLAYLIST_NAME);
+	await page.goto(`/library/playlists/${id}`);
 	const rows = page.locator('[role="row"]');
 	await expect(rows).toHaveCount(3);
 	await expect(rows.nth(0)).toContainText('Erster Titel');
 
-	// Drag the first row onto the third row's position — native HTML5 DnD,
-	// Playwright's dragTo() fires real dragstart/dragover/drop events.
-	// The app's own ondrop handler is async (await fetch, then
-	// location.reload()) and does its own reload once the PUT resolves, so
-	// this waits for that navigation rather than also calling page.reload()
-	// itself. Two things were confirmed empirically while getting this test
-	// stable: (1) calling page.reload() immediately after dragTo() races the
-	// in-flight PUT — dragTo() resolves as soon as the synthetic mouseup/drop
-	// fires, before the app's fetch necessarily completes, and the early
-	// reload cancels that in-flight request (the fixture's untouched order
-	// survived, proving the move never happened); (2) even after waiting for
-	// the PUT response, an *additional* explicit page.reload() collides with
-	// the app's own location.reload() and throws net::ERR_ABORTED — the app
-	// already reloads for us, so the test only needs to wait for that load.
-	const reloaded = page.waitForEvent('load');
+	// Drag the first row onto the third — native HTML5 DnD. Legacy reloaded the whole page after
+	// the PUT; here only the list is swapped (a playing player keeps playing), so wait for the PUT
+	// and the new order instead of a load event.
+	const moved = page.waitForResponse(
+		(res) => res.request().method() === 'PUT' && res.url().includes(`/playlists/${id}/entries/`)
+	);
 	await rows.nth(0).dragTo(rows.nth(2));
-	await reloaded;
+	expect((await moved).status()).toBe(204);
+	await expect(rows.nth(2)).toContainText('Erster Titel');
 
+	await page.reload();
 	const reordered = page.locator('[role="row"]');
 	await expect(reordered).toHaveCount(3);
+	await expect(reordered.nth(0)).toContainText('Zweiter Titel');
 	await expect(reordered.nth(2)).toContainText('Erster Titel');
+
+	// The keyboard way back: "nach oben" twice puts it first again.
+	await page.getByRole('button', { name: 'Erster Titel nach oben' }).click();
+	await expect(page.locator('[role="row"]').nth(1)).toContainText('Erster Titel');
+	await page.getByRole('button', { name: 'Erster Titel nach oben' }).click();
+	await expect(page.locator('[role="row"]').nth(0)).toContainText('Erster Titel');
+});
+
+test('create a playlist, add an album and a track from the album page, play, remove, delete', async ({
+	page
+}) => {
+	const name = `E2E-Neu-${Date.now()}`;
+	await page.goto('/library/playlists');
+	await page.getByRole('textbox', { name: 'Name der neuen Playlist' }).fill(name);
+	await page.getByRole('button', { name: 'Anlegen' }).click();
+	await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+	await expect(page.getByText('Noch keine Titel.')).toBeVisible();
+
+	const albumId = await itemId(page.request, 'E2E-Fixture-Album-Playlist');
+	await page.goto(`/library/albums/${albumId}`);
+	await page.getByRole('button', { name: 'Zur Playlist hinzufügen', exact: true }).click();
+	const dialog = page.getByRole('dialog', { name: 'Zur Playlist hinzufügen' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name }).click();
+	await expect(dialog.getByRole('status')).toHaveText(`Zu „${name}“ hinzugefügt.`);
+	await dialog.getByRole('button', { name: 'Schließen' }).click();
+	await expect(dialog).toBeHidden();
+
+	await page.getByRole('button', { name: 'Track One zur Playlist hinzufügen' }).click();
+	await dialog.getByRole('button', { name }).click();
+	await expect(dialog.getByRole('status')).toHaveText(`Zu „${name}“ hinzugefügt.`);
+	await dialog.getByRole('button', { name: 'Schließen' }).click();
+
+	await page.getByRole('link', { name: 'Playlists', exact: true }).click();
+	await expect(page).toHaveURL(/\/library\/playlists$/);
+	const tile = page.getByRole('link', { name });
+	await expect(tile).toContainText('2 Titel · 0.1 h');
+	await tile.click();
+	const rows = page.locator('[role="row"]');
+	await expect(rows).toHaveCount(2);
+	await expect(rows.nth(0)).toContainText('E2E-Fixture-Album-Playlist');
+	await expect(rows.nth(1)).toContainText('Track One');
+
+	// Playing goes through the mini player, which stays when the page changes.
+	await page.getByRole('button', { name: 'Abspielen', exact: true }).click();
+	await expect(page.getByTestId('mini-player')).toBeVisible();
+
+	await page.getByRole('button', { name: 'Track One entfernen' }).click();
+	await expect(page.locator('[role="row"]')).toHaveCount(1);
+	await expect(page.getByTestId('mini-player')).toBeVisible();
+
+	await page.getByText('Umbenennen').click();
+	await page.getByRole('textbox', { name: 'Neuer Name' }).fill(`${name}-umbenannt`);
+	await page.getByRole('button', { name: 'Speichern' }).click();
+	await expect(page.getByRole('heading', { level: 1, name: `${name}-umbenannt` })).toBeVisible();
+
+	page.once('dialog', (confirm) => void confirm.accept());
+	await page.getByRole('button', { name: 'Löschen' }).click();
+	await expect(page).toHaveURL(/\/library\/playlists$/);
+	await expect(page.getByText(`${name}-umbenannt`)).toHaveCount(0);
 });

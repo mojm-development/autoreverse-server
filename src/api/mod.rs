@@ -9,6 +9,7 @@ pub mod images;
 pub mod items;
 pub mod me;
 pub mod playback;
+pub mod playlists;
 pub mod scan;
 pub mod search;
 pub mod server;
@@ -28,6 +29,7 @@ pub fn router() -> Router<AppState> {
         .merge(scan::router())
         .merge(favorites::router())
         .merge(bookmarks::router())
+        .merge(playlists::router())
         .merge(search::router())
         .merge(me::router())
         .merge(playback::router())

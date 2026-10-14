@@ -403,3 +403,38 @@ test('getAnalyser() gives up quietly without an element or AudioContext', () => 
 	player.attachAudioElement(fakeAudio());
 	assert.equal(player.getAnalyser(), null);
 });
+
+test('onEnded can take over when a track runs out (playlist queue)', async () => {
+	const fetch = fakeFetch(
+		session({
+			tracks: [
+				{ id: 1, position: 1, title: 'T1', duration: 100 },
+				{ id: 2, position: 2, title: 'T2', duration: 100 }
+			]
+		})
+	);
+	const ended = [];
+	let takeOver = true;
+	const player = createPlayerStore({
+		fetch,
+		onEnded: (info) => {
+			ended.push(info);
+			return takeOver;
+		}
+	});
+	await player.play(42);
+	const el = fakeAudio();
+	player.attachAudioElement(el);
+	await flush();
+	el.onended();
+	assert.deepEqual(ended, [{ itemId: 42, trackId: 1, last: false }]);
+	// Taken over: the store did not move on to track 2.
+	assert.equal(player.current.trackIndex, 0);
+
+	takeOver = false;
+	el.onended();
+	assert.equal(player.current.trackIndex, 1);
+	el.onended();
+	assert.deepEqual(ended.at(-1), { itemId: 42, trackId: 2, last: true });
+	assert.equal(player.current.playing, false);
+});

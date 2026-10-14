@@ -11,6 +11,7 @@ use axum::{Router, routing::get};
 
 use super::format::{chapter_labels, format_hms, format_hours, human_duration, volume};
 use super::layout::Shell;
+use super::playlists::{PlaylistChoice, playlist_choices};
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
 use crate::library::bookmarks::bookmarks_for_item;
@@ -372,6 +373,7 @@ struct BookPage {
     bookmarks: Vec<BookmarkRow>,
     series_books: Vec<SeriesRow>,
     favorite: bool,
+    playlists: Vec<PlaylistChoice>,
     /// The saved position: where "Lesezeichen setzen" marks while the book is not playing.
     bookmark_at: f64,
 }
@@ -394,7 +396,16 @@ async fn detail(
             None => Ok(Vec::new()),
         }
     };
-    let (shell, track_rows, chapter_rows, progress_row, bookmark_rows, series_rows, favorite) = tokio::try_join!(
+    let (
+        shell,
+        track_rows,
+        chapter_rows,
+        progress_row,
+        bookmark_rows,
+        series_rows,
+        favorite,
+        playlists,
+    ) = tokio::try_join!(
         async { Shell::load(&state.db, &user, &uri).await },
         async { Ok(tracks(&state.db, book.id).await?) },
         async { Ok(chapters(&state.db, book.id).await?) },
@@ -402,6 +413,7 @@ async fn detail(
         async { Ok(bookmarks_for_item(&state.db, user.id, book.id).await?) },
         async { Ok::<_, WebError>(series_books.await?) },
         async { Ok(is_item_favorite(&state.db, user.id, book.id).await?) },
+        playlist_choices(&state.db, user.id),
     )?;
 
     let total: f64 = track_rows.iter().map(|t| t.duration).sum();
@@ -471,6 +483,7 @@ async fn detail(
             })
             .collect(),
         favorite,
+        playlists,
         bookmark_at: position,
         book,
     };

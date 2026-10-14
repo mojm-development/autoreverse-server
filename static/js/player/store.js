@@ -53,9 +53,13 @@ const HEARTBEAT_MS = 15_000;
  * @param {Partial<typeof DEFAULT_PREFERENCES>} [options.preferences]
  * @param {typeof fetch} [options.fetch]
  * @param {() => AudioContext | null} [options.createAudioContext]
+ * @param {(ended: { itemId: number, trackId: number, last: boolean }) => boolean} [options.onEnded]
+ *   Called whenever a track runs out; returning true means the caller plays on itself (a
+ *   playlist), so the store does not continue with the item's next track.
  */
 export function createPlayerStore(options = {}) {
 	const request = options.fetch ?? ((...args) => fetch(...args));
+	const onEnded = options.onEnded;
 	const createAudioContext =
 		options.createAudioContext ??
 		(() => (globalThis.AudioContext ? new globalThis.AudioContext() : null));
@@ -240,15 +244,21 @@ export function createPlayerStore(options = {}) {
 		audioEl.onended = () => {
 			if (!current) return;
 			const nextIndex = current.trackIndex + 1;
-			if (nextIndex < current.tracks.length) {
-				// Running out of media fires `pause` before `ended`; that pause is the track
-				// ending, not the user. jumpToTrack puts `playing` back and starts the next one.
-				jumpToTrack(nextIndex);
-			} else {
+			const last = nextIndex >= current.tracks.length;
+			if (last) {
 				current.playing = false;
 				void flushProgress(true);
 				notify();
 			}
+			// A queue (the playlist page) may take over: next entry instead of the next track.
+			const handled = onEnded?.({
+				itemId: current.itemId,
+				trackId: current.tracks[current.trackIndex]?.id,
+				last
+			});
+			// Running out of media fires `pause` before `ended`; that pause is the track
+			// ending, not the user. jumpToTrack puts `playing` back and starts the next one.
+			if (!handled && !last) jumpToTrack(nextIndex);
 		};
 		if (current) {
 			const { trackIndex, offset } = locate(current.tracks, current.position);

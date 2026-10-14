@@ -12,6 +12,7 @@ use axum::{Router, routing::get};
 use super::books::Link;
 use super::format::{encode_component, format_hours, human_duration};
 use super::layout::Shell;
+use super::playlists::{PlaylistChoice, playlist_choices};
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
 use crate::library::favorites::{favorite_track_ids, is_item_favorite};
@@ -317,6 +318,7 @@ struct AlbumPage {
     artist: String,
     tracks: Vec<TrackRow>,
     favorite: bool,
+    playlists: Vec<PlaylistChoice>,
 }
 
 async fn detail(
@@ -331,11 +333,12 @@ async fn detail(
         .await?
         .filter(|a| a.kind == "album")
         .ok_or_else(not_found)?;
-    let (shell, track_rows, favorite, favorite_tracks) = tokio::try_join!(
+    let (shell, track_rows, favorite, favorite_tracks, playlists) = tokio::try_join!(
         Shell::load(&state.db, &user, &uri),
         async { Ok(tracks(&state.db, album.id).await?) },
         async { Ok(is_item_favorite(&state.db, user.id, album.id).await?) },
         async { Ok::<_, WebError>(favorite_track_ids(&state.db, user.id, album.id).await?) },
+        playlist_choices(&state.db, user.id),
     )?;
     let total: f64 = track_rows.iter().map(|t| t.duration).sum();
     let eyebrow = match album.year {
@@ -368,6 +371,7 @@ async fn detail(
             })
             .collect(),
         favorite,
+        playlists,
         album,
     };
     Ok(Html(page.render()?))

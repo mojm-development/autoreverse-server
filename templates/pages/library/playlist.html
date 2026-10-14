@@ -1,0 +1,57 @@
+{#- legacy library/playlists/[id]/+page.svelte: the entries, reorderable by drag and drop. New
+    here: play, rename, delete, and per entry play / up / down / remove. static/js/playlists.js
+    handles drag and drop, static/js/player the playing. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ playlist.name }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content playlist-page" style="--a: var(--music)" data-playlist-id="{{ playlist.id }}">
+	<header>
+		<span class="eyebrow">Playlist</span>
+		<h1>{{ playlist.name }}</h1>
+		<p class="subline">{{ subline }}</p>
+		<div class="actions">
+			<button type="button" class="primary" data-action="play-playlist"{% if entries.is_empty() %} disabled{% endif %}>{% call ui::icon("play") %}{% endcall %} Abspielen</button>
+			<details class="rename"{% if error.is_some() %} open{% endif %}>
+				<summary>Umbenennen</summary>
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/rename">
+					<input name="name" value="{{ playlist.name }}" aria-label="Neuer Name" maxlength="100" required />
+					<button type="submit" class="primary">Speichern</button>
+				</form>
+			</details>
+			<form method="POST" action="/library/playlists/{{ playlist.id }}/delete" hx-confirm="Playlist „{{ playlist.name }}“ löschen?">
+				<button type="submit" class="danger">Löschen</button>
+			</form>
+		</div>
+		{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+	</header>
+
+	<div class="table" role="table" aria-label="Titel" data-refresh="playlist-entries">
+		{% for entry in entries %}
+		<div class="row" role="row" draggable="true" data-entry-id="{{ entry.id }}" data-entry-position="{{ loop.index }}" data-entry-item="{{ entry.item_id }}" data-entry-kind="{{ entry.kind }}" data-entry-track="{% if let Some(track) = entry.track_id %}{{ track }}{% endif %}">
+			<span class="index mono">{{ loop.index }}</span>
+			<button type="button" class="icon-btn small" data-action="play-entry" data-entry-index="{{ loop.index0 }}" aria-label="{{ entry.title }} abspielen" title="Abspielen">{% call ui::icon("play") %}{% endcall %}</button>
+			<span class="title">{{ entry.title }}</span>
+			<span class="cell">{{ entry.subtitle }}</span>
+			<span class="cell mono">{{ entry.duration }}</span>
+			<span class="entry-actions">
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/entries/{{ entry.id }}/move">
+					<input type="hidden" name="position" value="{{ loop.index - 1 }}" />
+					<button type="submit" class="icon-btn small" aria-label="{{ entry.title }} nach oben" title="Nach oben"{% if loop.first %} disabled{% endif %}>{% call ui::icon("arrow-up") %}{% endcall %}</button>
+				</form>
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/entries/{{ entry.id }}/move">
+					<input type="hidden" name="position" value="{{ loop.index + 1 }}" />
+					<button type="submit" class="icon-btn small" aria-label="{{ entry.title }} nach unten" title="Nach unten"{% if loop.last %} disabled{% endif %}>{% call ui::icon("arrow-down") %}{% endcall %}</button>
+				</form>
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/entries/{{ entry.id }}/delete">
+					<button type="submit" class="icon-btn small" aria-label="{{ entry.title }} entfernen" title="Entfernen">{% call ui::icon("close") %}{% endcall %}</button>
+				</form>
+			</span>
+		</div>
+		{% endfor %}
+	</div>
+	{% if entries.is_empty() %}
+	<p class="empty">Noch keine Titel. Auf einer Album- oder Hörbuchseite fügt „Zur Playlist hinzufügen“ welche hinzu.</p>
+	{% endif %}
+</div>
+{% endblock %}

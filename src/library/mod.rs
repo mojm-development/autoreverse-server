@@ -6,5 +6,6 @@ pub mod favorites;
 pub mod like;
 pub mod paths;
 pub mod playback;
+pub mod playlists;
 pub mod queries;
 pub mod sorting;
