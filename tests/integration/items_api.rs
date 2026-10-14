@@ -365,3 +365,148 @@ async fn refuses_a_cover_outside_the_roots_or_one_that_is_gone(db: PgPool) {
         assert_eq!(body_json(response).await["detail"], "Kein Cover");
     }
 }
+
+// ---- GET /library/more (legacy library-more.test.ts and the played cases) ----
+
+async fn seed_albums(db: &PgPool, count: usize) {
+    for i in 1..=count {
+        let title = format!("Album {i:03}");
+        seed(
+            db,
+            Seed {
+                artist: Some("X"),
+                ..Seed::new("album", &title)
+            },
+        )
+        .await;
+    }
+}
+
+#[sqlx::test]
+async fn library_more_pages_in_the_same_order_as_the_first_page(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    seed_albums(app.db(), 5).await;
+    let first = body_json(
+        app.get("/library/more?kind=album&limit=2&offset=0", Some(&token))
+            .await,
+    )
+    .await;
+    let second = body_json(
+        app.get("/library/more?kind=album&limit=2&offset=2", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(titles(&first), ["Album 001", "Album 002"]);
+    assert_eq!(titles(&second), ["Album 003", "Album 004"]);
+    assert_eq!(first["hasMore"], true);
+    // Raw rows with legacy's camelCase column names and JS dates.
+    let item = &first["items"][0];
+    assert_eq!(item["sortTitle"], "album 001");
+    assert_eq!(item["artist"], "X");
+    assert_eq!(item["lockedFields"], json!([]));
+    let added = item["addedAt"].as_str().unwrap();
+    assert_eq!(added.len(), "2026-01-01T00:00:00.000Z".len(), "{added}");
+    assert!(item.get("sort_title").is_none());
+}
+
+#[sqlx::test]
+async fn library_more_reports_has_more_false_on_the_last_page(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    seed_albums(app.db(), 3).await;
+    let body = body_json(
+        app.get("/library/more?kind=album&limit=2&offset=2", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(titles(&body), ["Album 003"]);
+    assert_eq!(body["hasMore"], false);
+}
+
+#[sqlx::test]
+async fn library_more_carries_durations(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    let album = seed(app.db(), Seed::new("album", "A")).await;
+    seed_track(app.db(), album, 1, "/a.mp3", 90.0).await;
+    let body = body_json(
+        app.get("/library/more?kind=album&limit=10&offset=0", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(body["durations"][album.to_string()], json!(90));
+}
+
+#[sqlx::test]
+async fn library_more_refuses_an_unknown_kind_a_big_page_and_strangers(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    let bad = app.get("/library/more?kind=podcast", Some(&token)).await;
+    assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(body_json(bad).await["detail"], "Unbekannte Art");
+    let big = app
+        .get("/library/more?kind=album&limit=101", Some(&token))
+        .await;
+    assert_eq!(big.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let anonymous = app.get("/library/more?kind=album", None).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test]
+async fn library_more_searches_and_hides_missing_items(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    seed_albums(app.db(), 3).await;
+    seed(app.db(), Seed::new("album", "Nordlicht")).await;
+    seed(
+        app.db(),
+        Seed {
+            missing: true,
+            ..Seed::new("album", "Nordwand")
+        },
+    )
+    .await;
+    let body = body_json(
+        app.get("/library/more?kind=album&q=nord&limit=10", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(titles(&body), ["Nordlicht"]);
+    let gone = body_json(
+        app.get("/library/more?kind=album&q=nord&missing=true", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(titles(&gone), ["Nordwand"]);
+}
+
+#[sqlx::test]
+async fn library_more_sorts_by_what_the_asking_user_played_last(db: PgPool) {
+    let (app, token, user) = signed_in(db).await;
+    let other = app.user("someone", false).await;
+    let old = seed(app.db(), Seed::new("album", "Alt")).await;
+    let new = seed(app.db(), Seed::new("album", "Neu")).await;
+    let theirs = seed(app.db(), Seed::new("album", "Ihres")).await;
+    seed(app.db(), Seed::new("album", "Nie gehört")).await;
+    for (who, item, age) in [(user, old, 86_400), (user, new, 0), (other, theirs, 0)] {
+        sqlx::query(
+            "INSERT INTO progress (user_id, item_id, position, updated_at)
+             VALUES ($1, $2, 5, now() - make_interval(secs => $3))",
+        )
+        .bind(who)
+        .bind(item)
+        .bind(f64::from(age))
+        .execute(app.db())
+        .await
+        .unwrap();
+    }
+    let body = body_json(
+        app.get("/library/more?kind=album&sort=played", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(&titles(&body)[..2], ["Neu", "Alt"]);
+    // An unknown sort reads as title, as in legacy.
+    let fallback = body_json(
+        app.get("/library/more?kind=album&sort=bogus", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(titles(&fallback), ["Alt", "Ihres", "Neu", "Nie gehört"]);
+}

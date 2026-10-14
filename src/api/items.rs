@@ -6,9 +6,10 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use axum::extract::{Path as UrlPath, State};
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
+use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -18,7 +19,7 @@ use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
 use crate::library::bulk_metadata::{BulkResult, UndoResult, bulk_edit, plan_series, undo_batch};
 use crate::library::metadata::{ITEM_FIELDS, edit_item, parse_request};
-use crate::library::queries::{self, Item, ItemsFilter, SortKey};
+use crate::library::queries::{self, Item, ItemsFilter, PAGE_SIZE, SortKey};
 use crate::serialize::{ChapterOut, ItemDetail, ItemSummary, TrackOut};
 use crate::state::AppState;
 
@@ -33,6 +34,7 @@ pub fn router() -> Router<AppState> {
         .route("/items/missing", delete(remove_missing))
         .route("/items/{id}/children", get(children))
         .route("/items/{id}/cover", get(cover))
+        .route("/library/more", get(library_more))
 }
 
 /// JS `Number.MAX_SAFE_INTEGER`, legacy's upper bound for `offset`.
@@ -78,6 +80,139 @@ async fn list(
     Ok(Json(ItemsOut {
         items: rows.iter().map(ItemSummary::from).collect(),
     }))
+}
+
+/// JS `Date.prototype.toJSON`: what legacy's raw Drizzle rows carried (milliseconds included).
+fn js_date<S: serde::Serializer>(d: &DateTime<Utc>, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&d.to_rfc3339_opts(SecondsFormat::Millis, true))
+}
+
+fn js_date_opt<S: serde::Serializer>(d: &Option<DateTime<Utc>>, s: S) -> Result<S::Ok, S::Error> {
+    match d {
+        Some(d) => js_date(d, s),
+        None => s.serialize_none(),
+    }
+}
+
+/// An `items` row as legacy's `/library/more` sent it: Drizzle's camelCase column names, every
+/// column, `Date`s as JS serialises them.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RawItem<'a> {
+    id: i32,
+    parent_id: Option<i32>,
+    kind: &'a str,
+    source_path: Option<&'a str>,
+    title: &'a str,
+    sort_title: &'a str,
+    cover_path: Option<&'a str>,
+    artist: Option<&'a str>,
+    album_artist: Option<&'a str>,
+    year: Option<i32>,
+    author: Option<&'a str>,
+    narrator: Option<&'a str>,
+    description: Option<&'a str>,
+    series: Option<&'a str>,
+    series_index: Option<f64>,
+    feed_url: Option<&'a str>,
+    #[serde(serialize_with = "js_date_opt")]
+    last_checked: Option<DateTime<Utc>>,
+    #[serde(serialize_with = "js_date_opt")]
+    published_at: Option<DateTime<Utc>>,
+    #[serde(serialize_with = "js_date")]
+    added_at: DateTime<Utc>,
+    #[serde(serialize_with = "js_date_opt")]
+    missing_since: Option<DateTime<Utc>>,
+    guid: Option<&'a str>,
+    chapters_url: Option<&'a str>,
+    feed_duration: Option<f64>,
+    keep_episodes: Option<i32>,
+    locked_fields: &'a [String],
+}
+
+impl<'a> From<&'a Item> for RawItem<'a> {
+    fn from(i: &'a Item) -> Self {
+        RawItem {
+            id: i.id,
+            parent_id: i.parent_id,
+            kind: &i.kind,
+            source_path: i.source_path.as_deref(),
+            title: &i.title,
+            sort_title: &i.sort_title,
+            cover_path: i.cover_path.as_deref(),
+            artist: i.artist.as_deref(),
+            album_artist: i.album_artist.as_deref(),
+            year: i.year,
+            author: i.author.as_deref(),
+            narrator: i.narrator.as_deref(),
+            description: i.description.as_deref(),
+            series: i.series.as_deref(),
+            series_index: i.series_index,
+            feed_url: i.feed_url.as_deref(),
+            last_checked: i.last_checked,
+            published_at: i.published_at,
+            added_at: i.added_at,
+            missing_since: i.missing_since,
+            guid: i.guid.as_deref(),
+            chapters_url: i.chapters_url.as_deref(),
+            feed_duration: i.feed_duration,
+            keep_episodes: i.keep_episodes,
+            locked_fields: &i.locked_fields,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LibraryMoreOut<'a> {
+    items: Vec<RawItem<'a>>,
+    #[serde(serialize_with = "crate::serialize::js_number_map")]
+    durations: HashMap<i32, f64>,
+    has_more: bool,
+}
+
+/// `GET /library/more` (legacy `library/more/+server.ts`): one page of albums or books for the
+/// old web UI's infinite scroll — the Rust web UI pages through `/library/albums/more` instead.
+/// Kept for any client that still calls it; native clients page through `/items`. Unlike
+/// `/items`, an unknown sort quietly reads as `title`, as in legacy.
+async fn library_more(
+    State(state): State<AppState>,
+    user: ApiUser,
+    ApiQuery(query): ApiQuery<QueryMap>,
+) -> ApiResult<Response> {
+    let kind = query.get("kind").map(String::as_str).unwrap_or_default();
+    if !matches!(kind, "album" | "book") {
+        return Err(ApiError::unprocessable("Unbekannte Art"));
+    }
+    let sort = query
+        .get("sort")
+        .and_then(|raw| SortKey::parse(raw))
+        .filter(|s| SortKey::BOOK_SORTS.contains(s))
+        .unwrap_or(SortKey::Title);
+    let offset = int_param(&query, "offset", 0, 0, MAX_SAFE_INTEGER)?;
+    let limit = int_param(&query, "limit", PAGE_SIZE, 1, PAGE_SIZE)?;
+    let rows = queries::items(
+        &state.db,
+        &ItemsFilter {
+            kind: Some(kind.to_owned()),
+            q: query.get("q").filter(|v| !v.is_empty()).cloned(),
+            artist: None,
+            missing: Some(query.get("missing").is_some_and(|m| m == "true")),
+            sort: Some(sort),
+            limit,
+            offset,
+            played_by: (sort == SortKey::Played).then_some(user.id),
+        },
+    )
+    .await?;
+    let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
+    let durations = queries::item_durations(&state.db, &ids).await?;
+    let out = LibraryMoreOut {
+        has_more: rows.len() as i64 == limit,
+        items: rows.iter().map(RawItem::from).collect(),
+        durations,
+    };
+    Ok(Json(out).into_response())
 }
 
 /// The item behind a path segment; anything that is not a known id is 404 "Unbekanntes Item".
