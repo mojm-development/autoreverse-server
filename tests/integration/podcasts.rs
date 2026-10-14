@@ -340,6 +340,101 @@ async fn download_writes_the_file_into_the_podcast_folder_and_adds_a_track(db: P
 }
 
 #[sqlx::test]
+async fn two_simultaneous_downloads_of_one_episode_fetch_it_once(db: PgPool) {
+    let web = FakeWeb::start().await;
+    web.set("/ep.mp3", 200, vec![7u8; 4096]);
+    web.delay("/ep.mp3", 300);
+    let dir = tempfile::tempdir().unwrap();
+    let podcast = seed(&db, Seed::new("podcast", "P")).await;
+    let id = episode(&db, podcast, "E", "gc", Some(&web.url("/ep.mp3"))).await;
+    let http = http_client();
+    let (a, b) = tokio::join!(
+        download_episode(&db, &http, id, dir.path()),
+        download_episode(&db, &http, id, dir.path())
+    );
+    let (a, b) = (a.unwrap(), b.unwrap());
+    assert_eq!(a.track_id, b.track_id);
+    // The waiting call took the finished download instead of fetching (and truncating) again.
+    assert_eq!(web.hits("/ep.mp3"), 1);
+    assert_eq!(track_paths(&db).await.len(), 1);
+    let folder = dir.path().join("P");
+    assert_eq!(
+        std::fs::read(folder.join("E.mp3")).unwrap(),
+        vec![7u8; 4096]
+    );
+    let leftovers: Vec<_> = std::fs::read_dir(&folder)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.ends_with(".part"))
+        .collect();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
+}
+
+#[sqlx::test]
+async fn a_download_under_a_new_name_keeps_the_track_and_what_points_at_it(db: PgPool) {
+    let web = FakeWeb::start().await;
+    web.set("/ep.mp3", 200, vec![0u8, 1, 2, 3]);
+    let dir = tempfile::tempdir().unwrap();
+    let podcast = seed(&db, Seed::new("podcast", "P")).await;
+    let id = episode(&db, podcast, "Alt", "gr", Some(&web.url("/ep.mp3"))).await;
+    let http = http_client();
+    let first = download_episode(&db, &http, id, dir.path()).await.unwrap();
+    let user: i32 = sqlx::query_scalar(
+        "INSERT INTO users (name, password_hash) VALUES ('u', 'x') RETURNING id",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO favorites (user_id, track_id) VALUES ($1, $2)")
+        .bind(user)
+        .bind(first.track_id)
+        .execute(&db)
+        .await
+        .unwrap();
+    let playlist: i32 =
+        sqlx::query_scalar("INSERT INTO playlists (user_id, name) VALUES ($1, 'L') RETURNING id")
+            .bind(user)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    sqlx::query(
+        "INSERT INTO playlist_entries (playlist_id, position, track_id) VALUES ($1, 0, $2)",
+    )
+    .bind(playlist)
+    .bind(first.track_id)
+    .execute(&db)
+    .await
+    .unwrap();
+
+    sqlx::query("UPDATE items SET title = 'Neu' WHERE id = $1")
+        .bind(id)
+        .execute(&db)
+        .await
+        .unwrap();
+    let second = download_episode(&db, &http, id, dir.path()).await.unwrap();
+
+    assert_eq!(second.track_id, first.track_id);
+    let folder = dir.path().join("P");
+    assert_eq!(
+        track_paths(&db).await,
+        vec![(id, folder.join("Neu.mp3").to_str().unwrap().to_owned())]
+    );
+    assert!(!folder.join("Alt.mp3").exists());
+    let favorites: i64 = sqlx::query_scalar("SELECT count(*) FROM favorites WHERE track_id = $1")
+        .bind(first.track_id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    let entries: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM playlist_entries WHERE track_id = $1")
+            .bind(first.track_id)
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!((favorites, entries), (1, 1));
+}
+
+#[sqlx::test]
 async fn download_keeps_two_episodes_with_the_same_title_apart(db: PgPool) {
     let web = FakeWeb::start().await;
     web.set("/ep.mp3", 200, vec![0u8, 1, 2, 3]);

@@ -1,6 +1,8 @@
 //! Downloading an episode into the podcasts directory (legacy `podcasts/download.ts`).
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use sqlx::PgPool;
 use tokio::io::AsyncWriteExt;
@@ -70,15 +72,43 @@ async fn store_chapters(
     }
 }
 
+/// One lock per episode for this process. Two downloads of the same episode (a click in the web
+/// UI while the retention run or a second client fetches it) used to share one `.part` file:
+/// `File::create` truncated the other's, and the slower one kept writing into the finished file.
+/// Process-wide like the scan status, keyed by podcasts directory and episode: one server process
+/// owns its directory (and tests, each with their own directory, do not wait on each other).
+type LockKey = (PathBuf, i32);
+static EPISODE_LOCKS: LazyLock<Mutex<HashMap<LockKey, Arc<tokio::sync::Mutex<()>>>>> =
+    LazyLock::new(Default::default);
+
+fn episode_lock(podcasts_dir: &Path, episode_id: i32) -> Arc<tokio::sync::Mutex<()>> {
+    let mut locks = EPISODE_LOCKS.lock().unwrap_or_else(|e| e.into_inner());
+    // Drop the entries nobody holds or waits for, so the map stays as small as the work in flight.
+    locks.retain(|_, lock| Arc::strong_count(lock) > 1);
+    locks
+        .entry((podcasts_dir.to_path_buf(), episode_id))
+        .or_default()
+        .clone()
+}
+
+/// `<destination>.<random>.part`: unique per run, so even a second process writing into the same
+/// directory cannot truncate this one's file.
+fn temp_path(destination: &Path) -> PathBuf {
+    let mut bytes = [0u8; 8];
+    getrandom::fill(&mut bytes).expect("the OS random source failed");
+    let tag: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let mut temp = destination.as_os_str().to_owned();
+    temp.push(format!(".{tag}.part"));
+    PathBuf::from(temp)
+}
+
 /// Streams `response` into `destination` via a `.part` file, so a broken transfer never leaves a
 /// half file under the real name.
 async fn write_file(
     mut response: reqwest::Response,
     destination: &Path,
 ) -> Result<(), DownloadError> {
-    let mut temp = destination.as_os_str().to_owned();
-    temp.push(".part");
-    let temp = PathBuf::from(temp);
+    let temp = temp_path(destination);
     let storage =
         |e: std::io::Error| DownloadError::Storage(format!("Speichern fehlgeschlagen: {e}"));
     if let Some(parent) = destination.parent() {
@@ -109,7 +139,49 @@ async fn write_file(
     result
 }
 
+/// The episode's current download, if its file is still on disk.
+async fn existing_download(
+    db: &PgPool,
+    episode_id: i32,
+) -> Result<Option<Downloaded>, sqlx::Error> {
+    let row: Option<(i32, f64, String)> = sqlx::query_as(
+        "SELECT id, duration, path FROM tracks WHERE item_id = $1 ORDER BY position, id LIMIT 1",
+    )
+    .bind(episode_id)
+    .fetch_optional(db)
+    .await?;
+    Ok(match row {
+        Some((track_id, duration, path)) if tokio::fs::try_exists(&path).await.unwrap_or(false) => {
+            Some(Downloaded { track_id, duration })
+        }
+        _ => None,
+    })
+}
+
+/// Downloads the episode, one run per episode at a time. A caller that had to wait for a running
+/// download of the same episode gets that result instead of fetching the file a second time; an
+/// uncontended call always fetches (that is how a listener re-downloads on purpose).
 pub async fn download_episode(
+    db: &PgPool,
+    http: &reqwest::Client,
+    episode_id: i32,
+    podcasts_dir: &Path,
+) -> Result<Downloaded, DownloadError> {
+    let lock = episode_lock(podcasts_dir, episode_id);
+    let _guard = match lock.try_lock() {
+        Ok(guard) => guard,
+        Err(_) => {
+            let guard = lock.lock().await;
+            if let Some(done) = existing_download(db, episode_id).await? {
+                return Ok(done);
+            }
+            guard
+        }
+    };
+    download_locked(db, http, episode_id, podcasts_dir).await
+}
+
+async fn download_locked(
     db: &PgPool,
     http: &reqwest::Client,
     episode_id: i32,
@@ -169,29 +241,46 @@ pub async fn download_episode(
 
     let path = destination.to_string_lossy().into_owned();
     let mut tx = db.begin().await?;
-    // A download under an earlier name (the title changed since) would otherwise block position 1.
-    let stale: Vec<String> =
-        sqlx::query_scalar("DELETE FROM tracks WHERE item_id = $1 AND path <> $2 RETURNING path")
-            .bind(episode_id)
-            .bind(&path)
-            .fetch_all(&mut *tx)
-            .await?;
-    let track_id: i32 = sqlx::query_scalar(
-        "INSERT INTO tracks (item_id, position, path, duration, title) VALUES ($1, 1, $2, $3, $4)
-         ON CONFLICT (path) DO UPDATE SET duration = EXCLUDED.duration
-         RETURNING id",
+    // A download under an earlier name (the title changed since) moves the existing track row to
+    // the new file instead of replacing it: favorites, playlist entries and metadata edits point
+    // at the track id and would go with a deleted row (ON DELETE CASCADE).
+    let current: Option<(i32, String)> = sqlx::query_as(
+        "SELECT id, path FROM tracks WHERE item_id = $1 ORDER BY position, id LIMIT 1 FOR UPDATE",
     )
     .bind(episode_id)
-    .bind(&path)
-    .bind(duration)
-    .bind(&title)
-    .fetch_one(&mut *tx)
+    .fetch_optional(&mut *tx)
     .await?;
-    tx.commit().await?;
-    for old in stale.iter().map(PathBuf::from) {
-        if is_inside(&old, podcasts_dir) {
-            let _ = tokio::fs::remove_file(&old).await;
+    let (track_id, stale) = match current {
+        Some((id, old_path)) => {
+            sqlx::query("UPDATE tracks SET path = $2, duration = $3 WHERE id = $1")
+                .bind(id)
+                .bind(&path)
+                .bind(duration)
+                .execute(&mut *tx)
+                .await?;
+            (id, (old_path != path).then_some(old_path))
         }
+        None => {
+            let id: i32 = sqlx::query_scalar(
+                "INSERT INTO tracks (item_id, position, path, duration, title)
+                 VALUES ($1, 1, $2, $3, $4)
+                 ON CONFLICT (path) DO UPDATE SET duration = EXCLUDED.duration
+                 RETURNING id",
+            )
+            .bind(episode_id)
+            .bind(&path)
+            .bind(duration)
+            .bind(&title)
+            .fetch_one(&mut *tx)
+            .await?;
+            (id, None)
+        }
+    };
+    tx.commit().await?;
+    if let Some(old) = stale.map(PathBuf::from)
+        && is_inside(&old, podcasts_dir)
+    {
+        let _ = tokio::fs::remove_file(&old).await;
     }
     Ok(Downloaded { track_id, duration })
 }

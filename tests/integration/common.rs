@@ -330,6 +330,7 @@ type Routes = std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, 
 pub struct FakeWeb {
     pub base: String,
     routes: Routes,
+    delays: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, u64>>>,
     pub requests: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
 }
 
@@ -337,11 +338,17 @@ impl FakeWeb {
     pub async fn start() -> Self {
         let routes: Routes = Default::default();
         let requests: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
-        let (r, q) = (routes.clone(), requests.clone());
+        let delays: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, u64>>> =
+            Default::default();
+        let (r, q, d) = (routes.clone(), requests.clone(), delays.clone());
         let router = Router::new().fallback(move |uri: axum::http::Uri| {
-            let (r, q) = (r.clone(), q.clone());
+            let (r, q, d) = (r.clone(), q.clone(), d.clone());
             async move {
                 q.lock().unwrap().push(uri.to_string());
+                let delay = d.lock().unwrap().get(uri.path()).copied();
+                if let Some(ms) = delay {
+                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                }
                 let found = r.lock().unwrap().get(uri.path()).cloned();
                 match found {
                     Some((status, body)) => {
@@ -357,6 +364,7 @@ impl FakeWeb {
         FakeWeb {
             base: format!("http://{addr}"),
             routes,
+            delays,
             requests,
         }
     }
@@ -366,6 +374,11 @@ impl FakeWeb {
             .lock()
             .unwrap()
             .insert(path.to_owned(), (status, body.into()));
+    }
+
+    /// Answers `path` only after `ms` milliseconds — for requests that must overlap.
+    pub fn delay(&self, path: &str, ms: u64) {
+        self.delays.lock().unwrap().insert(path.to_owned(), ms);
     }
 
     pub fn url(&self, path: &str) -> String {
