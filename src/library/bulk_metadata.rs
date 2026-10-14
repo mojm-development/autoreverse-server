@@ -550,6 +550,46 @@ impl Current {
     }
 }
 
+/// The user's most recent edit, if it was a bulk change: one batch over two or more items or
+/// tracks (a single-item edit has its own editor), made in the last 24 hours. The books and
+/// albums pages offer to undo it after the sheet is closed — only this one: an older batch is
+/// not "the last change" any more once something came after it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LastBulk {
+    pub batch_id: String,
+    /// Items and tracks the batch touched.
+    pub targets: i64,
+    /// Field changes, without the lock bookkeeping.
+    pub fields: i64,
+}
+
+pub async fn last_bulk_batch(db: &PgPool, user_id: i32) -> Result<Option<LastBulk>, sqlx::Error> {
+    let row: Option<(String, i64, i64)> = sqlx::query_as(
+        "WITH last AS (
+             SELECT batch_id, created_at FROM metadata_edits
+             WHERE user_id = $1 ORDER BY id DESC LIMIT 1
+         )
+         SELECT last.batch_id,
+             (SELECT count(DISTINCT (e.item_id, e.track_id)) FROM metadata_edits e
+              WHERE e.batch_id = last.batch_id),
+             (SELECT count(*) FROM metadata_edits e
+              WHERE e.batch_id = last.batch_id AND e.field <> $2)
+         FROM last
+         WHERE last.created_at > now() - interval '24 hours'",
+    )
+    .bind(user_id)
+    .bind(LOCK_FIELD)
+    .fetch_optional(db)
+    .await?;
+    Ok(row
+        .filter(|(_, targets, _)| *targets >= 2)
+        .map(|(batch_id, targets, fields)| LastBulk {
+            batch_id,
+            targets,
+            fields,
+        }))
+}
+
 /// `POST /items/bulk/undo`: puts a batch back. A field someone has changed since is left alone
 /// and counted as skipped — an undo must not quietly discard work that came after it.
 pub async fn undo_batch(db: &PgPool, batch_id: &str) -> ApiResult<UndoResult> {

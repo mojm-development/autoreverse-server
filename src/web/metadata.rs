@@ -6,6 +6,10 @@
 
 use serde_json::json;
 
+use sqlx::PgPool;
+
+use crate::error::WebResult;
+use crate::library::bulk_metadata::{LastBulk, last_bulk_batch};
 use crate::library::metadata::{FieldType, MetadataField, fields_for, item_cell};
 use crate::library::queries::{Item, Track};
 
@@ -98,9 +102,39 @@ pub struct BulkEditor {
     /// where the list is not one the API can filter to (the books page lists only what fits on
     /// it).
     pub filter_json: Option<String>,
+    /// The user's last bulk change, still undoable after its sheet was closed.
+    pub last: Option<LastBulkNotice>,
+}
+
+/// "Letzte Massenbearbeitung …" with its "Rückgängig" above the list.
+pub struct LastBulkNotice {
+    pub batch_id: String,
+    pub text: String,
+}
+
+impl LastBulkNotice {
+    pub fn from(last: &LastBulk) -> LastBulkNotice {
+        let fields = if last.fields == 1 { "Feld" } else { "Felder" };
+        LastBulkNotice {
+            batch_id: last.batch_id.clone(),
+            text: format!(
+                "Letzte Massenbearbeitung: {} {fields} an {} Einträgen",
+                last.fields, last.targets
+            ),
+        }
+    }
 }
 
 impl BulkEditor {
+    /// Adds the user's last bulk change, if any (see [`last_bulk_batch`]).
+    pub async fn with_last(mut self, db: &PgPool, user_id: i32) -> WebResult<BulkEditor> {
+        self.last = last_bulk_batch(db, user_id)
+            .await?
+            .as_ref()
+            .map(LastBulkNotice::from);
+        Ok(self)
+    }
+
     pub fn new(kind: &'static str, total: i64, filter: Option<serde_json::Value>) -> BulkEditor {
         BulkEditor {
             kind,
@@ -121,6 +155,7 @@ impl BulkEditor {
                 .collect(),
             total,
             filter_json: filter.map(|f| f.to_string()),
+            last: None,
         }
     }
 

@@ -257,6 +257,10 @@ async fn list(
             )),
         )
     });
+    let bulk = match bulk {
+        Some(bulk) => Some(bulk.with_last(&state.db, user.id).await?),
+        None => None,
+    };
     let page = AlbumsPage {
         pickable,
         bulk,

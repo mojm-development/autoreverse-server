@@ -297,3 +297,112 @@ async fn the_forms_are_for_verwalter(db: PgPool) {
     }
     assert!(chosen_cover(app.db(), "Kraftwerk").await.unwrap().is_none());
 }
+
+/// Posts JSON with the session of `cookie` as bearer token.
+async fn post_as(app: &TestApp, cookie: &str, uri: &str, body: serde_json::Value) -> StatusCode {
+    let token = cookie.trim_start_matches("autoreverse_session=");
+    app.post_json(uri, body, Some(token)).await.status()
+}
+
+#[sqlx::test]
+async fn the_last_bulk_change_stays_undoable_above_the_lists(db: PgPool) {
+    let app = TestApp::new(db);
+    let admin = cookie(&app, "oliver", true).await;
+    let user = cookie(&app, "gast", false).await;
+    let first = seed(app.db(), Seed::new("album", "Back in Black")).await;
+    let second = seed(app.db(), Seed::new("album", "Highway to Hell")).await;
+    let book = seed(app.db(), Seed::new("book", "Die Gefährten")).await;
+
+    // Nothing changed yet: the line is there for the script, but hidden and without a button.
+    let (_, html) = page(&app, "/library/albums", &admin).await;
+    assert!(html.contains(r#"<div class="last-bulk" data-last-bulk hidden>"#));
+    assert!(!html.contains("data-last-bulk-undo"));
+
+    let status = post_as(
+        &app,
+        &admin,
+        "/items/bulk",
+        serde_json::json!({ "ids": [first, second], "set": { "artist": "AC/DC", "year": 1980 }, "dry_run": false }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let batch: String = sqlx::query_scalar("SELECT batch_id FROM metadata_edits LIMIT 1")
+        .fetch_one(app.db())
+        .await
+        .unwrap();
+    for uri in ["/library/albums", "/library/books"] {
+        let (_, html) = page(&app, uri, &admin).await;
+        assert!(
+            html.contains("Letzte Massenbearbeitung: 4 Felder an 2 Einträgen"),
+            "{uri}"
+        );
+        assert!(
+            html.contains(&format!(r#"data-last-bulk-undo data-batch-id="{batch}""#)),
+            "{uri}"
+        );
+        assert!(
+            html.contains(r#"<div class="last-bulk" data-last-bulk>"#),
+            "{uri}"
+        );
+    }
+    // Only for Verwalter, and only their own change.
+    let (_, html) = page(&app, "/library/albums", &user).await;
+    assert!(!html.contains("data-last-bulk"));
+    let other = cookie(&app, "mara", true).await;
+    let (_, html) = page(&app, "/library/albums", &other).await;
+    assert!(!html.contains("data-last-bulk-undo"));
+
+    // A single edit afterwards is the last change now: nothing bulk left to offer.
+    let token = admin.trim_start_matches("autoreverse_session=");
+    let response = app
+        .call(
+            axum::http::Method::PATCH,
+            &format!("/items/{book}"),
+            Some(serde_json::json!({ "set": { "author": "Tolkien" } })),
+            Some(token),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let (_, html) = page(&app, "/library/albums", &admin).await;
+    assert!(!html.contains("data-last-bulk-undo"));
+}
+
+#[sqlx::test]
+async fn an_old_or_undone_bulk_change_is_not_offered(db: PgPool) {
+    let app = TestApp::new(db);
+    let admin = cookie(&app, "oliver", true).await;
+    let first = seed(app.db(), Seed::new("album", "A")).await;
+    let second = seed(app.db(), Seed::new("album", "B")).await;
+    let body =
+        serde_json::json!({ "ids": [first, second], "set": { "artist": "X" }, "dry_run": false });
+    assert_eq!(
+        post_as(&app, &admin, "/items/bulk", body).await,
+        StatusCode::OK
+    );
+    let batch: String = sqlx::query_scalar("SELECT batch_id FROM metadata_edits LIMIT 1")
+        .fetch_one(app.db())
+        .await
+        .unwrap();
+
+    // What the button sends.
+    let undo = serde_json::json!({ "batch_id": batch });
+    assert_eq!(
+        post_as(&app, &admin, "/items/bulk/undo", undo).await,
+        StatusCode::OK
+    );
+    let (_, html) = page(&app, "/library/albums", &admin).await;
+    assert!(!html.contains("data-last-bulk-undo"));
+
+    let body =
+        serde_json::json!({ "ids": [first, second], "set": { "artist": "Y" }, "dry_run": false });
+    assert_eq!(
+        post_as(&app, &admin, "/items/bulk", body).await,
+        StatusCode::OK
+    );
+    sqlx::query("UPDATE metadata_edits SET created_at = now() - interval '25 hours'")
+        .execute(app.db())
+        .await
+        .unwrap();
+    let (_, html) = page(&app, "/library/albums", &admin).await;
+    assert!(!html.contains("data-last-bulk-undo"));
+}

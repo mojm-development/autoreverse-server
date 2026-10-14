@@ -11,6 +11,7 @@
 		</h1>
 		{% if series.is_some() %}{% if let Some(author) = series_author %}<span class="head-author">{{ author }}</span>{% endif %}{% endif %}
 	</header>
+	{% if let Some(bulk) = bulk %}{% include "partials/last_bulk.html" %}{% endif %}
 
 	<div class="toolbar">
 		<form method="GET" class="search-form">

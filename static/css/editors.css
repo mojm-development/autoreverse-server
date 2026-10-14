@@ -298,6 +298,44 @@
 	color: var(--faint);
 }
 
+/* --- The last bulk change above the list, undoable after the sheet is closed. --- */
+.last-bulk {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 14px;
+	margin: 0 0 16px;
+	padding: 6px 6px 6px 16px;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--line);
+	background: var(--panel);
+	font: 400 12.5px var(--font-sans);
+	color: var(--dim);
+	width: fit-content;
+	max-width: 100%;
+}
+.last-bulk[hidden] {
+	display: none;
+}
+.last-bulk .outline {
+	height: 28px;
+	padding: 0 14px;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--line-strong);
+	background: transparent;
+	color: var(--text);
+	font: 500 12px var(--font-sans);
+}
+.last-bulk .outline:disabled {
+	opacity: 0.45;
+}
+.last-bulk .result:empty {
+	display: none;
+}
+.last-bulk .result {
+	padding-right: 10px;
+}
+
 /* --- SelectionBar: sits above the mini player, which owns the very bottom of the screen. --- */
 .selection-bar {
 	position: fixed;

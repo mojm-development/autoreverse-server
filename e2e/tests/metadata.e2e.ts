@@ -103,6 +103,29 @@ test('the bulk editor previews, applies and undoes a change to picked albums', a
 	await expect(sheet).toBeHidden();
 });
 
+test('the last bulk change can still be undone after the sheet is closed', async ({ page }) => {
+	const a = await itemId(page.request, 'E2E-Bulk-Album-A');
+	await page.goto('/library/albums?artist=E2E%20Bulk%20Artist');
+	await page.getByRole('button', { name: 'E2E-Bulk-Album-A auswählen' }).click();
+	await page.getByRole('button', { name: 'E2E-Bulk-Album-B auswählen' }).click();
+	await page.getByRole('status').filter({ hasText: 'ausgewählt' }).getByRole('button', { name: 'Bearbeiten' }).click();
+	const sheet = page.getByRole('dialog', { name: 'Mehrere bearbeiten' });
+	await sheet.locator('[data-field="year"] [data-field-toggle]').check();
+	await sheet.locator('[data-field="year"] [data-field-value]').fill('2001');
+	await sheet.getByRole('button', { name: 'Vorschau' }).click();
+	await sheet.getByRole('button', { name: 'Anwenden' }).click();
+	await expect(sheet.locator('.done-title')).toHaveText('2 Einträge geändert');
+	await sheet.getByRole('button', { name: 'Fertig' }).click();
+	await expect(sheet).toBeHidden();
+
+	const line = page.locator('[data-last-bulk]');
+	await expect(line).toContainText('Letzte Massenbearbeitung: 2 Felder an 2 Einträgen');
+	await line.getByRole('button', { name: 'Rückgängig' }).click();
+	await expect(line.getByRole('status')).toHaveText('Zurückgenommen: 2 Felder');
+	expect((await item(page, a)).year).toBeNull();
+	await expect(line.getByRole('button', { name: 'Rückgängig' })).toHaveCount(0);
+});
+
 test('the series assistant numbers picked books through', async ({ page }) => {
 	const a = await itemId(page.request, 'E2E-Series-Book-A');
 	const b = await itemId(page.request, 'E2E-Series-Book-B');

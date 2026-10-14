@@ -402,6 +402,30 @@ async function undoBulk(sheet) {
 	}
 }
 
+/**
+ * "Rückgängig" above the list: the last bulk change after its sheet was closed. The page is
+ * reloaded (titles, sort order); the result goes into the fresh page's status line.
+ */
+async function undoLastBulk(button) {
+	const batchId = button.dataset.batchId;
+	if (!batchId || button.disabled) return;
+	button.disabled = true;
+	let message;
+	try {
+		message = undoneText(await send('POST', '/items/bulk/undo', { batch_id: batchId }));
+		await refreshPage();
+	} catch (error) {
+		message = error instanceof Error ? error.message : 'Fehlgeschlagen';
+		if (button.isConnected) button.disabled = false;
+	}
+	const line = document.querySelector('[data-last-bulk]');
+	const result = line?.querySelector('[data-last-bulk-result]');
+	if (line && result) {
+		result.textContent = message;
+		line.hidden = false;
+	}
+}
+
 function openBulk() {
 	const bar = selectionBar();
 	const state = currentSelection();
@@ -452,6 +476,8 @@ document.addEventListener('click', (event) => {
 		return renderSelection();
 	}
 	if (target.closest('[data-selection-edit]')) return openBulk();
+	const undoLast = target.closest('[data-last-bulk-undo]');
+	if (undoLast) return void undoLastBulk(undoLast);
 
 	const sheet = target.closest('[data-sheet]');
 	if (!sheet) return;

@@ -10,6 +10,7 @@
 			<span class="count mono">{{ total }}</span>
 		</h1>
 	</header>
+	{% if let Some(bulk) = bulk %}{% include "partials/last_bulk.html" %}{% endif %}
 
 	<div class="toolbar">
 		<form method="GET" class="search-form">

@@ -1,7 +1,8 @@
 {#- legacy SelectionBar.svelte + BulkEditor.svelte, for Verwalter on the books and albums lists.
     The pick buttons on the tiles fill the selection (static/js/metadata/editor.js); the bar
     opens the editor, a <template> cloned into <body>. Preview first (dry run), then "Anwenden",
-    then "Rückgängig" while the sheet is open. Needs `bulk: BulkEditor`. -#}
+    then "Rückgängig" — in the sheet, and after closing it in partials/last_bulk.html. Needs
+    `bulk: BulkEditor`. -#}
 <div class="selection-bar" role="status" data-selection-bar data-kind="{{ bulk.kind }}" data-total="{{ bulk.total }}"{% if let Some(filter) = bulk.filter_json %} data-filter="{{ filter }}"{% endif %} hidden>
 	<span class="count" data-selection-count></span>
 	<button type="button" class="link" data-select-all hidden></button>
@@ -22,8 +23,8 @@
 			<div class="done" data-bulk-done hidden>
 				<p class="done-title" data-bulk-done-title></p>
 				<p class="done-text">
-					Die Änderung ist gespeichert. Solange dieses Fenster offen ist, kannst du sie in einem Zug
-					zurücknehmen.
+					Die Änderung ist gespeichert. Du kannst sie in einem Zug zurücknehmen — hier oder nach dem
+					Schließen über der Liste, solange sie deine letzte Änderung ist.
 				</p>
 				<button type="button" class="outline" data-bulk-undo>Rückgängig</button>
 			</div>

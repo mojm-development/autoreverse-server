@@ -303,8 +303,17 @@ async fn list(
         .collect();
 
     let pickable = shell.is_admin;
+    let bulk = if pickable {
+        Some(
+            BulkEditor::new("book", total, None)
+                .with_last(&state.db, user.id)
+                .await?,
+        )
+    } else {
+        None
+    };
     let page = BooksPage {
-        bulk: pickable.then(|| BulkEditor::new("book", total, None)),
+        bulk,
         pickable,
         shell,
         view: params.view,
