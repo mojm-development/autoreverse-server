@@ -171,6 +171,11 @@
 	flex: none;
 	color: var(--faint);
 }
+/* The entry playing right now, as the album page marks its track. */
+.playlist-page [role='row'][aria-current='true'] .index,
+.playlist-page [role='row'][aria-current='true'] .title {
+	color: var(--a);
+}
 .playlist-page .title {
 	flex: 2;
 	min-width: 0;

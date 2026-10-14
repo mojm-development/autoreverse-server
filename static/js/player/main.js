@@ -6,8 +6,10 @@ import { bindPlayerShortcuts } from './shortcuts.js';
 import { bindScrubbers } from './scrubber.js';
 import { createVisualizers } from './visualizer.js';
 import { installNavigation } from './navigation.js';
-import { render } from './ui.js';
+import { render, renderPlaylistRows } from './ui.js';
 import { formatHMS } from './format.js';
+import { createQueue, isEntryPlaying, playingEntryId, queueStep } from './queue.js';
+import { bindMediaSession } from './mediasession.js';
 
 const audio = document.querySelector('[data-player-audio]');
 
@@ -25,8 +27,8 @@ function pagePreferences() {
 if (audio) {
 	let lastServerPreferences = pagePreferences();
 	/**
-	 * The playlist being played: its entries (`{itemId, trackId, kind}`, `trackId` null for a
-	 * whole item) and which one plays. Playing anything else outside it ends it.
+	 * The playlist being played (queue.js): its entries and which one plays. Playing anything
+	 * else outside it ends it.
 	 */
 	let queue = null;
 	const store = createPlayerStore({
@@ -45,7 +47,10 @@ if (audio) {
 		scheduled = true;
 		requestAnimationFrame(() => {
 			scheduled = false;
-			render(store);
+			render(store, queueState());
+			for (const root of document.querySelectorAll('[data-playlist-id]')) {
+				renderPlaylistRows(root, playingEntryId(queue, root.dataset.playlistId, store.current));
+			}
 			visualizers.sync();
 		});
 	}
@@ -99,18 +104,60 @@ if (audio) {
 		else store.seek(seconds);
 	});
 
-	/** Plays entry `index` of the queue; past the end the queue is over. */
-	async function playQueueAt(index) {
-		const entry = queue?.entries[index];
-		if (!entry) {
-			queue = null;
+	/** Previous/next while a playlist plays: `{previous, next}` enabled, or null without one. */
+	function queueState() {
+		const current = store.current;
+		if (!queue || !current || !isEntryPlaying(queue.entries[queue.index], current)) return null;
+		return { previous: true, next: queueStep(queue, current, 1, store.trackOffset()).kind !== 'none' };
+	}
+
+	/** Starts one entry; true once it plays. */
+	async function playEntry(entry) {
+		if (entry.trackId) {
+			await store.playTrackById(entry.itemId, entry.trackId);
+			return isEntryPlaying(entry, store.current);
+		}
+		// A whole album plays from its first track; a book or episode where it was left.
+		if (entry.kind === 'album') return store.play(entry.itemId, 0);
+		if (await store.play(entry.itemId)) return true;
+		// An episode not downloaded yet is fetched first, as its own play button does.
+		return entry.kind === 'episode' && (await downloadEpisode(entry.itemId)) && store.play(entry.itemId);
+	}
+
+	/**
+	 * The fullscreen player follows the playlist to its next item, without a history entry:
+	 * "back" still leads to where the listener came from.
+	 */
+	function followFullscreen(itemId) {
+		const np = document.querySelector('[data-np]');
+		if (!np || Number(np.dataset.itemId) === itemId) return;
+		const href = `/library/${itemId}/player`;
+		if (!globalThis.htmx) {
+			location.replace(href);
 			return;
 		}
-		queue.index = index;
-		if (entry.trackId) await store.playTrackById(entry.itemId, entry.trackId);
-		// A whole album plays from its first track; a book or episode where it was left.
-		else if (entry.kind === 'album') await store.play(entry.itemId, 0);
-		else await store.play(entry.itemId);
+		void globalThis.htmx
+			.ajax('GET', href, { target: '#page', select: '#page', swap: 'outerHTML' })
+			.then(() => history.replaceState(history.state, '', href));
+	}
+
+	/**
+	 * Plays entry `index` of the queue; past the end the queue is over. An entry that cannot play
+	 * (its files are gone) is skipped, so one broken entry does not stop the playlist.
+	 */
+	async function playQueueAt(index) {
+		const mine = queue;
+		for (let i = index; mine && i < mine.entries.length; i++) {
+			mine.index = i;
+			const entry = mine.entries[i];
+			if (await playEntry(entry)) {
+				if (queue === mine) followFullscreen(entry.itemId);
+				scheduleRender();
+				return;
+			}
+			if (queue !== mine) return;
+		}
+		if (queue === mine) queue = null;
 	}
 
 	/** The rows of the playlist page around `element`, in their current order. */
@@ -118,13 +165,32 @@ if (audio) {
 		const page = element.closest('[data-playlist-id]');
 		if (!page) return;
 		const entries = [...page.querySelectorAll('[data-entry-id]')].map((row) => ({
+			entryId: row.dataset.entryId,
 			itemId: Number(row.dataset.entryItem),
 			trackId: row.dataset.entryTrack ? Number(row.dataset.entryTrack) : null,
 			kind: row.dataset.entryKind
 		}));
 		if (!entries.length) return;
-		queue = { entries, index: 0 };
+		queue = createQueue(page.dataset.playlistId, entries);
 		void playQueueAt(index);
+	}
+
+	/**
+	 * Previous (-1) or next (+1) in the mini bar, the fullscreen player, the keyboard and the
+	 * lock screen: inside a playlist across its entries (queue.js), else tracks or chapters.
+	 */
+	function step(direction) {
+		const current = store.current;
+		if (!current) return;
+		const result = queue
+			? queueStep(queue, current, direction, store.trackOffset())
+			: { kind: 'store' };
+		if (result.kind === 'entry') void playQueueAt(result.index);
+		else if (result.kind === 'restart') store.seekInTrack(0);
+		else if (result.kind === 'store') {
+			if (direction < 0) store.jumpPrevious();
+			else store.jumpNext();
+		}
 	}
 
 	/**
@@ -234,12 +300,12 @@ if (audio) {
 		toggle: () => store.toggle(),
 		'skip-back': () => store.skipBack(),
 		'skip-forward': () => store.skipForward(),
-		previous: () => store.jumpPrevious(),
-		next: () => store.jumpNext(),
+		previous: () => step(-1),
+		next: () => step(1),
 		'nudge-back': () => store.nudge(-1),
 		'nudge-forward': () => store.nudge(1),
-		'jump-previous': () => store.jumpPrevious(),
-		'jump-next': () => store.jumpNext(),
+		'jump-previous': () => step(-1),
+		'jump-next': () => step(1),
 		play: (el) => void store.play(pageItemId(el)),
 		restart: (el) => void restart(pageItemId(el)),
 		shuffle: (el) => void store.play(pageItemId(el), undefined, { shuffle: true }),
@@ -289,8 +355,8 @@ if (audio) {
 		if (action === 'toggle') store.toggle();
 		else if (action === 'back') store.nudge(-1);
 		else if (action === 'forward') store.nudge(1);
-		else if (action === 'previous') store.jumpPrevious();
-		else if (action === 'next') store.jumpNext();
+		else if (action === 'previous') step(-1);
+		else if (action === 'next') step(1);
 		return true;
 	});
 
@@ -335,6 +401,19 @@ if (audio) {
 			`/sessions/${current.sessionId}/close`,
 			json({ position: current.position, duration: current.position })
 		);
+	});
+
+	bindMediaSession(store, {
+		previous: () => step(-1),
+		next: () => step(1),
+		fetchItem: async (itemId) => {
+			try {
+				const res = await fetch(`/items/${itemId}`);
+				return res.ok ? await res.json() : null;
+			} catch {
+				return null;
+			}
+		}
 	});
 
 	mountPage();

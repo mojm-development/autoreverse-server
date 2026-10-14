@@ -92,6 +92,15 @@ test('create a playlist, add an album and a track from the album page, play, rem
 	// Playing goes through the mini player, which stays when the page changes.
 	await page.getByRole('button', { name: 'Abspielen', exact: true }).click();
 	await expect(page.getByTestId('mini-player')).toBeVisible();
+	// The playing entry is marked; the mini player steps through the playlist's entries.
+	await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
+	const mini = page.getByTestId('mini-player');
+	await mini.getByRole('button', { name: 'Nächster Eintrag' }).click();
+	await expect(rows.nth(1)).toHaveAttribute('aria-current', 'true');
+	await expect(rows.nth(0)).toHaveAttribute('aria-current', 'false');
+	await expect(mini.getByRole('button', { name: 'Nächster Eintrag' })).toBeDisabled();
+	await mini.getByRole('button', { name: 'Vorheriger Eintrag' }).click();
+	await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
 
 	await page.getByRole('button', { name: 'Track One entfernen' }).click();
 	await expect(page.locator('[role="row"]')).toHaveCount(1);

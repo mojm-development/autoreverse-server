@@ -57,7 +57,18 @@ function renderTrackRows(root, playingTrackId) {
 	}
 }
 
-export function renderMiniPlayer(store, onFullscreenPage) {
+/** The playlist page: the playing entry's row is the current one. */
+export function renderPlaylistRows(root, playingEntryId) {
+	for (const row of root.querySelectorAll('[data-entry-id]')) {
+		row.setAttribute('aria-current', String(row.dataset.entryId === playingEntryId));
+	}
+}
+
+/**
+ * `queue` is `{previous, next}` while a playlist plays (static/js/player/queue.js): then the
+ * mini bar shows previous/next for every kind, beside the skips of a book or episode.
+ */
+export function renderMiniPlayer(store, onFullscreenPage, queue = null) {
 	const bar = document.querySelector('[data-mini-player]');
 	if (!bar) return;
 	const current = store.current;
@@ -73,12 +84,20 @@ export function renderMiniPlayer(store, onFullscreenPage) {
 	const { skipBack, skipForward } = store.preferences;
 	bar.style.setProperty('--a', `var(--${accentFor(current.kind)})`);
 
-	for (const button of bar.querySelectorAll('[data-by-track]')) button.hidden = !byTrack;
+	for (const button of bar.querySelectorAll('[data-by-track]')) button.hidden = !byTrack && !queue;
 	for (const button of bar.querySelectorAll('[data-by-time]')) button.hidden = byTrack;
 	const previous = bar.querySelector('[data-action="previous"]');
 	const next = bar.querySelector('[data-action="next"]');
-	if (previous) previous.disabled = current.trackIndex === 0 && offset <= 3;
-	if (next) next.disabled = current.trackIndex >= current.tracks.length - 1;
+	if (previous) {
+		previous.disabled = queue ? !queue.previous : current.trackIndex === 0 && offset <= 3;
+		const label = queue ? 'Vorheriger Eintrag' : 'Vorheriger Titel';
+		if (previous.getAttribute('aria-label') !== label) previous.setAttribute('aria-label', label);
+	}
+	if (next) {
+		next.disabled = queue ? !queue.next : current.trackIndex >= current.tracks.length - 1;
+		const label = queue ? 'Nächster Eintrag' : 'Nächster Titel';
+		if (next.getAttribute('aria-label') !== label) next.setAttribute('aria-label', label);
+	}
 	const back = bar.querySelector('[data-action="skip-back"]');
 	const forward = bar.querySelector('[data-action="skip-forward"]');
 	if (back) {
@@ -118,7 +137,7 @@ export function renderMiniPlayer(store, onFullscreenPage) {
 	}
 }
 
-export function renderFullscreen(store, root) {
+export function renderFullscreen(store, root, queue = null) {
 	const itemId = Number(root.dataset.itemId);
 	const kind = root.dataset.kind;
 	const itemTitle = root.dataset.title ?? '';
@@ -171,15 +190,21 @@ export function renderFullscreen(store, root) {
 	}
 	const previous = root.querySelector('[data-action="jump-previous"]');
 	const next = root.querySelector('[data-action="jump-next"]');
+	// Inside a playlist the jumps reach the neighbouring entries too.
+	const queued = isPlayingThis && queue;
 	if (previous) {
-		previous.disabled = byTrack
-			? isPlayingThis && current.trackIndex === 0 && offset <= 3
-			: chapterIndex <= 0;
+		previous.disabled = queued
+			? !queue.previous
+			: byTrack
+				? isPlayingThis && current.trackIndex === 0 && offset <= 3
+				: chapterIndex <= 0;
 	}
 	if (next) {
-		next.disabled = byTrack
-			? isPlayingThis && current.trackIndex >= current.tracks.length - 1
-			: chapterIndex < 0 || chapterIndex >= chapters.length - 1;
+		next.disabled = queued
+			? !queue.next
+			: byTrack
+				? isPlayingThis && current.trackIndex >= current.tracks.length - 1
+				: chapterIndex < 0 || chapterIndex >= chapters.length - 1;
 	}
 
 	const stepBack = store.nudgeStep(-1, kind);
@@ -230,10 +255,10 @@ export function renderLiveItem(store, root) {
 	if (fill) fill.style.width = `${Math.min(100, Math.max(0, percent))}%`;
 }
 
-export function render(store) {
+export function render(store, queue = null) {
 	const fullscreen = document.querySelector('[data-np]');
-	renderMiniPlayer(store, Boolean(fullscreen));
-	if (fullscreen) renderFullscreen(store, fullscreen);
+	renderMiniPlayer(store, Boolean(fullscreen), queue);
+	if (fullscreen) renderFullscreen(store, fullscreen, queue);
 	for (const root of document.querySelectorAll('[data-live-item]')) renderLiveItem(store, root);
 }
 
