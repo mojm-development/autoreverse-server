@@ -397,3 +397,51 @@ async fn settings_podcasts_saves_the_default_and_explains_the_refresh(db: PgPool
     let html = page(&off, "/settings/podcasts", &admin).await;
     assert!(html.contains("AUTOREVERSE_PODCAST_REFRESH_HOURS=0"));
 }
+
+#[sqlx::test]
+async fn episodes_go_into_playlists_from_both_podcast_pages(db: PgPool) {
+    let dir = tempfile::tempdir().unwrap();
+    let app = app_with(db, dir.path(), "0");
+    let (cookie, user) = cookie(&app, "oliver", false).await;
+    let (podcast, newer, _older) = show(&app).await;
+    let playlist: i32 = sqlx::query_scalar(
+        "INSERT INTO playlists (user_id, name) VALUES ($1, 'Unterwegs') RETURNING id",
+    )
+    .bind(user)
+    .fetch_one(app.db())
+    .await
+    .unwrap();
+
+    for uri in [
+        format!("/library/podcasts/{podcast}"),
+        "/library/podcasts?filter=new".to_owned(),
+    ] {
+        let html = page(&app, &uri, &cookie).await;
+        assert!(html.contains("data-playlist-picker"), "{uri}");
+        assert!(
+            html.contains(&format!(r#"data-playlist-target="{playlist}""#)),
+            "{uri}"
+        );
+        assert!(
+            html.contains(&format!(
+                r#"data-playlist-pick data-pick-item="{newer}" aria-label="Neue Folge zur Playlist hinzufügen""#
+            )),
+            "{uri}"
+        );
+    }
+
+    // What the dialog sends; the playlist then lists the episode under its podcast, with the
+    // length its feed claims (not downloaded yet), ready for the queue to download and play.
+    sqlx::query("INSERT INTO playlist_entries (playlist_id, item_id, position) VALUES ($1, $2, 1)")
+        .bind(playlist)
+        .bind(newer)
+        .execute(app.db())
+        .await
+        .unwrap();
+    let html = page(&app, &format!("/library/playlists/{playlist}"), &cookie).await;
+    assert!(html.contains(&format!(
+        r#"data-entry-item="{newer}" data-entry-kind="episode""#
+    )));
+    assert!(html.contains(r#"<span class="cell">Maschinenraum</span>"#));
+    assert!(html.contains(r#"<span class="cell mono">60:00</span>"#));
+}

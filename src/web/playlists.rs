@@ -22,7 +22,7 @@ use crate::library::playlists::{
     Playlist, ResolvedEntry, create_playlist, delete_playlist, list_entries, list_playlists,
     move_entry, owned_playlist, playlist_overview, remove_entry, rename_playlist, resolve_entries,
 };
-use crate::library::queries::item_durations;
+use crate::library::queries::item_durations_with_feed_fallback;
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -151,14 +151,19 @@ pub struct EntryRow {
 }
 
 impl EntryRow {
-    fn new(resolved: ResolvedEntry, durations: &HashMap<i32, f64>) -> Option<EntryRow> {
+    /// `shows` names the podcast of each episode entry (by the episode's parent id).
+    fn new(
+        resolved: ResolvedEntry,
+        durations: &HashMap<i32, f64>,
+        shows: &HashMap<i32, String>,
+    ) -> Option<EntryRow> {
         let id = resolved.entry.id;
         if let Some(item) = resolved.item {
+            let show = item.parent_id.and_then(|p| shows.get(&p)).cloned();
             return Some(EntryRow {
                 id,
-                subtitle: item
-                    .artist
-                    .clone()
+                subtitle: show
+                    .or_else(|| item.artist.clone())
                     .or_else(|| item.author.clone())
                     .unwrap_or_default(),
                 duration: minutes_seconds(durations.get(&item.id).copied()),
@@ -216,7 +221,19 @@ async fn render_detail(
         .iter()
         .filter_map(|r| r.item.as_ref().map(|i| i.id))
         .collect();
-    let durations = item_durations(&state.db, &item_ids).await?;
+    // An episode not downloaded yet still has the length its feed claims.
+    let durations = item_durations_with_feed_fallback(&state.db, &item_ids).await?;
+    let parent_ids: Vec<i32> = resolved
+        .iter()
+        .filter_map(|r| r.item.as_ref().and_then(|i| i.parent_id))
+        .collect();
+    let shows: HashMap<i32, String> =
+        sqlx::query_as::<_, (i32, String)>("SELECT id, title FROM items WHERE id = ANY($1)")
+            .bind(&parent_ids)
+            .fetch_all(&state.db)
+            .await?
+            .into_iter()
+            .collect();
     let total: f64 = resolved
         .iter()
         .map(|r| match (&r.item, &r.track) {
@@ -227,7 +244,7 @@ async fn render_detail(
         .sum();
     let entries: Vec<EntryRow> = resolved
         .into_iter()
-        .filter_map(|r| EntryRow::new(r, &durations))
+        .filter_map(|r| EntryRow::new(r, &durations, &shows))
         .collect();
     let page = DetailPage {
         shell,

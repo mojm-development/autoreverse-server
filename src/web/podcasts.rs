@@ -18,6 +18,7 @@ use chrono::Local;
 
 use super::format::{encode_component, format_hours, human_duration, numeric_date, relative_day};
 use super::layout::Shell;
+use super::playlists::{PlaylistChoice, playlist_choices};
 use super::settings::{Section, settings_shell, web_user};
 use crate::api::podcasts::{UNKNOWN_PODCAST, retain_in_background};
 use crate::auth::{WebAdmin, WebUser};
@@ -217,6 +218,8 @@ struct OverviewPage {
     new_subline: String,
     search: Search,
     error: Option<&'static str>,
+    /// For "Zur Playlist hinzufügen" on the episode cards.
+    playlists: Vec<PlaylistChoice>,
 }
 
 async fn render_overview(
@@ -227,8 +230,11 @@ async fn render_overview(
     show_new: bool,
     error: Option<&'static str>,
 ) -> WebResult<Html<String>> {
-    let (shell, rail) =
-        tokio::try_join!(Shell::load(&state.db, user, uri), load_rail(state, user.id))?;
+    let (shell, rail, playlists) = tokio::try_join!(
+        Shell::load(&state.db, user, uri),
+        load_rail(state, user.id),
+        playlist_choices(&state.db, user.id)
+    )?;
     let rows = if show_new {
         new_episodes(&state.db, user.id, 60).await?
     } else {
@@ -291,6 +297,7 @@ async fn render_overview(
             query: query.to_owned(),
         },
         error,
+        playlists,
     };
     Ok(Html(page.render()?))
 }
@@ -550,6 +557,8 @@ struct DetailPage {
     keep_max: i32,
     keep_value: String,
     error: Option<String>,
+    /// For "Zur Playlist hinzufügen" on the episode cards.
+    playlists: Vec<PlaylistChoice>,
 }
 
 impl DetailPage {
@@ -589,11 +598,12 @@ async fn render_detail(
     let uri: Uri = format!("/library/podcasts/{}", podcast.id)
         .parse()
         .expect("podcast uri");
-    let (shell, mut rail, rows, keep_default) = tokio::try_join!(
+    let (shell, mut rail, rows, keep_default, playlists) = tokio::try_join!(
         Shell::load(&state.db, user, &uri),
         load_rail(state, user.id),
         async { Ok(queries::children(&state.db, podcast.id).await?) },
-        async { Ok(get_keep_default(&state.db).await?) }
+        async { Ok(get_keep_default(&state.db).await?) },
+        playlist_choices(&state.db, user.id)
     )?;
     rail.active_id = Some(podcast.id);
     rail.add_form = shell.is_admin;
@@ -659,6 +669,7 @@ async fn render_detail(
         keep_default,
         keep_max: KEEP_MAX,
         error,
+        playlists,
     };
     Ok(Html(page.render()?))
 }

@@ -60,6 +60,15 @@ test('search, preview, subscribe, play an episode, filter and unsubscribe', asyn
 	await page.getByRole('button', { name: /^Alle/ }).click();
 	await expect(page.locator('[data-episode]:visible')).toHaveCount(2);
 
+	// An episode goes into a playlist like an album or a book.
+	const listName = `E2E-Folgen-${Date.now()}`;
+	await page.getByRole('button', { name: 'E2E-Folge Zwei zur Playlist hinzufügen' }).click();
+	const picker = page.getByRole('dialog', { name: 'Zur Playlist hinzufügen' });
+	await picker.getByRole('textbox', { name: 'Name der neuen Playlist' }).fill(listName);
+	await picker.getByRole('button', { name: 'Anlegen' }).click();
+	await expect(picker.getByRole('status')).toHaveText(`Zu „${listName}“ hinzugefügt.`);
+	await picker.getByRole('button', { name: 'Schließen' }).click();
+
 	await page.getByRole('button', { name: 'Abo kündigen' }).click();
 	await page.getByRole('button', { name: 'Wirklich kündigen' }).click();
 	await expect(page).toHaveURL(/\/library\/podcasts$/);

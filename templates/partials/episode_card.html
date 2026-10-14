@@ -1,5 +1,6 @@
 {#- legacy EpisodeCard.svelte. Needs `episode: EpisodeCard`. static/js/player plays it (and
-    downloads it first if it is not yet), the download button goes to /episodes/{id}/download. -#}
+    downloads it first if it is not yet), the download button goes to /episodes/{id}/download, and
+    "Zur Playlist hinzufügen" opens the page's playlist_picker (static/js/playlists.js). -#}
 <li class="episode{% if episode.finished %} finished{% endif %}" id="episode-{{ episode.id }}" data-episode="{{ episode.id }}" data-status="{{ episode.status }}" data-downloaded="{{ episode.downloaded }}">
 	{% if let Some(url) = episode.cover_url %}<span class="cover" style="background-image: url(&quot;{{ url }}&quot;)"></span>
 	{% else if let Some(index) = episode.index %}<span class="index mono" aria-hidden="true">{{ index }}</span>{% endif %}
@@ -20,6 +21,7 @@
 		{% endif %}
 	</div>
 	<div class="actions">
+		<button type="button" class="ghost-btn" data-playlist-pick data-pick-item="{{ episode.id }}" aria-label="{{ episode.title }} zur Playlist hinzufügen" title="Zur Playlist hinzufügen">{% call ui::icon("playlist-add") %}{% endcall %}</button>
 		{% if !episode.downloaded %}
 		<button type="button" class="ghost-btn" aria-label="Folge herunterladen" title="Folge herunterladen" data-action="download-episode" data-episode-id="{{ episode.id }}">{% call ui::icon("download") %}{% endcall %}</button>
 		{% endif %}
