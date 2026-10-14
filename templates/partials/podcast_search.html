@@ -1,0 +1,11 @@
+{#- legacy PodcastSearch.svelte: static/js/podcasts.js asks /podcasts/search and lists the hits
+    with a link to the preview and "Abonnieren". `search.query` seeds the field from ?q=. -#}
+<div class="podcast-search" data-podcast-search>
+	<form class="search-form" data-podcast-search-form>
+		<input name="q" value="{{ search.query }}" placeholder="Podcast suchen" aria-label="Podcast suchen" />
+		<button type="submit">Suchen</button>
+	</form>
+	<p class="error" role="alert" data-podcast-search-error hidden></p>
+	<ul class="results" data-podcast-search-results></ul>
+	<p class="empty" data-podcast-search-empty hidden>Keine Treffer.</p>
+</div>

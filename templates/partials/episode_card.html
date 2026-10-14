@@ -1,0 +1,28 @@
+{#- legacy EpisodeCard.svelte. Needs `episode: EpisodeCard`. static/js/player plays it (and
+    downloads it first if it is not yet), the download button goes to /episodes/{id}/download. -#}
+<li class="episode{% if episode.finished %} finished{% endif %}" id="episode-{{ episode.id }}" data-episode="{{ episode.id }}" data-status="{{ episode.status }}" data-downloaded="{{ episode.downloaded }}">
+	{% if let Some(url) = episode.cover_url %}<span class="cover" style="background-image: url(&quot;{{ url }}&quot;)"></span>
+	{% else if let Some(index) = episode.index %}<span class="index mono" aria-hidden="true">{{ index }}</span>{% endif %}
+	<div class="body">
+		<h3 class="title">{{ episode.title }}</h3>
+		<p class="meta">
+			{% if let Some((show_title, show_href)) = episode.show %}<a class="show" href="{{ show_href }}">{{ show_title }}</a><span class="dot">·</span>{% endif %}
+			{% if !episode.date.is_empty() %}<span class="mono">{{ episode.date }}</span>{% endif %}
+			{% if !episode.duration.is_empty() %}<span class="dot">·</span><span class="mono">{{ episode.duration }}</span>{% endif %}
+			<span class="badge-soft" data-downloaded-badge{% if !episode.downloaded %} hidden{% endif %}>geladen</span>
+			{% if episode.finished %}<span class="done">gehört</span>{% endif %}
+		</p>
+		{% if episode.started %}
+		<p class="progress-line">
+			<span class="track"><span class="fill" style="width: {{ episode.percent }}%"></span></span>
+			<span class="left mono">noch {{ episode.left }}</span>
+		</p>
+		{% endif %}
+	</div>
+	<div class="actions">
+		{% if !episode.downloaded %}
+		<button type="button" class="ghost-btn" aria-label="Folge herunterladen" title="Folge herunterladen" data-action="download-episode" data-episode-id="{{ episode.id }}">{% call ui::icon("download") %}{% endcall %}</button>
+		{% endif %}
+		<button type="button" class="play" aria-label="{{ episode.play_label() }}" title="{{ episode.play_title() }}" data-action="play-episode" data-episode-id="{{ episode.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
+	</div>
+</li>

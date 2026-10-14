@@ -37,6 +37,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = SocketAddr::new(config.host, config.port);
     let state = AppState::new(pool, config);
+    autoreverse_server::podcasts::job::start(state.clone());
     let listener = TcpListener::bind(addr).await?;
     tracing::info!("Autoreverse läuft auf http://{addr}");
     axum::serve(listener, app(state))

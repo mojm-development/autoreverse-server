@@ -89,7 +89,7 @@ pub const SECTIONS: &[Section] = &[
 
 /// The shell around every settings page: the sidebar (books accent, "/settings" active) and the
 /// sections the subnav and the overview list — only those the user may open.
-async fn settings_shell(
+pub(crate) async fn settings_shell(
     state: &AppState,
     user: &WebUser,
     uri: &Uri,
@@ -105,7 +105,7 @@ async fn settings_shell(
     Ok((shell, sections))
 }
 
-fn web_user(admin: &WebAdmin) -> WebUser {
+pub(crate) fn web_user(admin: &WebAdmin) -> WebUser {
     WebUser {
         id: admin.id,
         token: admin.token.clone(),

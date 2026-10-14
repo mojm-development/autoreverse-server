@@ -19,6 +19,9 @@ pub struct Config {
     pub artists_dir: PathBuf,
     /// 0 turns the background refresh off.
     pub podcast_refresh_hours: f64,
+    /// The iTunes Search API; `AUTOREVERSE_PODCAST_DIRECTORY_URL` points it elsewhere (the e2e
+    /// run serves a fixture, so no browser test reaches the internet).
+    pub podcast_directory_url: String,
     /// First-admin bootstrap, only used against an empty `users` table.
     pub admin_user: Option<String>,
     pub admin_password: Option<String>,
@@ -66,6 +69,8 @@ impl Config {
             artists_dir: data_dir.join("artists"),
             data_dir,
             podcast_refresh_hours: refresh_hours(lookup("AUTOREVERSE_PODCAST_REFRESH_HOURS")),
+            podcast_directory_url: non_empty("AUTOREVERSE_PODCAST_DIRECTORY_URL")
+                .unwrap_or_else(|| crate::podcasts::directory::DIRECTORY_URL.into()),
             admin_user: non_empty("AUTOREVERSE_ADMIN_USER"),
             admin_password: non_empty("AUTOREVERSE_ADMIN_PASSWORD"),
             host,

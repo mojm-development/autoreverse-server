@@ -72,7 +72,7 @@ impl From<&ContinueEntry> for ContinueCard {
 pub struct RecentTile {
     pub id: i32,
     pub accent: &'static str,
-    /// Books and albums have a page to go to; podcasts get theirs in a later slice.
+    /// Every kind has a page to go to (legacy linked only books and albums).
     pub href: Option<String>,
     pub has_cover: bool,
     pub title: String,
@@ -84,8 +84,7 @@ impl From<&Item> for RecentTile {
         RecentTile {
             id: item.id,
             accent: accent(&item.kind),
-            href: matches!(item.kind.as_str(), "book" | "album")
-                .then(|| detail_href(&item.kind, item.id)),
+            href: Some(detail_href(&item.kind, item.id)),
             has_cover: item.cover_path.is_some(),
             title: item.title.clone(),
             subtitle: item

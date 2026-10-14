@@ -198,6 +198,47 @@ pub fn chapter_labels(titles: &[String], item_title: Option<&str>) -> Vec<String
     labels
 }
 
+const MONTHS: [&str; 12] = [
+    "Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sept.", "Okt.", "Nov.", "Dez.",
+];
+
+/// "Heute", "Gestern", "vor 3 Tagen", else "5. Jan. 2026" (legacy `relativeDay`, which used the
+/// browser's local time; here it is the server's). Empty without a date.
+pub fn relative_day(
+    value: Option<chrono::DateTime<chrono::Utc>>,
+    now: chrono::DateTime<chrono::Local>,
+) -> String {
+    use chrono::Datelike;
+    let Some(value) = value else {
+        return String::new();
+    };
+    let date = value.with_timezone(&chrono::Local).date_naive();
+    let days = (now.date_naive() - date).num_days();
+    match days {
+        0 => "Heute".into(),
+        1 => "Gestern".into(),
+        2..=6 => format!("vor {days} Tagen"),
+        _ => format!(
+            "{}. {} {}",
+            date.day(),
+            MONTHS[date.month0() as usize],
+            date.year()
+        ),
+    }
+}
+
+/// `01.02.2026` in the server's local time, "—" without a date.
+pub fn numeric_date(value: Option<chrono::DateTime<chrono::Utc>>) -> String {
+    value.map_or_else(
+        || "—".to_owned(),
+        |v| {
+            v.with_timezone(&chrono::Local)
+                .format("%d.%m.%Y")
+                .to_string()
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,5 +340,26 @@ mod tests {
             chapter_labels(&strings(&["Nur eins"]), Some("Nur eins")),
             strings(&["Nur eins"])
         );
+    }
+
+    #[test]
+    fn relative_day_names_today_yesterday_and_the_last_week() {
+        use chrono::{Local, TimeZone};
+        let now = Local.with_ymd_and_hms(2026, 3, 10, 12, 0, 0).unwrap();
+        let at = |d: u32| {
+            Some(
+                Local
+                    .with_ymd_and_hms(2026, 3, d, 8, 0, 0)
+                    .unwrap()
+                    .to_utc(),
+            )
+        };
+        assert_eq!(relative_day(at(10), now), "Heute");
+        assert_eq!(relative_day(at(9), now), "Gestern");
+        assert_eq!(relative_day(at(5), now), "vor 5 Tagen");
+        assert_eq!(relative_day(at(1), now), "1. März 2026");
+        assert_eq!(relative_day(None, now), "");
+        assert_eq!(numeric_date(None), "—");
+        assert_eq!(numeric_date(at(1)), "01.03.2026");
     }
 }

@@ -28,10 +28,15 @@ test('the album heart toggles and the album shows up under Favoriten', async ({ 
 test('a track heart marks the track as a favourite song', async ({ page }) => {
 	const albumId = await itemId(page.request, 'E2E-Fixture-Album-Favorite');
 	await page.goto(`/library/albums/${albumId}`);
+	// The heart flips before the server answers; leaving the page earlier would cancel the POST.
+	const saved = page.waitForResponse(
+		(res) => res.url().includes('/favorites/tracks/') && res.request().method() === 'POST'
+	);
 	await page.getByRole('button', { name: 'Titel favorisieren' }).first().click();
 	await expect(
 		page.getByRole('button', { name: 'Titel aus Favoriten entfernen' }).first()
 	).toHaveAttribute('aria-pressed', 'true');
+	await saved;
 	await page.goto('/library/favorites');
 	await expect(page.getByRole('table', { name: 'Songs' })).toContainText('Track One');
 });

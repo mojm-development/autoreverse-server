@@ -20,6 +20,8 @@ pub struct AppState {
     pub login_semaphore: Arc<Semaphore>,
     /// The one scan status of this process (legacy `scanState`).
     pub scan: ScanStatus,
+    /// Outgoing HTTP (feeds, episodes, the podcast directory).
+    pub http: reqwest::Client,
 }
 
 impl AppState {
@@ -30,6 +32,7 @@ impl AppState {
             login_throttle: Arc::new(LoginThrottle::new()),
             login_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_LOGIN_HASHES)),
             scan: ScanStatus::default(),
+            http: crate::podcasts::http_client(),
         }
     }
 }

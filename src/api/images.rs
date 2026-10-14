@@ -28,7 +28,7 @@ pub fn content_type(path: &Path) -> &'static str {
 }
 
 /// Absolute and with `.`/`..` folded away, without touching the filesystem (`path.resolve`).
-fn resolve(path: &Path) -> PathBuf {
+pub fn resolve(path: &Path) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let mut out = PathBuf::new();
     for component in absolute.components() {

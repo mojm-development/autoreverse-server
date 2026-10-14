@@ -29,7 +29,9 @@ BASE_URL="http://$E2E_HOST_IP:$PORT"
 VM_DIR='~/e2e/autoreverse'   # ~/e2e/node_modules in the VM holds @playwright/test + Chromium
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/autoreverse-e2e.XXXXXX")"
 SERVER_PID=''
+FEEDS_PID=''
 VM_STARTED=''
+FEEDS_PORT=3101  # fixed: e2e/fixtures/podcast/feed.xml names it
 
 log() { printf '\033[1m[e2e]\033[0m %s\n' "$*"; }
 psql_db() { docker compose -f "$ROOT/compose.yaml" exec -T postgres psql -v ON_ERROR_STOP=1 -q -U autoreverse "$@"; }
@@ -46,6 +48,10 @@ cleanup() {
 	if [[ -n "$VM_STARTED" && -z "${E2E_KEEP_VM:-}" ]]; then
 		log "VM $VM herunterfahren"
 		ssh "$JARVIS" "vm-down $VM" || true
+	fi
+	if [[ -n "$FEEDS_PID" ]]; then
+		kill "$FEEDS_PID" 2>/dev/null || true
+		wait "$FEEDS_PID" 2>/dev/null || true
 	fi
 	if [[ -n "$SERVER_PID" ]]; then
 		log "Server beenden"
@@ -66,6 +72,17 @@ if curl -s -o /dev/null "http://127.0.0.1:$PORT/"; then
 	log "Port $PORT ist schon belegt (alter Server?) – Abbruch."
 	exit 1
 fi
+# The podcast feed, its episodes and the directory answer (e2e/fixtures/podcast) on 127.0.0.1:
+# the server fetches them, the browser in the VM never does. No spec reaches the internet.
+log "Podcast-Fixtures auf 127.0.0.1:$FEEDS_PORT bereitstellen"
+mkdir -p "$WORK/feeds"
+cp "$E2E/fixtures/podcast/"* "$WORK/feeds/"
+for ep in ep1 ep2; do
+	ffmpeg -y -loglevel error -f lavfi -i anullsrc=r=8000:cl=mono -t 5 "$WORK/feeds/$ep.mp3"
+done
+python3 -m http.server "$FEEDS_PORT" --bind 127.0.0.1 --directory "$WORK/feeds" >"$WORK/feeds.log" 2>&1 &
+FEEDS_PID=$!
+
 log "Server auf 0.0.0.0:$PORT starten (Log: $WORK/server.log)"
 # Runs in $WORK, not the repo root: a developer's .env there must not leak in (ORIGIN, admin, …).
 # The server serves ./static relative to its working directory, hence the link.
@@ -76,6 +93,7 @@ ln -s "$ROOT/static" "$WORK/static"
 		AUTOREVERSE_DATA="$WORK/data" \
 		AUTOREVERSE_ADMIN_USER=Oliver AUTOREVERSE_ADMIN_PASSWORD=hunter2hunter2 \
 		AUTOREVERSE_PODCAST_REFRESH_HOURS=0 HOST=0.0.0.0 PORT="$PORT" \
+		AUTOREVERSE_PODCAST_DIRECTORY_URL="http://127.0.0.1:$FEEDS_PORT/search" \
 		"$ROOT/target/release/autoreverse-server" >"$WORK/server.log" 2>&1
 ) &
 SERVER_PID=$!

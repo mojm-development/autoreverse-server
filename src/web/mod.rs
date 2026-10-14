@@ -10,6 +10,7 @@ pub mod layout;
 pub mod login;
 pub mod player;
 pub mod playlists;
+pub mod podcasts;
 pub mod search;
 pub mod series;
 pub mod settings;
@@ -28,6 +29,7 @@ pub fn router() -> Router<AppState> {
         .merge(series::router())
         .merge(favorites::router())
         .merge(playlists::router())
+        .merge(podcasts::router())
         .merge(search::router())
         .merge(player::router())
         .merge(settings::router())

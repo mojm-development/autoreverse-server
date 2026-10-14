@@ -633,3 +633,83 @@ pub async fn total_items(db: &PgPool) -> Result<i64, sqlx::Error> {
         .fetch_one(db)
         .await
 }
+
+/// A subscription with how many episodes it has and how many of those are news to the user.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct PodcastOverview {
+    pub id: i32,
+    pub title: String,
+    pub cover_path: Option<String>,
+    pub episode_count: i32,
+    pub unheard_count: i32,
+}
+
+/// Every podcast by title (legacy `podcastOverview`). Only episodes published since the
+/// subscription count as unheard: a feed with a 400-episode back catalogue would otherwise report
+/// all 400 as "unheard" the second it is subscribed, which says nothing.
+pub async fn podcast_overview(
+    db: &PgPool,
+    user_id: i32,
+) -> Result<Vec<PodcastOverview>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT podcast.id, podcast.title, podcast.cover_path,
+                count(episode.id)::int AS episode_count,
+                count(episode.id) FILTER (
+                    WHERE (progress.item_id IS NULL OR progress.finished = false)
+                      AND episode.published_at >= podcast.added_at
+                )::int AS unheard_count
+         FROM items AS podcast
+         LEFT JOIN items AS episode ON episode.parent_id = podcast.id
+         LEFT JOIN progress ON progress.item_id = episode.id AND progress.user_id = $1
+         WHERE podcast.kind = 'podcast'
+         GROUP BY podcast.id ORDER BY lower(podcast.sort_title), podcast.id",
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await
+}
+
+/// An unfinished episode published since its podcast was subscribed ("Neue Folgen").
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct NewEpisode {
+    pub id: i32,
+    pub title: String,
+    pub published_at: Option<DateTime<Utc>>,
+    pub cover_path: Option<String>,
+    pub podcast_id: i32,
+    pub podcast_title: String,
+    pub podcast_has_cover: bool,
+    pub downloaded: bool,
+    /// Downloaded length, else what the feed claims, else 0.
+    pub duration: f64,
+    pub position: f64,
+}
+
+pub async fn new_episodes(
+    db: &PgPool,
+    user_id: i32,
+    limit: i64,
+) -> Result<Vec<NewEpisode>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT episode.id, episode.title, episode.published_at, episode.cover_path,
+                podcast.id AS podcast_id, podcast.title AS podcast_title,
+                podcast.cover_path IS NOT NULL AS podcast_has_cover,
+                count(track.id) > 0 AS downloaded,
+                coalesce(sum(track.duration), episode.feed_duration, 0) AS duration,
+                coalesce(progress.position, 0) AS position
+         FROM items AS episode
+         JOIN items AS podcast ON podcast.id = episode.parent_id
+         LEFT JOIN progress ON progress.item_id = episode.id AND progress.user_id = $1
+         LEFT JOIN tracks AS track ON track.item_id = episode.id
+         WHERE episode.kind = 'episode'
+           AND episode.published_at >= podcast.added_at
+           AND (progress.item_id IS NULL OR progress.finished = false)
+         GROUP BY episode.id, podcast.id, progress.item_id, progress.position
+         ORDER BY episode.published_at DESC NULLS LAST, episode.id DESC
+         LIMIT $2",
+    )
+    .bind(user_id)
+    .bind(limit)
+    .fetch_all(db)
+    .await
+}

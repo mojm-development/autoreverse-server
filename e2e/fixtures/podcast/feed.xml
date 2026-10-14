@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Served by run-on-jarvis.sh on 127.0.0.1:3101 (the server fetches it, not the browser). -->
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:psc="http://podlove.org/simple-chapters">
+  <channel>
+    <title>E2E-Fixture-Podcast</title>
+    <description>Ein Podcast nur für die Browser-Tests.</description>
+    <item>
+      <title>E2E-Folge Zwei</title>
+      <guid>e2e-2</guid>
+      <pubDate>Tue, 06 Jan 2026 10:00:00 GMT</pubDate>
+      <itunes:duration>00:00:05</itunes:duration>
+      <enclosure url="http://127.0.0.1:3101/ep2.mp3" type="audio/mpeg" length="1"/>
+      <psc:chapters version="1.2">
+        <psc:chapter start="00:00:00" title="Anfang"/>
+        <psc:chapter start="00:00:02" title="Mitte"/>
+      </psc:chapters>
+    </item>
+    <item>
+      <title>E2E-Folge Eins</title>
+      <guid>e2e-1</guid>
+      <pubDate>Mon, 05 Jan 2026 10:00:00 GMT</pubDate>
+      <itunes:duration>00:00:05</itunes:duration>
+      <enclosure url="http://127.0.0.1:3101/ep1.mp3" type="audio/mpeg" length="1"/>
+    </item>
+  </channel>
+</rss>

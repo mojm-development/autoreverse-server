@@ -321,3 +321,63 @@ pub async fn seed_progress(db: &PgPool, user_id: i32, item_id: i32, position: f6
     .await
     .unwrap();
 }
+
+type Routes = std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, (u16, Vec<u8>)>>>;
+
+/// A local HTTP server standing in for the internet (feeds, artwork, episodes, the podcast
+/// directory). Answers by path; unknown paths are 404. Records every request URI.
+#[derive(Clone)]
+pub struct FakeWeb {
+    pub base: String,
+    routes: Routes,
+    pub requests: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl FakeWeb {
+    pub async fn start() -> Self {
+        let routes: Routes = Default::default();
+        let requests: std::sync::Arc<std::sync::Mutex<Vec<String>>> = Default::default();
+        let (r, q) = (routes.clone(), requests.clone());
+        let router = Router::new().fallback(move |uri: axum::http::Uri| {
+            let (r, q) = (r.clone(), q.clone());
+            async move {
+                q.lock().unwrap().push(uri.to_string());
+                let found = r.lock().unwrap().get(uri.path()).cloned();
+                match found {
+                    Some((status, body)) => {
+                        (axum::http::StatusCode::from_u16(status).unwrap(), body)
+                    }
+                    None => (axum::http::StatusCode::NOT_FOUND, b"nope".to_vec()),
+                }
+            }
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        FakeWeb {
+            base: format!("http://{addr}"),
+            routes,
+            requests,
+        }
+    }
+
+    pub fn set(&self, path: &str, status: u16, body: impl Into<Vec<u8>>) {
+        self.routes
+            .lock()
+            .unwrap()
+            .insert(path.to_owned(), (status, body.into()));
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("{}{path}", self.base)
+    }
+
+    pub fn hits(&self, path: &str) -> usize {
+        self.requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|uri| uri.split('?').next() == Some(path))
+            .count()
+    }
+}

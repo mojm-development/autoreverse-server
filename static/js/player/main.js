@@ -194,6 +194,42 @@ if (audio) {
 		}
 	}
 
+	/** Shows an episode as downloaded wherever the page lists it. */
+	function markDownloaded(episodeId) {
+		for (const card of document.querySelectorAll(`[data-episode="${episodeId}"]`)) {
+			card.dataset.downloaded = 'true';
+			card.querySelector('[data-downloaded-badge]')?.removeAttribute('hidden');
+			card.querySelector('[data-action="download-episode"]')?.remove();
+		}
+	}
+
+	/** POST /episodes/{id}/download; true once the episode has a file. */
+	async function downloadEpisode(episodeId, button) {
+		if (!episodeId || button?.getAttribute('aria-busy') === 'true') return false;
+		button?.setAttribute('aria-busy', 'true');
+		if (button) button.disabled = true;
+		try {
+			const res = await fetch(`/episodes/${episodeId}/download`, { method: 'POST' });
+			if (!res.ok) return false;
+			markDownloaded(episodeId);
+			return true;
+		} catch {
+			return false;
+		} finally {
+			button?.removeAttribute('aria-busy');
+			if (button?.isConnected) button.disabled = false;
+		}
+	}
+
+	/** An episode plays once it is downloaded; one that is not yet is downloaded first. */
+	async function playEpisode(button) {
+		const episodeId = Number(button.dataset.episodeId);
+		if (!episodeId) return;
+		const card = document.querySelector(`[data-episode="${episodeId}"]`);
+		if (card?.dataset.downloaded !== 'true' && !(await downloadEpisode(episodeId, button))) return;
+		void store.play(episodeId);
+	}
+
 	const ACTIONS = {
 		toggle: () => store.toggle(),
 		'skip-back': () => store.skipBack(),
@@ -210,12 +246,21 @@ if (audio) {
 		'play-track': (el) => void store.playTrackById(pageItemId(el), Number(el.dataset.trackId)),
 		'play-from': (el) => void store.playFrom(pageItemId(el), Number(el.dataset.position)),
 		bookmark: (el) => void addBookmark(el),
+		'play-episode': (el) => void playEpisode(el),
+		'download-episode': (el) => void downloadEpisode(Number(el.dataset.episodeId), el),
 		'play-playlist': (el) => startPlaylist(el, 0),
 		'play-entry': (el) => startPlaylist(el, Number(el.dataset.entryIndex) || 0),
 		close: () => history.back()
 	};
 
-	const QUEUE_ENDING = new Set(['play', 'restart', 'shuffle', 'play-track', 'play-from']);
+	const QUEUE_ENDING = new Set([
+		'play',
+		'restart',
+		'shuffle',
+		'play-track',
+		'play-from',
+		'play-episode'
+	]);
 
 	// Capture phase: a play button inside a tile link must act before htmx follows the link.
 	document.addEventListener(
