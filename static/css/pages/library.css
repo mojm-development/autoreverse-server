@@ -1,0 +1,5 @@
+/* library/+page.svelte */
+.content {
+	padding: 24px 32px;
+	overflow: hidden;
+}

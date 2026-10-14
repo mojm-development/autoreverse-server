@@ -1,0 +1,13 @@
+{#- legacy +error.svelte -#}
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Fehler {{ status }} · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/error.css" />{% endblock %}
+{% block body %}
+<div class="error-page">
+	<div class="brand">{% call ui::brand_mark(30) %}{% endcall %}<span class="wordmark">Autoreverse</span></div>
+	<span class="code mono">{{ status }}</span>
+	<h1>{{ message }}</h1>
+	<a class="primary" href="/library">Zur Bibliothek</a>
+</div>
+{% endblock %}

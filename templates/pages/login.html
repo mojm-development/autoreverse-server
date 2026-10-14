@@ -1,0 +1,62 @@
+{#- legacy login/+page.svelte -#}
+{% extends "base.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Anmelden · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/login.css" />{% endblock %}
+{% block body %}
+<div class="login" style="--a: var(--book)">
+	<div class="branding">
+		<div class="brand">
+			{% call ui::brand_mark(34) %}{% endcall %}<span class="wordmark">Autoreverse</span>
+		</div>
+		<div>
+			<h1>Ein Server. Alles zum Hören.</h1>
+			<p>
+				Hörbücher, Podcast-Folgen und Alben in einer Datenbank — eine Suche, ein Fortschritt, eine
+				Warteschlange.
+			</p>
+			<div class="stats">
+				<span><strong class="mono">{{ counts.book_count }}</strong><small class="eyebrow">Hörbücher</small></span>
+				<span><strong class="mono">{{ counts.album_count }}</strong><small class="eyebrow">Alben</small></span>
+				<span><strong class="mono">{{ counts.podcast_count }}</strong><small class="eyebrow">Abos</small></span>
+			</div>
+		</div>
+		<span class="version mono">autoreverse {{ crate::VERSION }} · {{ hostname }}</span>
+	</div>
+	<div class="form-panel">
+		<form method="POST">
+			<h2>Anmelden</h2>
+			<label>
+				<span class="eyebrow">Name</span>
+				<input name="name" required autocomplete="username" />
+			</label>
+			<label>
+				<span class="eyebrow">Passwort</span>
+				<span class="password-field">
+					<input
+						name="password"
+						type="password"
+						required
+						autocomplete="current-password"
+						aria-label="Passwort"
+					/>
+					<button
+						type="button"
+						class="icon-btn"
+						data-password-toggle
+						aria-label="Eingabe anzeigen"
+					>
+						{% call ui::icon("eye") %}{% endcall %}
+					</button>
+				</span>
+			</label>
+			{% if let Some(message) = message %}<p role="alert">{{ message }}</p>{% endif %}
+			<button type="submit" class="primary">Anmelden</button>
+			<div class="warning">
+				Diese Verbindung ist unverschlüsselt. Nur im eigenen Netz anmelden oder einen TLS-Proxy
+				davorsetzen.
+			</div>
+		</form>
+	</div>
+</div>
+{% endblock %}

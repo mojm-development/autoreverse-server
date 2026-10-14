@@ -1,0 +1,8 @@
+{#- Small shared pieces (legacy Icon.svelte, BrandMark.svelte). Import with
+    {% import "partials/ui.html" as ui %}. -#}
+{% macro icon(name) -%}
+<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-testid="icon-{{ name }}"><use href="#icon-{{ name }}"></use></svg>
+{%- endmacro %}
+{% macro brand_mark(size) -%}
+<img src="/logo.png" alt="" width="{{ size }}" height="{{ size }}" class="mark" />
+{%- endmacro %}
