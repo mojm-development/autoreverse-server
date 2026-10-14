@@ -1,0 +1,33 @@
+{#- legacy library/albums/[id]/+page.svelte, without the player actions, favourites and the
+    editor. -#}
+{% extends "layouts/app.html" %}
+{% block title %}{{ album.title }} · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/album.css" />{% endblock %}
+{% block content %}
+<div class="content album-page" style="--a: var(--music)">
+	<div class="hero">
+		<div class="cover">
+			{% if album.cover_path.is_some() %}<img src="/items/{{ album.id }}/cover" alt="" />{% endif %}
+		</div>
+		<div class="meta">
+			<span class="eyebrow">{{ eyebrow }}</span>
+			<h1>{{ album.title }}</h1>
+			<p class="subline">{{ subline }}</p>
+		</div>
+	</div>
+
+	<div class="table" role="table" aria-label="Titel">
+		<div class="table-head" role="row">
+			<span></span><span>Titel</span><span>Interpret</span><span>Dauer</span>
+		</div>
+		{% for track in tracks %}
+		<div role="row" class="row">
+			<span class="index mono">{{ track.number }}</span>
+			<span class="title">{{ track.title }}</span>
+			<span class="cell">{{ artist }}</span>
+			<span class="cell mono">{{ track.duration }}</span>
+		</div>
+		{% endfor %}
+	</div>
+</div>
+{% endblock %}

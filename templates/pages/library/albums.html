@@ -1,0 +1,70 @@
+{#- legacy library/albums/+page.svelte -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ heading }} · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/albums.css" />{% endblock %}
+{% block content %}
+<div class="content albums-page" style="--a: var(--music)">
+	<header>
+		<h1>
+			{{ heading }}
+			<span class="count mono">{{ total }}</span>
+		</h1>
+	</header>
+
+	<div class="toolbar">
+		<form method="GET" class="search-form">
+			<input type="hidden" name="view" value="{{ view }}" />
+			<input type="hidden" name="sort" value="{{ sort }}" />
+			{% if let Some(artist) = artist %}<input type="hidden" name="artist" value="{{ artist }}" />{% endif %}
+			<span class="search-field">
+				{% call ui::icon("search") %}{% endcall %}
+				<input type="search" name="q" value="{{ q }}" placeholder="Alben durchsuchen" />
+			</span>
+		</form>
+		<div class="sort-toggle" role="group" aria-label="Sortierung">
+			{% for option in sort_options %}<a href="{{ option.href }}" aria-current="{{ option.current }}">{{ option.label }}</a>
+			{% endfor %}
+		</div>
+		<div class="spacer"></div>
+		<div class="view-toggle" role="group" aria-label="Ansicht">
+			<a href="{{ grid_href }}" aria-current="{{ view == "grid" }}">Raster</a>
+			<a href="{{ list_href }}" aria-current="{{ view == "list" }}">Liste</a>
+		</div>
+	</div>
+
+	{% if !q.is_empty() || artist.is_some() || missing %}
+	<div class="chips">
+		{% if !q.is_empty() %}
+		<span class="chip">Suche: {{ q }}
+			<a href="{{ clear_q_href }}" aria-label="Suche aufheben">×</a></span>
+		{% endif %}
+		{% if let Some(artist) = artist %}
+		<span class="chip">Interpret: {{ artist }}
+			<a href="{{ clear_artist_href }}" aria-label="Interpretenfilter aufheben">×</a></span>
+		{% endif %}
+		{% if missing %}
+		<span class="chip">Fehlend
+			<a href="{{ clear_missing_href }}" aria-label="Filter aufheben">×</a></span>
+		{% endif %}
+	</div>
+	{% endif %}
+
+	{% if albums.is_empty() %}
+	<p class="empty">{{ empty }}</p>
+	{% else if view == "grid" %}
+	<div class="grid-6">
+		{% for album in albums %}{% include "partials/album_tile.html" %}
+		{% endfor %}{% include "partials/more_sentinel.html" %}
+	</div>
+	{% else %}
+	<div class="table" role="table" aria-label="Alben">
+		<div class="table-head" role="row">
+			<span></span><span></span><span>Titel</span><span>Interpret</span><span>Jahr</span><span>Dauer</span>
+		</div>
+		{% for album in albums %}{% include "partials/album_row.html" %}
+		{% endfor %}{% include "partials/more_sentinel.html" %}
+	</div>
+	{% endif %}
+</div>
+{% endblock %}

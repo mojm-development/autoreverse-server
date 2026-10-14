@@ -224,6 +224,7 @@ async fn list(
                 limit: 200,
                 offset: 0,
                 played_by: Some(user.id),
+                ..Default::default()
             };
             tokio::try_join!(
                 queries::items(&state.db, &filter),

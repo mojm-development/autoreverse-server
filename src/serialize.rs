@@ -96,6 +96,26 @@ impl From<&Track> for TrackOut {
     }
 }
 
+/// A single track (`GET /tracks/{id}`): the list shape plus what a client needs to place it —
+/// its item and disc.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TrackDetail {
+    #[serde(flatten)]
+    pub track: TrackOut,
+    pub item_id: i32,
+    pub disc: Option<i32>,
+}
+
+impl From<&Track> for TrackDetail {
+    fn from(row: &Track) -> Self {
+        TrackDetail {
+            track: row.into(),
+            item_id: row.item_id,
+            disc: row.disc,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChapterOut {
     pub title: String,

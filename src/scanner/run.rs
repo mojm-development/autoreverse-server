@@ -57,7 +57,7 @@ pub async fn run_scan(app: AppState) {
             return;
         }
     };
-    let (Some(books_dir), Some(_music_dir)) = (paths.books_dir, paths.music_dir) else {
+    let (Some(books_dir), Some(music_dir)) = (paths.books_dir, paths.music_dir) else {
         let mut state = status.lock();
         state.last_error = Some(PATHS_MISSING.into());
         state.running = false;
@@ -77,8 +77,8 @@ pub async fn run_scan(app: AppState) {
         failures: Vec::new(),
     };
 
-    // The music pass joins here with its own root (slice 3).
-    let passes = [(books_dir, ItemKind::Book)];
+    // Two separate passes, each with its own root: the root scopes what a pass may remove.
+    let passes = [(books_dir, ItemKind::Book), (music_dir, ItemKind::Album)];
     if let Err(e) = run_passes(&app, &passes, &mut guard.failures).await {
         status.lock().last_error = Some(e.to_string());
     }

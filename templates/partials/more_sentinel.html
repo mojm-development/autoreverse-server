@@ -1,0 +1,5 @@
+{#- legacy InfiniteScroll.svelte: once scrolled into view, htmx fetches the next page and puts it
+    in place of this element (which the page brings along again if there is yet another). -#}
+{% if let Some(href) = more_href %}
+<div class="sentinel" hx-get="{{ href }}" hx-trigger="revealed" hx-swap="outerHTML" aria-hidden="true"></div>
+{% endif %}

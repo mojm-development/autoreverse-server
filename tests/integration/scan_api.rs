@@ -159,9 +159,10 @@ async fn scans_the_fixture_library_and_serves_the_book(db: PgPool) {
     let status = app.wait_for_scan().await;
     assert_eq!(status.last_error, None);
     let report = status.last_report.unwrap();
+    // One book from the books root, one album from the music root.
     assert_eq!(
         (report.new, report.updated, report.removed, report.skipped),
-        (1, 0, 0, 0)
+        (2, 0, 0, 0)
     );
     assert!(status.started_at.is_some() && status.progress.is_none());
 
@@ -179,16 +180,24 @@ async fn scans_the_fixture_library_and_serves_the_book(db: PgPool) {
     assert_eq!(detail["chapters"][0]["title"], "Kapitel 1");
     assert!(detail["tracks"][0]["duration"].as_f64().unwrap() > 1.0);
 
-    // Music is a pass of its own and not part of this slice: nothing else was stored.
-    let albums: i64 = sqlx::query_scalar("SELECT count(*) FROM items WHERE kind <> 'book'")
-        .fetch_one(app.db())
-        .await
-        .unwrap();
-    assert_eq!(albums, 0);
+    // The music pass: folder artist, album title from the tag, the track with its title.
+    let albums = body_json(app.get("/items?kind=album", Some(&token)).await).await;
+    let album = &albums["items"][0];
+    assert_eq!(album["title"], "Testalbum");
+    assert_eq!(album["artist"], "Interpret");
+    assert_eq!(album["author"], Value::Null);
+    let detail = body_json(
+        app.get(&format!("/items/{}", album["id"]), Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(detail["tracks"][0]["title"], "Titel 1");
+    // Music has no chapters, not even one per file.
+    assert_eq!(detail["chapters"], serde_json::json!([]));
 
     // Nothing changed on disk: the second scan reads no tags.
     let again = scan(&app, &token).await.last_report.unwrap();
-    assert_eq!((again.new, again.unchanged), (0, 1));
+    assert_eq!((again.new, again.unchanged), (0, 2));
 }
 
 #[sqlx::test]
@@ -203,16 +212,8 @@ async fn a_rescan_picks_up_changes_and_removes_vanished_books(db: PgPool) {
     );
     make_audio(&library.books().join("Autor/Zweites/01.mp3"), &[]);
     // An album under the music root must survive the books pass whatever happens there.
-    let music_dir = library.music().join("Interpret/Album");
-    seed(
-        app.db(),
-        Seed {
-            source_path: music_dir.to_str(),
-            ..Seed::new("album", "Album")
-        },
-    )
-    .await;
-    assert_eq!(scan(&app, &token).await.last_report.unwrap().new, 2);
+    make_audio(&library.music().join("Interpret/Album/01.mp3"), &[]);
+    assert_eq!(scan(&app, &token).await.last_report.unwrap().new, 3);
 
     std::fs::remove_dir_all(library.books().join("Autor/Zweites")).unwrap();
     make_audio(
@@ -226,7 +227,8 @@ async fn a_rescan_picks_up_changes_and_removes_vanished_books(db: PgPool) {
         .fetch_one(app.db())
         .await
         .unwrap();
-    assert_eq!(tracks, 2);
+    // Two in the book, one in the album.
+    assert_eq!(tracks, 3);
     let albums: i64 = sqlx::query_scalar("SELECT count(*) FROM items WHERE kind = 'album'")
         .fetch_one(app.db())
         .await

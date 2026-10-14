@@ -141,6 +141,8 @@ pub const PAGE_SIZE: i64 = 100;
 pub struct ItemsFilter {
     pub kind: Option<String>,
     pub q: Option<String>,
+    /// Exact album artist (`/items?artist=`).
+    pub artist: Option<String>,
     pub missing: Option<bool>,
     pub sort: Option<SortKey>,
     pub limit: i64,
@@ -150,16 +152,22 @@ pub struct ItemsFilter {
     pub played_by: Option<i32>,
 }
 
-/// Top-level items only (no episodes), with the kind / search / missing filters.
+/// Top-level items only (no episodes), with the kind / search / artist / missing filters.
 fn push_item_conditions(
     query: &mut QueryBuilder<Postgres>,
     kind: Option<&str>,
     q: Option<&str>,
+    artist: Option<&str>,
     missing: Option<bool>,
 ) {
     query.push(" WHERE items.parent_id IS NULL");
     if let Some(kind) = kind {
         query.push(" AND items.kind = ").push_bind(kind.to_owned());
+    }
+    if let Some(artist) = artist {
+        query
+            .push(" AND items.artist = ")
+            .push_bind(artist.to_owned());
     }
     if let Some(q) = q.filter(|q| !q.is_empty()) {
         let pattern = like_pattern(q);
@@ -194,6 +202,7 @@ pub async fn items(db: &PgPool, filter: &ItemsFilter) -> Result<Vec<Item>, sqlx:
         &mut query,
         filter.kind.as_deref(),
         filter.q.as_deref(),
+        filter.artist.as_deref(),
         filter.missing,
     );
     let mut sort = filter.sort.unwrap_or(SortKey::Title);
@@ -209,7 +218,7 @@ pub async fn items(db: &PgPool, filter: &ItemsFilter) -> Result<Vec<Item>, sqlx:
 /// Present top-level items of `kind` matching `q`.
 pub async fn count_items(db: &PgPool, kind: &str, q: Option<&str>) -> Result<i64, sqlx::Error> {
     let mut query = QueryBuilder::new("SELECT count(*) FROM items");
-    push_item_conditions(&mut query, Some(kind), q, Some(false));
+    push_item_conditions(&mut query, Some(kind), q, None, Some(false));
     query.build_query_scalar().fetch_one(db).await
 }
 
@@ -235,6 +244,23 @@ pub async fn cover_path_for(db: &PgPool, row: &Item) -> Result<Option<String>, s
             .fetch_optional(db)
             .await?;
     Ok(parent.flatten())
+}
+
+pub async fn track(db: &PgPool, id: i32) -> Result<Option<Track>, sqlx::Error> {
+    sqlx::query_as("SELECT * FROM tracks WHERE id = $1")
+        .bind(id)
+        .fetch_optional(db)
+        .await
+}
+
+/// The items below `parent_id` (a podcast's episodes), newest first.
+pub async fn children(db: &PgPool, parent_id: i32) -> Result<Vec<Item>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT * FROM items WHERE parent_id = $1 ORDER BY published_at DESC NULLS LAST, id",
+    )
+    .bind(parent_id)
+    .fetch_all(db)
+    .await
 }
 
 pub async fn tracks(db: &PgPool, item_id: i32) -> Result<Vec<Track>, sqlx::Error> {
@@ -285,6 +311,60 @@ pub async fn item_durations(
     .fetch_all(db)
     .await?;
     Ok(rows.into_iter().collect())
+}
+
+/// Duration per item, falling back to what the feed claims. The tracks of an episode only exist
+/// once it was downloaded; until then its `<itunes:duration>` stands in.
+pub async fn item_durations_with_feed_fallback(
+    db: &PgPool,
+    item_ids: &[i32],
+) -> Result<HashMap<i32, f64>, sqlx::Error> {
+    if item_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let mut durations = item_durations(db, item_ids).await?;
+    let claimed: Vec<(i32, f64)> = sqlx::query_as(
+        "SELECT id, feed_duration FROM items WHERE id = ANY($1) AND feed_duration IS NOT NULL",
+    )
+    .bind(item_ids)
+    .fetch_all(db)
+    .await?;
+    for (id, duration) in claimed {
+        durations.entry(id).or_insert(duration);
+    }
+    Ok(durations)
+}
+
+/// An album artist and how many present albums they have.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct Artist {
+    pub name: String,
+    pub album_count: i32,
+}
+
+/// Every album artist with at least one present album, case-insensitively by name.
+pub async fn artists(db: &PgPool) -> Result<Vec<Artist>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT artist AS name, count(*)::int AS album_count FROM items
+         WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
+         GROUP BY artist ORDER BY lower(artist), artist",
+    )
+    .fetch_all(db)
+    .await
+}
+
+/// An artist's present albums, newest first, then by title.
+pub async fn albums_of_artist(db: &PgPool, artist: &str) -> Result<Vec<Item>, sqlx::Error> {
+    let sql = format!(
+        "SELECT * FROM items
+         WHERE kind = 'album' AND artist = $1 AND missing_since IS NULL
+         ORDER BY year DESC NULLS LAST, {}",
+        *NATURAL_TITLE
+    );
+    sqlx::query_as(sqlx::AssertSqlSafe(sql))
+        .bind(artist)
+        .fetch_all(db)
+        .await
 }
 
 /// A user's progress on one item.

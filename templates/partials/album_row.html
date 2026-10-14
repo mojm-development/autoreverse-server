@@ -1,0 +1,10 @@
+{#- One album in the list view (legacy ListRow with href); the row-play button joins with
+    playback. -#}
+<a href="/library/albums/{{ album.id }}" role="row" class="row">
+	<span class="index mono"><span class="number">{{ album.number }}</span></span>
+	<span class="cover-thumb"{% if album.has_cover %} style="background-image: url(/items/{{ album.id }}/cover)"{% endif %}></span>
+	<span class="title">{{ album.title }}</span>
+	<span class="cell">{% if album.artist.is_empty() %}—{% else %}{{ album.artist }}{% endif %}</span>
+	<span class="cell mono">{{ album.year }}</span>
+	<span class="cell mono right">{{ album.duration }}</span>
+</a>

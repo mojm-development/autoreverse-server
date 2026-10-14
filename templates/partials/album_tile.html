@@ -1,0 +1,17 @@
+{#- legacy CoverTile.svelte for an album (`album: AlbumRow`), inside its link. The play and pick
+    buttons join with playback and bulk editing. -#}
+<a href="/library/albums/{{ album.id }}" class="tile-link">
+	<figure class="cover-tile">
+		<div class="art">
+			{% if album.has_cover %}
+			<img src="/items/{{ album.id }}/cover" alt="" width="100" height="100" loading="lazy" />
+			{% else %}
+			<div class="placeholder" style="--accent: var(--music)"></div>
+			{% endif %}
+		</div>
+		<figcaption>
+			<span class="title">{{ album.title }}</span>
+			<span class="subtitle">{{ album.artist }}</span>
+		</figcaption>
+	</figure>
+</a>

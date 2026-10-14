@@ -1,5 +1,7 @@
 //! The server-rendered web UI (German). Handlers call the library modules directly, not the API.
 
+pub mod albums;
+pub mod artists;
 pub mod books;
 pub mod format;
 pub mod home;
@@ -17,6 +19,8 @@ pub fn router() -> Router<AppState> {
         .merge(home::router())
         .merge(login::router())
         .merge(books::router())
+        .merge(albums::router())
+        .merge(artists::router())
         .merge(series::router())
         .merge(settings::router())
 }

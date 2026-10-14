@@ -1,0 +1,3 @@
+{#- The next page of /library/albums (see web/albums.rs `more`). -#}
+{% for album in albums %}{% if view == "grid" %}{% include "partials/album_tile.html" %}{% else %}{% include "partials/album_row.html" %}{% endif %}
+{% endfor %}{% include "partials/more_sentinel.html" %}

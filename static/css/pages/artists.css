@@ -1,0 +1,124 @@
+/* library/artists/+page.svelte */
+.artists-page {
+	padding: 24px 32px 32px;
+}
+.artists-page header {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	flex-wrap: wrap;
+	margin-bottom: 20px;
+}
+.artists-page h1 {
+	font: 600 20px var(--font-sans);
+	margin: 0;
+}
+.artists-page .count {
+	color: var(--faint);
+	font-size: 13px;
+}
+.artists-page .search-field {
+	margin-left: auto;
+}
+.artists-page .grid {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+	gap: 24px 16px;
+}
+.artists-page .grid[hidden],
+.artists-page .tile[hidden] {
+	display: none;
+}
+.artists-page .tile {
+	position: relative;
+	min-width: 0;
+}
+.artists-page .link {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 9px;
+	color: inherit;
+	min-width: 0;
+	text-align: center;
+}
+/* People are round here: a circle tells an artist apart from an album at a glance. */
+.artists-page .portrait {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	border-radius: 50%;
+	overflow: hidden;
+	background: var(--tile);
+	background-image: repeating-linear-gradient(135deg, var(--stripe) 0 1px, transparent 1px 7px);
+	transition: transform 140ms ease;
+}
+.artists-page .link:hover .portrait {
+	transform: scale(1.03);
+}
+.artists-page .portrait img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.artists-page .initials {
+	font: 600 22px var(--font-sans);
+	color: var(--faint);
+	letter-spacing: 0.04em;
+}
+.artists-page .name {
+	font: 500 12.5px/1.3 var(--font-sans);
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.artists-page .count-sub {
+	color: var(--faint);
+	font-size: 11px;
+}
+.artists-page .edit {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: rgb(0 0 0 / 0.55);
+	color: #fff;
+	font-size: 14px;
+	opacity: 0;
+}
+.artists-page .tile:hover .edit,
+.artists-page .edit:focus-visible {
+	opacity: 1;
+}
+.artists-page .empty {
+	color: var(--faint);
+}
+@media (max-width: 700px) {
+	.artists-page {
+		padding: 18px 16px 24px;
+	}
+	.artists-page .search-field {
+		margin-left: 0;
+	}
+	.artists-page .search-field input {
+		width: 100%;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.artists-page .portrait {
+		transition: none;
+	}
+	.artists-page .link:hover .portrait {
+		transform: none;
+	}
+}

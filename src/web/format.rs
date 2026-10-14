@@ -49,6 +49,39 @@ pub fn volume(index: f64) -> String {
     }
 }
 
+/// JS `encodeURIComponent`: everything but `A–Z a–z 0–9 - _ . ! ~ * ' ( )` percent-encoded as
+/// UTF-8, so an artist name is one path segment or one query value.
+pub fn encode_component(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'!'
+            | b'~'
+            | b'*'
+            | b'\''
+            | b'('
+            | b')' => out.push(byte as char),
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+/// Up to two initials for a name without a picture: "Die Ärzte" → "DÄ".
+pub fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .take(2)
+        .filter_map(|part| part.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect()
+}
+
 const SEPARATORS: &[char] = &[' ', '\t', '-', '–', '—', ':', ',', '.', '·', '|', '/'];
 
 fn trim_edges(value: &str) -> String {
@@ -171,6 +204,21 @@ mod tests {
 
     fn strings(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn encodes_like_encode_uri_component() {
+        assert_eq!(encode_component("Die Ärzte"), "Die%20%C3%84rzte");
+        assert_eq!(encode_component("AC/DC & Co"), "AC%2FDC%20%26%20Co");
+        assert_eq!(encode_component("a-b_c.d!e~f*g'h(i)"), "a-b_c.d!e~f*g'h(i)");
+    }
+
+    #[test]
+    fn initials_take_the_first_letters_of_two_words() {
+        assert_eq!(initials("Die Ärzte"), "DÄ");
+        assert_eq!(initials("kraftwerk"), "K");
+        assert_eq!(initials("The Notwist Band"), "TN");
+        assert_eq!(initials("   "), "");
     }
 
     #[test]

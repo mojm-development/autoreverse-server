@@ -1,0 +1,43 @@
+{#- legacy library/artists/[name]/+page.svelte: the current choice. Uploading, picking an album
+    and resetting join with metadata editing (slice 8). -#}
+{% extends "layouts/app.html" %}
+{% block title %}{{ artist }} · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/artist.css" />{% endblock %}
+{% block content %}
+<div class="content artist-page" style="--a: var(--music)">
+	<header>
+		<h1>{{ artist }}</h1>
+		<a class="back" href="/library/artists">Zurück zu den Interpreten</a>
+	</header>
+
+	<section>
+		<h2>Eigenes Bild</h2>
+		<div class="custom">
+			<span class="preview">
+				{% if let Some(url) = custom_image_url %}<img src="{{ url }}" alt="" />{% endif %}
+			</span>
+		</div>
+	</section>
+
+	<section>
+		<div class="section-head">
+			<h2>Album als Bild</h2>
+		</div>
+		{% if albums.is_empty() %}
+		<p class="hint">Für diesen Interpreten ist kein Album in der Bibliothek.</p>
+		{% else %}
+		<div class="grid">
+			{% for album in albums %}
+			<div class="album" aria-current="{{ album.active }}">
+				<span class="cover">
+					{% if album.has_cover %}<img src="/items/{{ album.id }}/cover" alt="" loading="lazy" />{% endif %}
+				</span>
+				<span class="title">{{ album.title }}</span>
+				<span class="year mono">{{ album.year }}{% if album.active %} · gewählt{% else if album.saved %} · gespeichert{% endif %}</span>
+			</div>
+			{% endfor %}
+		</div>
+		{% endif %}
+	</section>
+</div>
+{% endblock %}
