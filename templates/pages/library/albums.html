@@ -3,7 +3,7 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}{{ heading }} · Autoreverse{% endblock %}
 {% block content %}
-<div class="content albums-page" style="--a: var(--music)">
+<div class="content albums-page" style="--a: var(--music)" data-paged-root>
 	<header>
 		<h1>
 			{{ heading }}
@@ -52,12 +52,12 @@
 	{% if albums.is_empty() %}
 	<p class="empty">{{ empty }}</p>
 	{% else if view == "grid" %}
-	<div class="grid-6">
+	<div class="grid-6" data-paged-list>
 		{% for album in albums %}{% include "partials/album_tile.html" %}
 		{% endfor %}{% include "partials/more_sentinel.html" %}
 	</div>
 	{% else %}
-	<div class="table" role="table" aria-label="Alben">
+	<div class="table" role="table" aria-label="Alben" data-paged-list>
 		<div class="table-head" role="row">
 			<span></span><span></span><span>Titel</span><span>Interpret</span><span>Jahr</span><span>Dauer</span>
 		</div>
@@ -65,7 +65,7 @@
 		{% endfor %}{% include "partials/more_sentinel.html" %}
 	</div>
 	{% endif %}
-	<p class="list-status" role="status" aria-live="polite"></p>
+	<p class="list-status" role="status" aria-live="polite" data-paged-status></p>
 	{% if let Some(bulk) = bulk %}{% include "partials/bulk_editor.html" %}{% endif %}
 </div>
 {% endblock %}

@@ -165,6 +165,10 @@
    line (empty unless loading) that keeps the page's bottom spacing. */
 .albums-page .sentinel {
 	height: 1px;
+	/* legacy's rootMargin 800px: the next page loads well before the end comes into view. Only
+	   rendered after a full page of 100, so the list is always taller than the lift. */
+	position: relative;
+	top: -800px;
 }
 .albums-page .list-status {
 	min-height: 18px;

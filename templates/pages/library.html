@@ -4,7 +4,8 @@
 {% block content %}
 <div class="content home-page">
 	<header>
-		<h1>{{ greeting }}, {{ name }}</h1>
+		{#- The server's hour is only the fallback; static/js/pages.js greets by the visitor's clock. -#}
+		<h1 data-greeting="{{ name }}">{{ greeting }}, {{ name }}</h1>
 		{#- Legacy rendered the filter without wiring it up; so does this. -#}
 		<div class="segment" role="tablist">
 			<button type="button" role="tab" class="pill" aria-current="true">Alles</button>

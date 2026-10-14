@@ -87,7 +87,7 @@ async fn the_albums_page_lists_present_albums_with_counts(db: PgPool) {
     assert!(html.contains(r#"href="/library/albums" aria-current="true""#));
     assert!(html.contains(r#">Interpreten <span class="count mono">2</span></a"#));
     // A short list has nothing more to load.
-    assert!(!html.contains("hx-trigger=\"revealed\""));
+    assert!(!html.contains("class=\"sentinel\""));
 
     let (_, list) = page(&app, "/library/albums?view=list", &cookie).await;
     assert!(list.contains(r#"role="table" aria-label="Alben""#));
@@ -157,12 +157,19 @@ async fn a_long_list_loads_the_rest_page_by_page(db: PgPool) {
     assert!(html.contains(r#"<span class="count mono">150</span>"#));
     assert_eq!(html.matches(r#"class="row""#).count(), 100);
     assert!(html.contains(r#"hx-get="/library/albums/more?view=list&#38;offset=100""#));
+    // Loads ahead of the end (CSS lifts the trip wire), says so while loading, and every row
+    // carries the key the page uses to drop a repeated album.
+    assert!(html.contains(r#"hx-trigger="intersect once""#));
+    assert!(html.contains(r#"data-loading-label="Weitere Alben werden geladen""#));
+    assert!(html.contains("data-paged-list") && html.contains("data-paged-status"));
+    assert_eq!(html.matches("data-entry-key=").count(), 100);
 
     let (status, chunk) = page(&app, "/library/albums/more?view=list&offset=100", &cookie).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(chunk.matches(r#"class="row""#).count(), 50);
     // Numbering continues and natural sort carries over the page boundary.
     assert!(chunk.contains(r#"<span class="number">101</span>"#));
+    assert_eq!(chunk.matches("data-entry-key=").count(), 50);
     assert!(chunk.contains("Album 101") && chunk.contains("Album 150"));
     assert!(!chunk.contains("<html") && !chunk.contains("hx-get"));
 }
