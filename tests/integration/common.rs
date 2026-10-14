@@ -131,3 +131,174 @@ pub fn cookie_pair(response: &Response<Body>) -> String {
         .unwrap()
         .to_owned()
 }
+
+/// Temporary library roots and data directory, removed when dropped.
+pub struct TempLibrary {
+    pub dir: tempfile::TempDir,
+}
+
+impl TempLibrary {
+    pub fn new() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        for sub in ["books", "music", "data"] {
+            std::fs::create_dir_all(dir.path().join(sub)).unwrap();
+        }
+        TempLibrary { dir }
+    }
+
+    pub fn books(&self) -> std::path::PathBuf {
+        self.dir.path().join("books")
+    }
+
+    pub fn music(&self) -> std::path::PathBuf {
+        self.dir.path().join("music")
+    }
+
+    pub fn data(&self) -> std::path::PathBuf {
+        self.dir.path().join("data")
+    }
+
+    pub fn path_str(path: &std::path::Path) -> String {
+        path.to_str().unwrap().to_owned()
+    }
+}
+
+impl TestApp {
+    /// The app with `AUTOREVERSE_DATA` pointing at `data` (covers land in `data/covers`).
+    pub fn with_data_dir(db: PgPool, data: &std::path::Path) -> Self {
+        let data = data.to_str().unwrap().to_owned();
+        let config =
+            Config::from_lookup(|key| (key == "AUTOREVERSE_DATA").then(|| data.clone())).unwrap();
+        Self::with_config(db, config)
+    }
+
+    /// Waits until the background scan is done and returns its status.
+    pub async fn wait_for_scan(&self) -> autoreverse_server::scanner::state::ScanState {
+        for _ in 0..600 {
+            let status = self.state.scan.snapshot();
+            if !status.running {
+                return status;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        panic!("scan did not finish within 30 s");
+    }
+}
+
+/// A one-second silent mp3 written by ffmpeg, with the given `-metadata` tags.
+pub fn make_audio(path: &std::path::Path, tags: &[(&str, &str)]) {
+    make_audio_with(path, tags, &[]);
+}
+
+/// Like [`make_audio`], with extra ffmpeg arguments before the output (e.g. a chapters file).
+pub fn make_audio_with(path: &std::path::Path, tags: &[(&str, &str)], extra: &[&str]) {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    let mut command = std::process::Command::new("ffmpeg");
+    command.args([
+        "-y",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=r=8000:cl=mono",
+    ]);
+    command.args(extra);
+    command.args(["-t", "1"]);
+    for (key, value) in tags {
+        command.arg("-metadata").arg(format!("{key}={value}"));
+    }
+    let status = command
+        .arg(path)
+        .status()
+        .expect("ffmpeg must be installed");
+    assert!(status.success(), "ffmpeg failed for {}", path.display());
+}
+
+/// An `items` row for a test; `sort_title` is the lower-cased title, as the scanner stores it.
+#[derive(Debug, Clone, Default)]
+pub struct Seed<'a> {
+    pub kind: &'a str,
+    pub title: &'a str,
+    pub author: Option<&'a str>,
+    pub artist: Option<&'a str>,
+    pub series: Option<&'a str>,
+    pub series_index: Option<f64>,
+    pub cover_path: Option<&'a str>,
+    pub source_path: Option<&'a str>,
+    pub description: Option<&'a str>,
+    pub narrator: Option<&'a str>,
+    pub parent_id: Option<i32>,
+    pub missing: bool,
+    pub added_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl<'a> Seed<'a> {
+    pub fn new(kind: &'a str, title: &'a str) -> Self {
+        Seed {
+            kind,
+            title,
+            ..Default::default()
+        }
+    }
+}
+
+pub async fn seed(db: &PgPool, item: Seed<'_>) -> i32 {
+    sqlx::query_scalar(
+        "INSERT INTO items (kind, title, sort_title, author, artist, series, series_index,
+             cover_path, source_path, description, narrator, parent_id, missing_since, added_at)
+         VALUES ($1, $2, lower($2), $3, $4, $5, $6, $7, $8, $9, $10, $11,
+             CASE WHEN $12 THEN now() END, coalesce($13, now()))
+         RETURNING id",
+    )
+    .bind(item.kind)
+    .bind(item.title)
+    .bind(item.author)
+    .bind(item.artist)
+    .bind(item.series)
+    .bind(item.series_index)
+    .bind(item.cover_path)
+    .bind(item.source_path)
+    .bind(item.description)
+    .bind(item.narrator)
+    .bind(item.parent_id)
+    .bind(item.missing)
+    .bind(item.added_at)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+pub async fn seed_track(
+    db: &PgPool,
+    item_id: i32,
+    position: i32,
+    path: &str,
+    duration: f64,
+) -> i32 {
+    sqlx::query_scalar(
+        "INSERT INTO tracks (item_id, position, path, duration) VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(item_id)
+    .bind(position)
+    .bind(path)
+    .bind(duration)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+pub async fn seed_progress(db: &PgPool, user_id: i32, item_id: i32, position: f64, finished: bool) {
+    sqlx::query(
+        "INSERT INTO progress (user_id, item_id, position, finished) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(user_id)
+    .bind(item_id)
+    .bind(position)
+    .bind(finished)
+    .execute(db)
+    .await
+    .unwrap();
+}

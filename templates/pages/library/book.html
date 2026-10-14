@@ -1,0 +1,71 @@
+{#- legacy library/books/[id]/+page.svelte, without the player actions and the editor. -#}
+{% extends "layouts/app.html" %}
+{% block title %}{{ book.title }} · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/book.css" />{% endblock %}
+{% block content %}
+<div class="content book-page" style="--a: var(--book)">
+	<div class="hero">
+		<div class="cover">
+			{% if book.cover_path.is_some() %}<img src="/items/{{ book.id }}/cover" alt="" />{% endif %}
+		</div>
+		<div class="meta">
+			<div class="eyebrow-row">
+				<span class="eyebrow">Hörbuch</span>
+				{% if book.series.is_some() %}<span class="pill">Serie · {{ series_books.len() }} Bände</span>{% endif %}
+			</div>
+			<h1>{{ book.title }}</h1>
+			<p class="subline">{{ subline }}</p>
+		</div>
+	</div>
+
+	<div class="progress-row">
+		<span class="chapter-name">{{ current_chapter }}</span>
+		<span class="progress-meta mono">{{ progress_meta }}</span>
+	</div>
+	<div class="scrubber">
+		{% for tick in ticks %}<span class="tick" style="left: {{ tick }}%"></span>{% endfor %}
+		<div class="fill" style="width: {{ percent }}%"></div>
+	</div>
+
+	<div data-tabs>
+		<div class="tabs">
+			<button class="tab active" data-tab="chapters">Kapitel</button>
+			<button class="tab" data-tab="bookmarks">Lesezeichen · {{ bookmarks.len() }}</button>
+			{% if book.series.is_some() %}<button class="tab" data-tab="series">Serie · {{ series_books.len() }} Bände</button>{% endif %}
+			<span class="tab-trailing mono">{{ chapter_count }} Kapitel</span>
+		</div>
+
+		<div data-tab-panel="chapters">
+			<div class="table chapter-list" role="table" aria-label="Kapitel">
+				{% for chapter in chapters %}
+				<div role="row" class="row" title="{{ chapter.title }}">
+					<span class="index mono">{{ chapter.number }}</span>
+					<span class="title">{{ chapter.label }}</span>
+					<span class="cell state">{{ chapter.state }}</span>
+					<span class="cell mono">{{ chapter.start }}</span>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+		<div data-tab-panel="bookmarks" hidden>
+			<div class="table" role="table" aria-label="Lesezeichen">
+				{% for bookmark in bookmarks %}
+				<div role="row" class="row">
+					<span class="title">{{ bookmark.title }}</span>
+					<span class="cell mono">{{ bookmark.position }}</span>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+		{% if book.series.is_some() %}
+		<div data-tab-panel="series" hidden>
+			<div class="table" role="table" aria-label="Serie">
+				{% for sibling in series_books %}
+				<a href="/library/books/{{ sibling.id }}" role="row" class="row"><span class="title">{{ sibling.title }}</span></a>
+				{% endfor %}
+			</div>
+		</div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

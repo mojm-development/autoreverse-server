@@ -9,6 +9,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod library;
+pub mod scanner;
 pub mod serialize;
 pub mod state;
 pub mod web;

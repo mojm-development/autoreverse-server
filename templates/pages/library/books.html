@@ -1,0 +1,106 @@
+{#- legacy library/books/+page.svelte -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{% if let Some(series) = series %}{{ series }}{% else %}Bibliothek{% endif %} · Autoreverse{% endblock %}
+{% block head %}<link rel="stylesheet" href="/css/pages/books.css" /><script src="/js/books.js" defer></script>{% endblock %}
+{% block content %}
+<div class="content books-page" style="--a: var(--book)">
+	<header>
+		<h1>
+			{% if let Some(series) = series %}{{ series }}{% else %}Bibliothek{% endif %}
+			<span class="count mono">{{ total }}</span>
+		</h1>
+		{% if series.is_some() %}{% if let Some(author) = series_author %}<span class="head-author">{{ author }}</span>{% endif %}{% endif %}
+	</header>
+
+	<div class="toolbar">
+		<form method="GET" class="search-form">
+			<input type="hidden" name="sort" value="{{ sort }}" />
+			<input type="hidden" name="view" value="{{ view }}" />
+			{% if let Some(series) = series %}<input type="hidden" name="series" value="{{ series }}" />{% endif %}
+			{% if let Some(author) = series_author %}<input type="hidden" name="author" value="{{ author }}" />{% endif %}
+			<span class="search-field">
+				{% call ui::icon("search") %}{% endcall %}
+				<input type="search" name="q" value="{{ q }}" placeholder="Bibliothek durchsuchen" />
+			</span>
+		</form>
+		{% if sortable %}
+		<div class="sort-toggle" role="group" aria-label="Sortierung">
+			{% for option in sort_options %}<a href="{{ option.href }}" aria-current="{{ option.current }}">{{ option.label }}</a>
+			{% endfor %}
+		</div>
+		{% endif %}
+		<div class="spacer"></div>
+		<div class="view-toggle" role="group" aria-label="Ansicht">
+			<a href="{{ grid_href }}" aria-current="{{ view == "grid" }}">Raster</a>
+			<a href="{{ list_href }}" aria-current="{{ view == "list" }}">Liste</a>
+		</div>
+	</div>
+
+	<div class="pills" role="group" aria-label="Nach Fortschritt filtern" data-status-filter>
+		{% for option in filters %}
+		<button class="pill{% if option.key == "all" %} active{% endif %}" aria-pressed="{{ option.key == "all" }}" data-filter="{{ option.key }}">
+			{{ option.label }}
+			<span class="pill-count mono">{{ option.count }}</span>
+		</button>
+		{% endfor %}
+	</div>
+
+	{% if !q.is_empty() || series.is_some() %}
+	<div class="chips">
+		{% if !q.is_empty() %}
+		<span class="chip">
+			Suche: {{ q }}
+			<a href="{{ clear_q_href }}" aria-label="Suche aufheben">×</a>
+		</span>
+		{% endif %}
+		{% if let Some(series) = series %}
+		<span class="chip">
+			Serie: {{ series }}{% if let Some(author) = series_author %} · {{ author }}{% endif %}
+			<a href="{{ clear_series_href }}" aria-label="Serienfilter aufheben">×</a>
+		</span>
+		{% endif %}
+	</div>
+	{% endif %}
+
+	{% if books.is_empty() %}
+	<p class="empty">{{ empty }}</p>
+	{% else %}
+	<p class="empty" data-filter-empty hidden>Kein Hörbuch in diesem Filter.</p>
+	{% if view == "grid" %}
+	<div class="grid-6">
+		{% for book in books %}
+		<a href="/library/books/{{ book.id }}" class="tile-link" data-status="{{ book.status.key() }}">
+			{% include "partials/cover_tile.html" %}
+		</a>
+		{% endfor %}
+	</div>
+	{% else %}
+	<div class="table" role="table" aria-label="Hörbücher">
+		<div class="table-head" role="row">
+			<span></span><span>Titel</span><span>Autor</span><span>Fortschritt</span><span>Länge</span>
+		</div>
+		{% for book in books %}
+		<a href="/library/books/{{ book.id }}" role="row" class="row" data-status="{{ book.status.key() }}">
+			<span class="cover-thumb"{% if book.has_cover %} style="background-image: url(/items/{{ book.id }}/cover)"{% endif %}></span>
+			<span class="title-cell">
+				<span class="title">{{ book.title }}</span>
+				{% if !book.band.is_empty() %}<span class="band">{{ book.band }}</span>{% endif %}
+			</span>
+			<span class="cell">{{ book.author }}</span>
+			<span class="cell progress-cell">
+				{% if book.status.key() == "finished" %}
+				<span class="done">beendet</span>
+				{% else if book.percent > 0 %}
+				<span class="track"><span class="fill" style="width: {{ book.percent }}%"></span></span>
+				<span class="left mono">{{ book.remaining }}</span>
+				{% endif %}
+			</span>
+			<span class="cell mono right">{{ book.duration }}</span>
+		</a>
+		{% endfor %}
+	</div>
+	{% endif %}
+	{% endif %}
+</div>
+{% endblock %}

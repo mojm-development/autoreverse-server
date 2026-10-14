@@ -6,7 +6,14 @@ mod common;
 
 mod auth_api;
 mod bootstrap;
+mod items_api;
+mod library_paths;
 mod passwords;
+mod queries;
+mod scan_api;
+mod scan_store;
+mod scanner_folders;
 mod server_info;
 mod tokens;
 mod web_auth;
+mod web_library;

@@ -1,0 +1,109 @@
+/* library/series/+page.svelte */
+.series-page {
+	padding: 24px 32px 32px;
+}
+.series-page header {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	flex-wrap: wrap;
+	margin-bottom: 20px;
+}
+.series-page h1 {
+	font: 600 20px var(--font-sans);
+	margin: 0;
+}
+.series-page .count {
+	color: var(--faint);
+	font-size: 13px;
+}
+.series-page .search-field {
+	margin-left: auto;
+}
+.series-page .search-field input {
+	width: 220px;
+}
+.series-page .author-group {
+	margin-bottom: 26px;
+}
+.series-page .author-name {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	font: 600 13px var(--font-sans);
+	color: var(--dim);
+	margin: 0 0 10px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--line);
+}
+.series-page .grid {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 10px;
+}
+.series-page .tile {
+	height: 100%;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 12px 14px;
+	border-radius: var(--radius-lg);
+	border: 1px solid var(--line);
+	background: var(--panel);
+	color: inherit;
+}
+.series-page .tile:hover {
+	border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+	background: var(--panel-hi);
+}
+/* Three covers fanned out: a series is a shelf, not a word. */
+.series-page .stack {
+	position: relative;
+	width: 80px;
+	height: 52px;
+	flex: none;
+}
+.series-page .spine {
+	position: absolute;
+	top: 0;
+	left: calc(var(--i) * 14px);
+	width: 52px;
+	height: 52px;
+	border-radius: var(--radius-sm);
+	background: var(--tile) center/cover;
+	box-shadow: 0 0 0 1px var(--line);
+}
+.series-page .empty-spine {
+	background-image: repeating-linear-gradient(135deg, var(--stripe) 0 1px, transparent 1px 7px);
+}
+.series-page .body {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.series-page .name {
+	font: 600 13px var(--font-sans);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.series-page .count-sub {
+	color: var(--faint);
+	font-size: 11px;
+}
+.series-page .empty {
+	color: var(--faint);
+}
+@media (max-width: 700px) {
+	.series-page {
+		padding: 18px 16px 24px;
+	}
+	.series-page .search-field {
+		margin-left: 0;
+	}
+}

@@ -8,6 +8,7 @@ use tokio::sync::Semaphore;
 use crate::auth::login::MAX_CONCURRENT_LOGIN_HASHES;
 use crate::auth::throttle::LoginThrottle;
 use crate::config::Config;
+use crate::scanner::state::ScanStatus;
 
 /// Cheap to clone; everything behind it is shared. One per server process — what legacy kept in
 /// module-level singletons (throttle, semaphore) lives here, so each test gets its own.
@@ -17,6 +18,8 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub login_throttle: Arc<LoginThrottle>,
     pub login_semaphore: Arc<Semaphore>,
+    /// The one scan status of this process (legacy `scanState`).
+    pub scan: ScanStatus,
 }
 
 impl AppState {
@@ -26,6 +29,7 @@ impl AppState {
             config: Arc::new(config),
             login_throttle: Arc::new(LoginThrottle::new()),
             login_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_LOGIN_HASHES)),
+            scan: ScanStatus::default(),
         }
     }
 }

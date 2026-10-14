@@ -32,6 +32,11 @@ function renderThemeToggles() {
 	}
 }
 
+let scanLogOpen = false;
+function renderScanLog() {
+	for (const log of document.querySelectorAll('[data-scan-log]')) log.hidden = !scanLogOpen;
+}
+
 document.addEventListener('click', (event) => {
 	const target = event.target instanceof Element ? event.target : null;
 
@@ -45,6 +50,28 @@ document.addEventListener('click', (event) => {
 		}
 		document.documentElement.dataset.theme = next;
 		renderThemeToggles();
+		return;
+	}
+
+	// Tabs (book detail): a [data-tab] button shows the [data-tab-panel] of the same name inside
+	// the surrounding [data-tabs].
+	const tab = target?.closest('[data-tab]');
+	const tabs = tab?.closest('[data-tabs]');
+	if (tab && tabs) {
+		for (const other of tabs.querySelectorAll('[data-tab]')) {
+			other.classList.toggle('active', other === tab);
+		}
+		for (const panel of tabs.querySelectorAll('[data-tab-panel]')) {
+			panel.hidden = panel.dataset.tabPanel !== tab.dataset.tab;
+		}
+		return;
+	}
+
+	// ScanStatusCard's "Protokoll": the card is re-fetched every few seconds, so the open state
+	// lives here and is applied again after each swap.
+	if (target?.closest('[data-scan-log-toggle]')) {
+		scanLogOpen = !scanLogOpen;
+		renderScanLog();
 		return;
 	}
 
@@ -62,3 +89,6 @@ document.addEventListener('click', (event) => {
 
 document.addEventListener('DOMContentLoaded', renderThemeToggles);
 document.addEventListener('htmx:afterSwap', renderThemeToggles);
+// `htmx:load` fires on content an outerHTML swap put in place (the old element, where
+// `afterSwap` fires, is already detached by then).
+document.addEventListener('htmx:load', renderScanLog);

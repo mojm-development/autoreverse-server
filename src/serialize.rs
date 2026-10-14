@@ -1,6 +1,10 @@
-//! Wire-format helpers shared by the API serializers.
+//! Wire format (legacy `api/serialize.ts`): rows in, snake_case API objects out, timestamps
+//! through [`to_iso`]. Routes never hand-roll row → JSON mapping.
 
 use chrono::{DateTime, SecondsFormat, Utc};
+use serde::Serialize;
+
+use crate::library::queries::{Chapter, Item, Track};
 
 /// ISO-8601 in UTC with whole seconds and a `Z`: `2026-10-14T18:22:57Z`. Legacy cut the
 /// milliseconds off `toISOString()` because strict ISO-8601 clients (the iOS app) reject them.
@@ -19,6 +23,94 @@ pub fn iso_opt<S: serde::Serializer>(d: &Option<DateTime<Utc>>, s: S) -> Result<
 /// `serde(serialize_with)` adapter for `DateTime<Utc>` fields.
 pub fn iso<S: serde::Serializer>(d: &DateTime<Utc>, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_str(&to_iso(*d))
+}
+
+/// An item in a list. No `cover_path` (a server path), only whether there is one; no
+/// description (blurbs run long, a list would carry megabytes of prose).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ItemSummary {
+    pub id: i32,
+    pub kind: String,
+    pub title: String,
+    pub has_cover: bool,
+    pub author: Option<String>,
+    pub artist: Option<String>,
+    pub series: Option<String>,
+    pub year: Option<i32>,
+    #[serde(serialize_with = "iso_opt")]
+    pub missing_since: Option<DateTime<Utc>>,
+    #[serde(serialize_with = "iso_opt")]
+    pub published_at: Option<DateTime<Utc>>,
+}
+
+impl From<&Item> for ItemSummary {
+    fn from(row: &Item) -> Self {
+        ItemSummary {
+            id: row.id,
+            kind: row.kind.clone(),
+            title: row.title.clone(),
+            has_cover: row.cover_path.is_some(),
+            author: row.author.clone(),
+            artist: row.artist.clone(),
+            series: row.series.clone(),
+            year: row.year,
+            missing_since: row.missing_since,
+            published_at: row.published_at,
+        }
+    }
+}
+
+/// A single item: the summary plus its description.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ItemDetail {
+    #[serde(flatten)]
+    pub summary: ItemSummary,
+    pub description: Option<String>,
+}
+
+impl From<&Item> for ItemDetail {
+    fn from(row: &Item) -> Self {
+        ItemDetail {
+            summary: row.into(),
+            description: row.description.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TrackOut {
+    pub id: i32,
+    pub position: i32,
+    pub title: Option<String>,
+    pub duration: f64,
+}
+
+impl From<&Track> for TrackOut {
+    fn from(row: &Track) -> Self {
+        TrackOut {
+            id: row.id,
+            position: row.position,
+            title: row.title.clone(),
+            duration: row.duration,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ChapterOut {
+    pub title: String,
+    pub start: f64,
+    pub end: f64,
+}
+
+impl From<&Chapter> for ChapterOut {
+    fn from(row: &Chapter) -> Self {
+        ChapterOut {
+            title: row.title.clone(),
+            start: row.start,
+            end: row.end,
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,3 +1,6 @@
-//! Library queries shared by API and web.
+//! Library queries and settings shared by API and web.
 
+pub mod like;
+pub mod paths;
 pub mod queries;
+pub mod sorting;
