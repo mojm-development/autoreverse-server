@@ -1,9 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// Scheibe 5 (Suche): /library/search gibt es im Rust-Server noch nicht. Mit der Scheibe wandert
-// das Fixture-Album „Zzz-Test-Album-9182-NoMatch“ mit dem Track „Zzz-Test-Track-Only-9182“ nach
-// e2e/seed.sql; legacy legte es per drizzle an.
-test.fixme();
+// The album „Zzz-Test-Album-9182-NoMatch“ with the track „Zzz-Test-Track-Only-9182“ is seeded by
+// e2e/seed.sql; legacy inserted it through drizzle.
 
 test('searching updates the URL query and shows grouped result counts', async ({ page }) => {
 	await page.goto('/library/search');
@@ -14,7 +12,7 @@ test('searching updates the URL query and shows grouped result counts', async ({
 });
 
 test('track-only search results are visible when no albums match', async ({ page }) => {
-	// Seeded by e2e/seed.sql (from Scheibe 5 on)
+	// Seeded by e2e/seed.sql
 	const testTrackTitle = 'Zzz-Test-Track-Only-9182';
 
 	// Search for the track by its distinctive title

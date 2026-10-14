@@ -418,3 +418,8 @@ img.mark {
 .search-field input::-webkit-search-cancel-button {
 	display: none;
 }
+
+/* The favourite heart: filled and in the accent while set. */
+.fav-toggle[aria-pressed='true'] {
+	color: var(--a, var(--music));
+}

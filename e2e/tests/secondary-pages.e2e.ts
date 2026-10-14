@@ -3,8 +3,7 @@ import { expect, test } from '@playwright/test';
 // The album "E2E-Fixture-Album-ForArtist" by this artist is seeded by e2e/seed.sql.
 const ARTIST_NAME = 'Ansa Volt';
 
-// Scheibe 5: /library/favorites und /library/bookmarks fehlen noch (Artists und Series gibt es).
-test.fixme('every sidebar link resolves to a real page, not a 404', async ({ page }) => {
+test('every sidebar link resolves to a real page, not a 404', async ({ page }) => {
 	for (const path of [
 		'/library/favorites',
 		'/library/artists',

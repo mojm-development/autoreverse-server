@@ -14,6 +14,7 @@ use super::format::{encode_component, format_hours, human_duration};
 use super::layout::Shell;
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
+use crate::library::favorites::{favorite_track_ids, is_item_favorite};
 use crate::library::queries::{
     self, Item, ItemsFilter, PAGE_SIZE, SortKey, albums_of_artist, count_items, count_missing,
     item_durations, tracks,
@@ -303,6 +304,7 @@ pub struct TrackRow {
     pub number: usize,
     pub title: String,
     pub duration: String,
+    pub favorite: bool,
 }
 
 #[derive(Template)]
@@ -314,6 +316,7 @@ struct AlbumPage {
     subline: String,
     artist: String,
     tracks: Vec<TrackRow>,
+    favorite: bool,
 }
 
 async fn detail(
@@ -328,9 +331,12 @@ async fn detail(
         .await?
         .filter(|a| a.kind == "album")
         .ok_or_else(not_found)?;
-    let (shell, track_rows) = tokio::try_join!(Shell::load(&state.db, &user, &uri), async {
-        Ok(tracks(&state.db, album.id).await?)
-    },)?;
+    let (shell, track_rows, favorite, favorite_tracks) = tokio::try_join!(
+        Shell::load(&state.db, &user, &uri),
+        async { Ok(tracks(&state.db, album.id).await?) },
+        async { Ok(is_item_favorite(&state.db, user.id, album.id).await?) },
+        async { Ok::<_, WebError>(favorite_track_ids(&state.db, user.id, album.id).await?) },
+    )?;
     let total: f64 = track_rows.iter().map(|t| t.duration).sum();
     let eyebrow = match album.year {
         Some(year) => format!("Album · {year}"),
@@ -358,8 +364,10 @@ async fn detail(
                     .clone()
                     .unwrap_or_else(|| format!("Titel {}", i + 1)),
                 duration: format_hours(t.duration),
+                favorite: favorite_tracks.contains(&t.id),
             })
             .collect(),
+        favorite,
         album,
     };
     Ok(Html(page.render()?))

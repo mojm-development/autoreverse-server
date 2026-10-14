@@ -1,0 +1,4 @@
+{#- "Lesezeichen setzen": static/js/player bookmarks where the player is in this item, else at
+    `data-position` (`bookmark_at`, the saved position), then refreshes the `[data-refresh]`
+    parts of the page. -#}
+<button class="outline bookmark-here" data-action="bookmark" data-position="{{ bookmark_at }}">{% call ui::icon("bookmark") %}{% endcall %} <span data-bookmark-label>Lesezeichen setzen</span></button>

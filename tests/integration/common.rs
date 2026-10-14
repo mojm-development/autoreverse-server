@@ -70,6 +70,25 @@ impl TestApp {
         self.send(request).await
     }
 
+    /// Any method with an optional JSON body and bearer token.
+    pub async fn call(
+        &self,
+        method: axum::http::Method,
+        uri: &str,
+        body: Option<Value>,
+        token: Option<&str>,
+    ) -> Response<Body> {
+        let mut builder = with_bearer(Request::builder().method(method).uri(uri), token);
+        let body = match body {
+            Some(json) => {
+                builder = builder.header(header::CONTENT_TYPE, "application/json");
+                Body::from(json.to_string())
+            }
+            None => Body::empty(),
+        };
+        self.send(builder.body(body).unwrap()).await
+    }
+
     /// A browser form POST. `cookie` is a full `Cookie` header value.
     pub async fn post_form(&self, uri: &str, form: &str, cookie: Option<&str>) -> Response<Body> {
         let mut request = Request::post(uri)

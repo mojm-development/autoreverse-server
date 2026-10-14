@@ -4,7 +4,7 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Serialize;
 
-use crate::library::queries::{Chapter, Item, Track};
+use crate::library::queries::{Chapter, Item, Track, TrackHit};
 
 /// ISO-8601 in UTC with whole seconds and a `Z`: `2026-10-14T18:22:57Z`. Legacy cut the
 /// milliseconds off `toISOString()` because strict ISO-8601 clients (the iOS app) reject them.
@@ -189,6 +189,45 @@ impl From<&Chapter> for ChapterOut {
             title: row.title.clone(),
             start: row.start,
             end: row.end,
+        }
+    }
+}
+
+/// A track in a cross-item list (favourites, search) with the item it belongs to
+/// (`toTrackSummary`).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TrackSummary {
+    pub id: i32,
+    pub title: Option<String>,
+    #[serde(serialize_with = "js_number")]
+    pub duration: f64,
+    pub item_id: i32,
+    pub item_title: String,
+    pub item_kind: String,
+}
+
+impl TrackSummary {
+    pub fn new(track: &Track, item: &Item) -> Self {
+        TrackSummary {
+            id: track.id,
+            title: track.title.clone(),
+            duration: track.duration,
+            item_id: item.id,
+            item_title: item.title.clone(),
+            item_kind: item.kind.clone(),
+        }
+    }
+}
+
+impl From<&TrackHit> for TrackSummary {
+    fn from(hit: &TrackHit) -> Self {
+        TrackSummary {
+            id: hit.id,
+            title: hit.title.clone(),
+            duration: hit.duration,
+            item_id: hit.item_id,
+            item_title: hit.item_title.clone(),
+            item_kind: hit.item_kind.clone(),
         }
     }
 }

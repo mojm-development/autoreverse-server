@@ -242,7 +242,7 @@ async fn the_fullscreen_player_shows_a_book_with_its_chapters(db: PgPool) {
     assert!(html.contains("Shift+←/→ Kapitel · Esc zurück"));
     assert!(html.contains(r#"data-action="play-from" data-position="1800""#));
     assert!(html.contains(r#"aria-label="Aufbewahren für alle Zeit - Kapitel 2 abspielen""#));
-    assert!(html.contains("Lesezeichen · 1"));
+    assert!(html.contains(r#"Lesezeichen · <span data-refresh="bookmark-count">1</span>"#));
     assert!(html.contains(r#"data-action="play-from" data-position="90""#));
     assert!(html.contains("Zuletzt gesetzt"));
     assert!(html.contains(&format!(r#"src="/items/{book}/cover""#)));

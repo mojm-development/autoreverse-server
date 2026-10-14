@@ -77,6 +77,7 @@
 						<option value="45">45 Min</option>
 						<option value="60">60 Min</option>
 					</select>
+					{% include "partials/bookmark_button.html" %}
 				</div>
 			</div>
 			<p class="hints mono" data-np-hints>Leertaste Play · ← {{ step_back }} s · → {{ step_forward }} s · Shift+←/→ {{ list_label }} · Esc zurück</p>
@@ -86,7 +87,7 @@
 	<div class="right" data-tabs>
 		<div class="tabs">
 			<button class="tab active" data-tab="chapters">{{ list_label }}</button>
-			<button class="tab" data-tab="bookmarks">Lesezeichen · {{ bookmarks.len() }}</button>
+			<button class="tab" data-tab="bookmarks">Lesezeichen · <span data-refresh="bookmark-count">{{ bookmarks.len() }}</span></button>
 		</div>
 		<div data-tab-panel="chapters">
 			{% if by_track %}
@@ -105,7 +106,7 @@
 			{% endif %}
 		</div>
 		<div data-tab-panel="bookmarks" hidden>
-			<div class="table" role="table" aria-label="Lesezeichen">
+			<div class="table" role="table" aria-label="Lesezeichen" data-refresh="bookmark-list">
 				{% for bookmark in bookmarks %}
 				<button type="button" class="bookmark-row bare" role="row" data-action="play-from" data-position="{{ bookmark.position_secs }}">
 					<span>{{ bookmark.title }}</span>
@@ -114,12 +115,14 @@
 				{% endfor %}
 			</div>
 		</div>
-		{% if let Some(last) = bookmarks.last() %}
-		<div class="bookmark-card">
-			<span class="eyebrow">Zuletzt gesetzt</span>
-			<span class="title">{{ last.title }}</span>
+		<div data-refresh="bookmark-card">
+			{% if let Some(last) = bookmarks.last() %}
+			<div class="bookmark-card">
+				<span class="eyebrow">Zuletzt gesetzt</span>
+				<span class="title">{{ last.title }}</span>
+			</div>
+			{% endif %}
 		</div>
-		{% endif %}
 	</div>
 </div>
 {% endblock %}

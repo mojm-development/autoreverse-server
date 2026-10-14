@@ -1,0 +1,7 @@
+{#- One item hit on the search page (`hit: Hit`). -#}
+<a href="{{ hit.href }}" role="row" class="row">
+	<span class="dot" style="background: var(--{{ hit.accent }})"></span>
+	<span class="title">{{ hit.title }}</span>
+	<span class="row-meta">{{ hit.subtitle }}</span>
+	<span class="status mono">{{ hit.status }}</span>
+</a>

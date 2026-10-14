@@ -1,5 +1,5 @@
-{#- legacy library/albums/[id]/+page.svelte, without favourites (slice 5) and the editor
-    (slice 8). static/js/player marks the playing track. -#}
+{#- legacy library/albums/[id]/+page.svelte, without the editor (slice 8). static/js/player
+    marks the playing track; the hearts are handled by static/js/app.js. -#}
 {% extends "layouts/app.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}{{ album.title }} · Autoreverse{% endblock %}
@@ -16,13 +16,14 @@
 			<div class="actions">
 				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} Abspielen</button>
 				<button class="outline" data-action="shuffle">{% call ui::icon("shuffle") %}{% endcall %} Zufall</button>
+				{% call ui::favorite("items", album.id, favorite, "Zu Favoriten hinzufügen", "Aus Favoriten entfernen", "") %}{% endcall %}
 			</div>
 		</div>
 	</div>
 
 	<div class="table" role="table" aria-label="Titel">
 		<div class="table-head" role="row">
-			<span></span><span>Titel</span><span>Interpret</span><span>Dauer</span>
+			<span></span><span>Titel</span><span>Interpret</span><span></span><span>Dauer</span>
 		</div>
 		{% for track in tracks %}
 		<div role="row" class="row clickable" aria-current="false" data-track-row data-track-id="{{ track.id }}">
@@ -30,6 +31,7 @@
 			<span class="index mono"><span class="num">{{ track.number }}</span>{% call ui::icon("play") %}{% endcall %}</span>
 			<span class="title">{{ track.title }}</span>
 			<span class="cell">{{ artist }}</span>
+			<span class="cell fav above">{% call ui::favorite("tracks", track.id, track.favorite, "Titel favorisieren", "Titel aus Favoriten entfernen", "small") %}{% endcall %}</span>
 			<span class="cell mono">{{ track.duration }}</span>
 		</div>
 		{% endfor %}

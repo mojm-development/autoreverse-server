@@ -67,6 +67,14 @@ document.addEventListener('click', (event) => {
 		return;
 	}
 
+	// The favourite heart: optimistic, back to the old state when the server refuses.
+	const heart = target?.closest('[data-favorite]');
+	if (heart) {
+		event.preventDefault();
+		void toggleFavorite(heart);
+		return;
+	}
+
 	// ScanStatusCard's "Protokoll": the card is re-fetched every few seconds, so the open state
 	// lives here and is applied again after each swap.
 	if (target?.closest('[data-scan-log-toggle]')) {
@@ -85,6 +93,43 @@ document.addEventListener('click', (event) => {
 		passwordButton.setAttribute('aria-label', show ? 'Eingabe verbergen' : 'Eingabe anzeigen');
 		setIcon(passwordButton, show ? 'eye-off' : 'eye');
 	}
+});
+
+function renderFavorite(button, on) {
+	const label = on ? button.dataset.labelOn : button.dataset.labelOff;
+	button.setAttribute('aria-pressed', String(on));
+	if (label) {
+		button.setAttribute('aria-label', label);
+		button.title = label;
+	}
+	setIcon(button, on ? 'heart-filled' : 'heart');
+}
+
+async function toggleFavorite(button) {
+	if (button.dataset.busy) return;
+	const on = button.getAttribute('aria-pressed') !== 'true';
+	button.dataset.busy = '1';
+	renderFavorite(button, on);
+	try {
+		const res = await fetch(`/favorites/${button.dataset.favorite}/${button.dataset.favoriteId}`, {
+			method: on ? 'POST' : 'DELETE'
+		});
+		if (!res.ok) renderFavorite(button, !on);
+	} catch {
+		renderFavorite(button, !on);
+	} finally {
+		delete button.dataset.busy;
+	}
+}
+
+// Search page: Esc empties the field and shows the empty search (legacy clearSearch), through
+// the boosted form so a playing player keeps playing.
+document.addEventListener('keydown', (event) => {
+	const input = event.target instanceof Element ? event.target.closest('[data-search-input]') : null;
+	if (!input || event.key !== 'Escape') return;
+	event.preventDefault();
+	input.value = '';
+	input.form?.requestSubmit();
 });
 
 document.addEventListener('DOMContentLoaded', renderThemeToggles);

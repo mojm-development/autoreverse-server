@@ -1,6 +1,8 @@
 //! Library queries and settings shared by API and web.
 
 pub mod artist_covers;
+pub mod bookmarks;
+pub mod favorites;
 pub mod like;
 pub mod paths;
 pub mod playback;

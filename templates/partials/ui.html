@@ -16,3 +16,8 @@
 {% macro scrubber(kind, label) -%}
 <div class="scrubber" role="slider" tabindex="0" aria-label="{{ label }}" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00" data-scrubber="{{ kind }}"><span class="ticks" data-scrubber-ticks></span><div class="fill"></div><div class="thumb"></div></div>
 {%- endmacro %}
+{#- The favourite heart (legacy album page). `kind` is `items` or `tracks`; static/js/app.js
+    sends POST/DELETE /favorites/{kind}/{id} and flips label, `aria-pressed` and icon. -#}
+{% macro favorite(kind, id, on, label_off, label_on, extra_class) -%}
+<button type="button" class="icon-btn fav-toggle {{ extra_class }}" aria-label="{% if on %}{{ label_on }}{% else %}{{ label_off }}{% endif %}" title="{% if on %}{{ label_on }}{% else %}{{ label_off }}{% endif %}" aria-pressed="{{ on }}" data-favorite="{{ kind }}" data-favorite-id="{{ id }}" data-label-off="{{ label_off }}" data-label-on="{{ label_on }}"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-testid="icon-{% if on %}heart-filled{% else %}heart{% endif %}"><use href="#icon-{% if on %}heart-filled{% else %}heart{% endif %}"></use></svg></button>
+{%- endmacro %}

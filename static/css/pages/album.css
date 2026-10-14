@@ -128,3 +128,13 @@
 		flex-direction: column;
 	}
 }
+/* The heart column of the track list, and its header placeholder. */
+.album-page .fav,
+.album-page .table-head span:nth-child(4) {
+	flex: none;
+	width: 26px;
+}
+.album-page .icon-btn.small {
+	width: 26px;
+	height: 26px;
+}

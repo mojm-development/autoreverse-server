@@ -6,6 +6,7 @@ mod common;
 
 mod auth_api;
 mod bootstrap;
+mod collections_api;
 mod items_api;
 mod library_paths;
 mod music;
@@ -18,6 +19,7 @@ mod scanner_folders;
 mod server_info;
 mod tokens;
 mod web_auth;
+mod web_collections;
 mod web_library;
 mod web_music;
 mod web_playback;

@@ -13,9 +13,11 @@ use super::format::{chapter_labels, format_hms, format_hours, human_duration, vo
 use super::layout::Shell;
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
+use crate::library::bookmarks::bookmarks_for_item;
+use crate::library::favorites::is_item_favorite;
 use crate::library::queries::{
-    self, Item, ItemsFilter, ProgressEntry, SortKey, bookmarks_for_item, chapters, count_items,
-    item_durations, progress, progress_map, series_siblings, tracks,
+    self, Item, ItemsFilter, ProgressEntry, SortKey, chapters, count_items, item_durations,
+    progress, progress_map, series_siblings, tracks,
 };
 use crate::state::AppState;
 
@@ -369,6 +371,9 @@ struct BookPage {
     ticks: Vec<String>,
     bookmarks: Vec<BookmarkRow>,
     series_books: Vec<SeriesRow>,
+    favorite: bool,
+    /// The saved position: where "Lesezeichen setzen" marks while the book is not playing.
+    bookmark_at: f64,
 }
 
 async fn detail(
@@ -389,13 +394,14 @@ async fn detail(
             None => Ok(Vec::new()),
         }
     };
-    let (shell, track_rows, chapter_rows, progress_row, bookmark_rows, series_rows) = tokio::try_join!(
+    let (shell, track_rows, chapter_rows, progress_row, bookmark_rows, series_rows, favorite) = tokio::try_join!(
         async { Shell::load(&state.db, &user, &uri).await },
         async { Ok(tracks(&state.db, book.id).await?) },
         async { Ok(chapters(&state.db, book.id).await?) },
         async { Ok(progress(&state.db, user.id, book.id).await?) },
         async { Ok(bookmarks_for_item(&state.db, user.id, book.id).await?) },
         async { Ok::<_, WebError>(series_books.await?) },
+        async { Ok(is_item_favorite(&state.db, user.id, book.id).await?) },
     )?;
 
     let total: f64 = track_rows.iter().map(|t| t.duration).sum();
@@ -464,6 +470,8 @@ async fn detail(
                 title: b.title.clone(),
             })
             .collect(),
+        favorite,
+        bookmark_at: position,
         book,
     };
     Ok(Html(page.render()?))

@@ -17,7 +17,10 @@ INSERT INTO e2e_items VALUES
 	('E2E-Fixture-Book-Restart', 'book', 'A Narrator', NULL, 500),
 	('E2E-Fixture-Book-EndOfBook', 'book', 'A Narrator', NULL, 3600),
 	('E2E-Fixture-NowPlaying-Book', 'book', NULL, NULL, NULL),
-	('E2E-Fixture-Album-Detail', 'album', NULL, 'E2E Fixture Artist', NULL);
+	('E2E-Fixture-Album-Detail', 'album', NULL, 'E2E Fixture Artist', NULL),
+	-- favorites-bookmarks: a heart to toggle and a bookmark at the saved 0:12:34.
+	('E2E-Fixture-Album-Favorite', 'album', NULL, 'E2E Fixture Artist', NULL),
+	('E2E-Fixture-Book-Bookmark', 'book', NULL, NULL, 754);
 
 INSERT INTO items (kind, title, sort_title, author, narrator, artist)
 SELECT e.kind, e.title, lower(e.title),
@@ -56,3 +59,13 @@ ON CONFLICT (user_id, item_id) DO UPDATE SET position = EXCLUDED.position, finis
 INSERT INTO items (kind, title, sort_title, artist)
 SELECT 'album', 'E2E-Fixture-Album-ForArtist', 'e2e-fixture-album-forartist', 'Ansa Volt'
 WHERE NOT EXISTS (SELECT 1 FROM items WHERE title = 'E2E-Fixture-Album-ForArtist');
+
+-- search: an album whose title does not match the query, so only its track is a hit.
+INSERT INTO items (kind, title, sort_title, artist)
+SELECT 'album', 'Zzz-Test-Album-9182-NoMatch', 'zzz-test-album-9182-nomatch', 'Test Artist'
+WHERE NOT EXISTS (SELECT 1 FROM items WHERE title = 'Zzz-Test-Album-9182-NoMatch');
+
+INSERT INTO tracks (item_id, position, path, duration, title)
+SELECT i.id, 1, '/test/paths/Zzz-Test-Track-Only-9182.mp3', 300, 'Zzz-Test-Track-Only-9182'
+FROM items i WHERE i.title = 'Zzz-Test-Album-9182-NoMatch'
+ON CONFLICT (path) DO NOTHING;

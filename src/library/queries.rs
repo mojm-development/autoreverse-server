@@ -481,29 +481,6 @@ pub async fn book_series(db: &PgPool, user_id: i32) -> Result<Vec<BookSeries>, s
     .await
 }
 
-/// A user's bookmarks in one item, in playback order.
-#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
-pub struct Bookmark {
-    pub id: i32,
-    pub position: f64,
-    pub title: String,
-}
-
-pub async fn bookmarks_for_item(
-    db: &PgPool,
-    user_id: i32,
-    item_id: i32,
-) -> Result<Vec<Bookmark>, sqlx::Error> {
-    sqlx::query_as(
-        "SELECT id, position, title FROM bookmarks
-         WHERE user_id = $1 AND item_id = $2 ORDER BY position",
-    )
-    .bind(user_id)
-    .bind(item_id)
-    .fetch_all(db)
-    .await
-}
-
 /// Top-level, present items per kind, plus present tracks (`libraryCounts`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct LibraryCounts {
@@ -569,4 +546,90 @@ pub async fn recently_added(db: &PgPool, limit: i64) -> Result<Vec<Item>, sqlx::
     .bind(limit)
     .fetch_all(db)
     .await
+}
+
+/// Present items of the given kinds whose title, author or artist contains `q` — episodes too,
+/// not only top-level items (legacy `searchItems`).
+pub async fn search_items(
+    db: &PgPool,
+    q: &str,
+    kinds: &[&str],
+    limit: i64,
+) -> Result<Vec<Item>, sqlx::Error> {
+    let sql = format!(
+        "SELECT * FROM items
+         WHERE kind = ANY($1) AND missing_since IS NULL
+           AND (title ILIKE $2 ESCAPE '\\' OR author ILIKE $2 ESCAPE '\\'
+                OR artist ILIKE $2 ESCAPE '\\')
+         ORDER BY {} LIMIT $3",
+        natural_key("sort_title")
+    );
+    let kinds: Vec<String> = kinds.iter().map(|k| (*k).to_owned()).collect();
+    sqlx::query_as(sqlx::AssertSqlSafe(sql))
+        .bind(kinds)
+        .bind(like_pattern(q))
+        .bind(limit)
+        .fetch_all(db)
+        .await
+}
+
+/// A track hit with the item it belongs to.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct TrackHit {
+    pub id: i32,
+    pub title: Option<String>,
+    pub duration: f64,
+    pub item_id: i32,
+    pub item_title: String,
+    pub item_kind: String,
+}
+
+/// Tracks of present items whose title contains `q`.
+pub async fn search_tracks(db: &PgPool, q: &str, limit: i64) -> Result<Vec<TrackHit>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT track.id, track.title, track.duration, track.item_id,
+                item.title AS item_title, item.kind AS item_kind
+         FROM tracks AS track JOIN items AS item ON item.id = track.item_id
+         WHERE track.title ILIKE $1 ESCAPE '\\' AND item.missing_since IS NULL
+         ORDER BY lower(track.title) LIMIT $2",
+    )
+    .bind(like_pattern(q))
+    .bind(limit)
+    .fetch_all(db)
+    .await
+}
+
+/// An album artist or book author matching a search, with how many present works they have.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct NameHit {
+    pub name: String,
+    /// `artist` or `author`.
+    pub role: String,
+    pub work_count: i32,
+}
+
+pub async fn search_artists(db: &PgPool, q: &str, limit: i64) -> Result<Vec<NameHit>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT name, role, count(*)::int AS work_count FROM (
+             SELECT artist AS name, 'artist' AS role FROM items
+             WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
+               AND artist ILIKE $1 ESCAPE '\\'
+             UNION ALL
+             SELECT author AS name, 'author' AS role FROM items
+             WHERE kind = 'book' AND author IS NOT NULL AND missing_since IS NULL
+               AND author ILIKE $1 ESCAPE '\\'
+         ) AS named
+         GROUP BY name, role ORDER BY lower(name) LIMIT $2",
+    )
+    .bind(like_pattern(q))
+    .bind(limit)
+    .fetch_all(db)
+    .await
+}
+
+/// Every present item, episodes included (the search page's "in N Items").
+pub async fn total_items(db: &PgPool) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar("SELECT count(*) FROM items WHERE missing_since IS NULL")
+        .fetch_one(db)
+        .await
 }

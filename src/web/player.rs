@@ -15,7 +15,8 @@ use super::home::accent;
 use super::layout::Shell;
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
-use crate::library::queries::{self, Item, bookmarks_for_item};
+use crate::library::bookmarks::bookmarks_for_item;
+use crate::library::queries::{self, Item};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -71,6 +72,8 @@ struct PlayerPage {
     /// Chapter starts as percentages of the whole item.
     ticks: Vec<String>,
     speeds: Vec<SpeedOption>,
+    /// Fallback for "Lesezeichen setzen" before the player has caught up with this item.
+    bookmark_at: f64,
 }
 
 async fn player(
@@ -175,6 +178,7 @@ async fn player(
                 selected: (value - prefs.playback_speed).abs() < 1e-9,
             })
             .collect(),
+        bookmark_at: 0.0,
         shell,
         item,
     };

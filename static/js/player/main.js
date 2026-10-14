@@ -7,6 +7,7 @@ import { bindScrubbers } from './scrubber.js';
 import { createVisualizers } from './visualizer.js';
 import { installNavigation } from './navigation.js';
 import { render } from './ui.js';
+import { formatHMS } from './format.js';
 
 const audio = document.querySelector('[data-player-audio]');
 
@@ -94,6 +95,48 @@ if (audio) {
 		if (await store.play(itemId)) store.seek(0);
 	}
 
+	/**
+	 * Re-reads the current page and swaps in the parts marked `[data-refresh]` (bookmark list and
+	 * count), leaving everything else — open tab, scroll position, the player — as it is.
+	 */
+	async function refreshParts() {
+		const res = await fetch(location.href, { headers: { accept: 'text/html' } });
+		if (!res.ok) return;
+		const fresh = new DOMParser().parseFromString(await res.text(), 'text/html');
+		for (const part of document.querySelectorAll('[data-refresh]')) {
+			const next = fresh.querySelector(`[data-refresh="${part.dataset.refresh}"]`);
+			if (next) part.innerHTML = next.innerHTML;
+		}
+	}
+
+	/** "Lesezeichen setzen": where the player is in this item, else at the saved position. */
+	async function addBookmark(button) {
+		const itemId = pageItemId(button);
+		if (!itemId || button.dataset.busy) return;
+		const current = store.current;
+		const position =
+			current?.itemId === itemId ? current.position : Number(button.dataset.position) || 0;
+		const label = button.querySelector('[data-bookmark-label]');
+		button.dataset.busy = '1';
+		try {
+			const res = await fetch('/bookmarks', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ item_id: itemId, position, title: formatHMS(position) })
+			});
+			if (!res.ok) return;
+			await refreshParts();
+			if (label) {
+				label.textContent = 'Lesezeichen gesetzt';
+				setTimeout(() => (label.textContent = 'Lesezeichen setzen'), 2000);
+			}
+		} catch {
+			// Offline: nothing was set, the button stays as it was.
+		} finally {
+			delete button.dataset.busy;
+		}
+	}
+
 	const ACTIONS = {
 		toggle: () => store.toggle(),
 		'skip-back': () => store.skipBack(),
@@ -109,6 +152,7 @@ if (audio) {
 		shuffle: (el) => void store.play(pageItemId(el), undefined, { shuffle: true }),
 		'play-track': (el) => void store.playTrackById(pageItemId(el), Number(el.dataset.trackId)),
 		'play-from': (el) => void store.playFrom(pageItemId(el), Number(el.dataset.position)),
+		bookmark: (el) => void addBookmark(el),
 		close: () => history.back()
 	};
 

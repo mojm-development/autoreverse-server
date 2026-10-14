@@ -1,5 +1,5 @@
-{#- legacy library/books/[id]/+page.svelte, without "Lesezeichen setzen" (slice 5) and the editor
-    (slice 8). static/js/player follows the player here while it plays this book. -#}
+{#- legacy library/books/[id]/+page.svelte, without the editor (slice 8). static/js/player follows
+    the player here while it plays this book and sets bookmarks; the heart is static/js/app.js. -#}
 {% extends "layouts/app.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}{{ book.title }} · Autoreverse{% endblock %}
@@ -19,6 +19,8 @@
 			<div class="actions">
 				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} {{ play_label }}</button>
 				<button class="outline" data-action="restart">{% call ui::icon("previous") %}{% endcall %} Von vorn</button>
+				{% include "partials/bookmark_button.html" %}
+				{% call ui::favorite("items", book.id, favorite, "Zu Favoriten hinzufügen", "Aus Favoriten entfernen", "") %}{% endcall %}
 			</div>
 		</div>
 	</div>
@@ -35,7 +37,7 @@
 	<div data-tabs>
 		<div class="tabs">
 			<button class="tab active" data-tab="chapters">Kapitel</button>
-			<button class="tab" data-tab="bookmarks">Lesezeichen · {{ bookmarks.len() }}</button>
+			<button class="tab" data-tab="bookmarks">Lesezeichen · <span data-refresh="bookmark-count">{{ bookmarks.len() }}</span></button>
 			{% if book.series.is_some() %}<button class="tab" data-tab="series">Serie · {{ series_books.len() }} Bände</button>{% endif %}
 			<span class="tab-trailing mono">{{ chapter_count }} Kapitel</span>
 		</div>
@@ -44,7 +46,7 @@
 			{% include "partials/chapter_list.html" %}
 		</div>
 		<div data-tab-panel="bookmarks" hidden>
-			<div class="table" role="table" aria-label="Lesezeichen">
+			<div class="table" role="table" aria-label="Lesezeichen" data-refresh="bookmark-list">
 				{% for bookmark in bookmarks %}
 				<div role="row" class="row clickable">
 					<button type="button" class="activator bare" aria-label="Lesezeichen {{ bookmark.title }} abspielen" data-action="play-from" data-position="{{ bookmark.position_secs }}"></button>
