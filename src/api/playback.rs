@@ -9,7 +9,7 @@ use axum::{Json, Router, routing::get, routing::post};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use super::validate::{ApiJson, ApiQuery, INVALID_JSON, QueryMap, int_param};
+use super::validate::{ApiJson, ApiQuery, INVALID_JSON, JsonBody, QueryMap, int_param};
 use crate::auth::ApiUser;
 use crate::auth::preferences::{
     Preferences, SKIP_MAX, SKIP_MIN, SPEED_MAX, SPEED_MIN, get_preferences, set_preferences,
@@ -93,9 +93,10 @@ async fn put_progress(
     State(state): State<AppState>,
     user: ApiUser,
     Path(raw_id): Path<String>,
-    ApiJson(body): ApiJson<Map<String, Value>>,
+    body: JsonBody,
 ) -> ApiResult<StatusCode> {
     let row = find_item(&state, &raw_id).await?;
+    let body: Map<String, Value> = body.parse()?;
     let position = position_of(&body)?;
     let finished = match body.get("finished") {
         None | Some(Value::Null) => false,

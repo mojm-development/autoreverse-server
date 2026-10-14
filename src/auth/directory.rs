@@ -86,8 +86,18 @@ async fn lock_admins(tx: &mut Transaction<'_, Postgres>) -> Result<Vec<i32>, sql
 /// Sets the role and returns the resulting `is_admin`. Demoting the only admin is refused.
 pub async fn set_admin(db: &PgPool, user_id: i32, is_admin: bool) -> Result<bool, DirectoryError> {
     let mut tx = db.begin().await?;
+    let resulting = set_admin_in(&mut tx, user_id, is_admin).await?;
+    tx.commit().await?;
+    Ok(resulting)
+}
+
+async fn set_admin_in(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: i32,
+    is_admin: bool,
+) -> Result<bool, DirectoryError> {
     if !is_admin {
-        let admins = lock_admins(&mut tx).await?;
+        let admins = lock_admins(tx).await?;
         if admins.len() <= 1 && admins.contains(&user_id) {
             return Err(DirectoryError::LastAdmin);
         }
@@ -96,11 +106,9 @@ pub async fn set_admin(db: &PgPool, user_id: i32, is_admin: bool) -> Result<bool
         sqlx::query_scalar("UPDATE users SET is_admin = $1 WHERE id = $2 RETURNING is_admin")
             .bind(is_admin)
             .bind(user_id)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut **tx)
             .await?;
-    let resulting = row.ok_or(DirectoryError::NotFound)?;
-    tx.commit().await?;
-    Ok(resulting)
+    row.ok_or(DirectoryError::NotFound)
 }
 
 /// Deletes `user_id` on behalf of `actor_id`. Nobody deletes themselves (that would also be the
@@ -141,10 +149,21 @@ pub async fn reset_password(
 ) -> Result<(), DirectoryError> {
     let hash = hash_password(password).await;
     let mut tx = db.begin().await?;
+    set_hash_in(&mut tx, user_id, &hash, keep).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+async fn set_hash_in(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: i32,
+    hash: &str,
+    keep: Option<&str>,
+) -> Result<(), DirectoryError> {
     let updated = sqlx::query("UPDATE users SET password_hash = $1 WHERE id = $2")
         .bind(hash)
         .bind(user_id)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?
         .rows_affected();
     if updated == 0 {
@@ -153,8 +172,32 @@ pub async fn reset_password(
     sqlx::query("DELETE FROM auth_tokens WHERE user_id = $1 AND value IS DISTINCT FROM $2")
         .bind(user_id)
         .bind(keep)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
+    Ok(())
+}
+
+/// `PATCH /users/{id}` with both a role and a password: one transaction, so a refused demotion
+/// (last admin) leaves the password untouched, and a missing user changes nothing at all. The
+/// hash is computed before the transaction opens — argon2 takes long, the row locks should not.
+pub async fn update_user(
+    db: &PgPool,
+    user_id: i32,
+    is_admin: Option<bool>,
+    password: Option<&str>,
+    keep: Option<&str>,
+) -> Result<(), DirectoryError> {
+    let hash = match password {
+        Some(password) => Some(hash_password(password).await),
+        None => None,
+    };
+    let mut tx = db.begin().await?;
+    if let Some(is_admin) = is_admin {
+        set_admin_in(&mut tx, user_id, is_admin).await?;
+    }
+    if let Some(hash) = hash {
+        set_hash_in(&mut tx, user_id, &hash, keep).await?;
+    }
     tx.commit().await?;
     Ok(())
 }

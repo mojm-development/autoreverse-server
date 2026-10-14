@@ -4,6 +4,7 @@
 
 mod common;
 
+mod api_edges;
 mod artist_covers;
 mod auth_api;
 mod bootstrap;

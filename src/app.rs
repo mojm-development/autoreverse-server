@@ -32,6 +32,7 @@ pub fn app(state: AppState) -> Router {
             state.clone(),
             reject_cross_site_forms,
         ))
+        .layer(middleware::from_fn(trim_trailing_slash))
         .layer(CatchPanicLayer::custom(panic_response))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -58,6 +59,23 @@ fn wants_html(headers: &HeaderMap) -> bool {
 fn panic_response(_panic: Box<dyn Any + Send + 'static>) -> Response {
     tracing::error!("handler panicked");
     detail_response(StatusCode::INTERNAL_SERVER_ERROR, INTERNAL_DETAIL)
+}
+
+/// SvelteKit's default `trailingSlash: 'never'`: `/items/` answers 308 to `/items` (query kept),
+/// so a client that appends a slash still lands on the route instead of a 404.
+async fn trim_trailing_slash(request: Request, next: Next) -> Response {
+    let path = request.uri().path();
+    if path.len() > 1 && path.ends_with('/') {
+        // One leading slash only: `//evil.example/` must not become a protocol-relative
+        // redirect off-site.
+        let trimmed = format!("/{}", path.trim_matches('/'));
+        let target = match request.uri().query() {
+            Some(query) => format!("{trimmed}?{query}"),
+            None => trimmed,
+        };
+        return (StatusCode::PERMANENT_REDIRECT, [(header::LOCATION, target)]).into_response();
+    }
+    next.run(request).await
 }
 
 /// SvelteKit's CSRF check, which legacy got for free: a form-encoded POST/PUT/PATCH/DELETE whose

@@ -14,8 +14,8 @@ use serde_json::{Map, Value};
 use super::validate::ApiJson;
 use crate::auth::ApiAdmin;
 use crate::auth::directory::{
-    DirectoryError, add_user, delete_user, find_user, list_users, reset_password, set_admin,
-    valid_name, valid_password,
+    DirectoryError, add_user, delete_user, find_user, list_users, update_user, valid_name,
+    valid_password,
 };
 use crate::error::{ApiError, ApiResult};
 use crate::serialize::{iso, iso_opt};
@@ -156,17 +156,10 @@ async fn update(
     if is_admin.is_none() && password.is_none() {
         return Err(ApiError::unprocessable(NOTHING_TO_CHANGE));
     }
-    if let Some(is_admin) = is_admin {
-        set_admin(&state.db, id, is_admin)
-            .await
-            .map_err(|e| map_directory_error(e, LAST_ADMIN_DEMOTE))?;
-    }
-    if let Some(password) = password {
-        let keep = (id == admin.id).then_some(admin.token.as_str());
-        reset_password(&state.db, id, password, keep)
-            .await
-            .map_err(|e| map_directory_error(e, LAST_ADMIN_DEMOTE))?;
-    }
+    let keep = (id == admin.id).then_some(admin.token.as_str());
+    update_user(&state.db, id, is_admin, password, keep)
+        .await
+        .map_err(|e| map_directory_error(e, LAST_ADMIN_DEMOTE))?;
     let row = find_user(&state.db, id)
         .await?
         .ok_or_else(|| ApiError::not_found(UNKNOWN_USER))?;

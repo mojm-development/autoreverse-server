@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use super::validate::ApiJson;
+use super::validate::{ApiJson, JsonBody};
 use crate::auth::ApiUser;
 use crate::error::{ApiError, ApiResult};
 use crate::library::playlists::{
@@ -157,9 +157,10 @@ async fn rename(
     State(state): State<AppState>,
     user: ApiUser,
     Path(raw_id): Path<String>,
-    ApiJson(body): ApiJson<Map<String, Value>>,
+    body: JsonBody,
 ) -> ApiResult<Json<PlaylistOut>> {
     let playlist = own(&state, &user, &raw_id).await?;
+    let body: Map<String, Value> = body.parse()?;
     let name = name_from(&body)?;
     let row = rename_playlist(&state.db, playlist.id, name).await?;
     let count = entry_count(&state.db, row.id).await?;
@@ -207,9 +208,10 @@ async fn add_entry(
     State(state): State<AppState>,
     user: ApiUser,
     Path(raw_id): Path<String>,
-    ApiJson(body): ApiJson<Map<String, Value>>,
+    body: JsonBody,
 ) -> ApiResult<Json<EntryOut>> {
     let playlist = own(&state, &user, &raw_id).await?;
+    let body: Map<String, Value> = body.parse()?;
     let unknown_item = || ApiError::not_found("Unbekanntes Item");
     let unknown_track = || ApiError::not_found("Unbekannter Track");
     let target = match (id_field(&body, "item_id"), id_field(&body, "track_id")) {
@@ -248,13 +250,14 @@ async fn reorder_entry(
     State(state): State<AppState>,
     user: ApiUser,
     Path((raw_id, raw_entry)): Path<(String, String)>,
-    ApiJson(body): ApiJson<Map<String, Value>>,
+    body: JsonBody,
 ) -> ApiResult<StatusCode> {
     let playlist = own(&state, &user, &raw_id).await?;
     let entry_id = path_id(&raw_entry, UNKNOWN_ENTRY)?;
     entry(&state.db, playlist.id, entry_id)
         .await?
         .ok_or_else(|| ApiError::not_found(UNKNOWN_ENTRY))?;
+    let body: Map<String, Value> = body.parse()?;
     let count = entry_count(&state.db, playlist.id).await?;
     let position = body
         .get("position")

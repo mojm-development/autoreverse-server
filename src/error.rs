@@ -72,12 +72,17 @@ impl From<sqlx::Error> for ApiError {
 
 #[derive(Serialize)]
 struct Detail<'a> {
+    /// Only on a 500: legacy's `handleError` answered uncaught errors with
+    /// `{message, detail}` (SvelteKit's `App.Error` needs `message`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<&'a str>,
     detail: &'a str,
 }
 
-/// The body every error response carries.
+/// The body every error response carries: `{detail}`, and `{message, detail}` for a 500.
 pub fn detail_response(status: StatusCode, detail: &str) -> Response {
-    (status, axum::Json(Detail { detail })).into_response()
+    let message = (status == StatusCode::INTERNAL_SERVER_ERROR).then_some(detail);
+    (status, axum::Json(Detail { message, detail })).into_response()
 }
 
 impl IntoResponse for ApiError {
@@ -192,5 +197,26 @@ mod tests {
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(response.headers()[header::RETRY_AFTER], "12");
         assert_eq!(response.headers()[header::CONTENT_TYPE], "application/json");
+    }
+
+    async fn body(response: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[tokio::test]
+    async fn only_a_500_carries_message_beside_detail() {
+        let internal = ApiError::internal("boom").into_response();
+        assert_eq!(
+            body(internal).await,
+            serde_json::json!({ "message": INTERNAL_DETAIL, "detail": INTERNAL_DETAIL })
+        );
+        let missing = ApiError::not_found("Unbekanntes Item").into_response();
+        assert_eq!(
+            body(missing).await,
+            serde_json::json!({ "detail": "Unbekanntes Item" })
+        );
     }
 }

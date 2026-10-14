@@ -31,6 +31,30 @@ impl<T: DeserializeOwned, S: Send + Sync> FromRequest<S> for ApiJson<T> {
     }
 }
 
+/// A JSON body read now and parsed later, for routes that look up the path's row first: legacy
+/// answered an unknown item with 404 before it read the body (`readJson` came after the lookup),
+/// so a broken body on a missing item is 404, not 422.
+#[derive(Debug, Clone)]
+pub struct JsonBody(Bytes);
+
+impl JsonBody {
+    /// The body as `T`, or 422 "Ungültiger JSON-Body".
+    pub fn parse<T: DeserializeOwned>(&self) -> Result<T, ApiError> {
+        serde_json::from_slice(&self.0).map_err(|_| ApiError::unprocessable(INVALID_JSON))
+    }
+}
+
+impl<S: Send + Sync> FromRequest<S> for JsonBody {
+    type Rejection = ApiError;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        Bytes::from_request(req, state)
+            .await
+            .map(JsonBody)
+            .map_err(|_| ApiError::unprocessable(INVALID_JSON))
+    }
+}
+
 /// Typed query parameters; a parameter that does not fit `T` is a 422.
 #[derive(Debug, Clone)]
 pub struct ApiQuery<T>(pub T);
@@ -39,11 +63,24 @@ impl<T: DeserializeOwned, S: Send + Sync> FromRequestParts<S> for ApiQuery<T> {
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let query = parts.uri.query().unwrap_or("");
-        serde_urlencoded::from_str(query)
+        let invalid = |_: serde_urlencoded::de::Error| ApiError::unprocessable(INVALID_QUERY);
+        let query = first_values(parts.uri.query().unwrap_or("")).map_err(invalid)?;
+        serde_urlencoded::from_str(&query)
             .map(ApiQuery)
-            .map_err(|_| ApiError::unprocessable(INVALID_QUERY))
+            .map_err(invalid)
     }
+}
+
+/// The query with only the first value of a repeated key, as `URLSearchParams.get` read it in
+/// legacy (`?limit=5&limit=500` is 5, not 500).
+fn first_values(query: &str) -> Result<String, serde_urlencoded::de::Error> {
+    let pairs: Vec<(String, String)> = serde_urlencoded::from_str(query)?;
+    let mut seen = std::collections::HashSet::new();
+    let first: Vec<(String, String)> = pairs
+        .into_iter()
+        .filter(|(key, _)| seen.insert(key.clone()))
+        .collect();
+    Ok(serde_urlencoded::to_string(first).expect("pairs of strings always encode"))
 }
 
 /// Raw query parameters, for routes that validate one by one with [`int_param`].
@@ -73,6 +110,14 @@ pub fn int_param(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_repeated_query_key_keeps_its_first_value() {
+        let query = first_values("limit=5&q=a%20b&limit=500").unwrap();
+        let map: QueryMap = serde_urlencoded::from_str(&query).unwrap();
+        assert_eq!(map["limit"], "5");
+        assert_eq!(map["q"], "a b");
+    }
 
     fn q(pairs: &[(&str, &str)]) -> QueryMap {
         pairs
