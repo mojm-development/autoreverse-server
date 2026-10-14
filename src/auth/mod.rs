@@ -3,6 +3,7 @@
 pub mod bootstrap;
 pub mod login;
 pub mod passwords;
+pub mod preferences;
 pub mod session;
 pub mod throttle;
 pub mod tokens;

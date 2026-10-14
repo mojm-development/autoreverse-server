@@ -12,6 +12,7 @@ pub mod library;
 pub mod scanner;
 pub mod serialize;
 pub mod state;
+pub mod streaming;
 pub mod web;
 
 pub use app::app;

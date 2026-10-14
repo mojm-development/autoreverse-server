@@ -7,6 +7,7 @@ pub mod format;
 pub mod home;
 pub mod layout;
 pub mod login;
+pub mod player;
 pub mod series;
 pub mod settings;
 
@@ -22,5 +23,6 @@ pub fn router() -> Router<AppState> {
         .merge(albums::router())
         .merge(artists::router())
         .merge(series::router())
+        .merge(player::router())
         .merge(settings::router())
 }

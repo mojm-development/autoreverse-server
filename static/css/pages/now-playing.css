@@ -1,0 +1,369 @@
+/* routes/(fullscreen)/library/[id]/player/+page.svelte, prefixed with `.np`. */
+.np {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1fr 360px;
+	/* The transport must stay on screen: the page never grows past the viewport, the
+	   artwork gives way instead. */
+	height: 100dvh;
+	min-height: 520px;
+	background: var(--bg);
+	overflow: hidden;
+}
+.np .ambient {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	overflow: hidden;
+}
+.np .blob {
+	position: absolute;
+	width: 60vw;
+	height: 60vw;
+	border-radius: 50%;
+	filter: blur(90px);
+	opacity: 0.16;
+}
+.np .blob.a {
+	background: var(--a);
+	top: -10%;
+	left: -10%;
+	animation: npDriftA 26s ease-in-out infinite alternate;
+}
+.np .blob.b {
+	background: var(--music);
+	bottom: -15%;
+	right: -5%;
+	animation: npDriftB 32s ease-in-out infinite alternate;
+}
+.np .blob.c {
+	background: var(--podcast);
+	top: 30%;
+	right: 20%;
+	animation: npDriftC 40s ease-in-out infinite alternate;
+}
+@keyframes npDriftA {
+	from {
+		transform: translate(0, 0) scale(1);
+	}
+	to {
+		transform: translate(6%, 4%) scale(1.08);
+	}
+}
+@keyframes npDriftB {
+	from {
+		transform: translate(0, 0) scale(1);
+	}
+	to {
+		transform: translate(-5%, -6%) scale(1.05);
+	}
+}
+@keyframes npDriftC {
+	from {
+		transform: translate(0, 0) scale(1);
+	}
+	to {
+		transform: translate(4%, -3%) scale(0.95);
+	}
+}
+
+.np .left {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	padding: 28px 40px;
+	min-height: 0;
+	overflow: hidden;
+}
+.np .status-row {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.np .back {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 0 14px 0 11px;
+	font-size: 11.5px;
+	color: var(--dim);
+}
+.np .back:hover {
+	color: var(--text);
+	border-color: var(--a);
+}
+.np .back .icon {
+	font-size: 15px;
+	flex: none;
+}
+.np .session {
+	margin-left: auto;
+	color: var(--faint);
+	font-size: 11px;
+}
+.np .hero {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 10px;
+	/* Takes the room between the status row and the transport, so cover and visualizer
+	   grow into it instead of leaving a hole above them. */
+	flex: 1 1 0;
+	min-height: 0;
+	justify-content: flex-end;
+}
+.np .cover-row {
+	display: flex;
+	align-items: stretch;
+	gap: 24px;
+	align-self: stretch;
+	/* basis 0, so the square artwork sizes itself from the leftover height rather than
+	   pushing the transport off screen. */
+	flex: 1 1 0;
+	min-height: 0;
+	max-height: 42dvh;
+	margin-bottom: 12px;
+}
+.np .viz-panel {
+	flex: 1;
+	min-width: 0;
+	--viz-gap: 5px;
+	--viz-segment: 12px;
+}
+.np .row-viz {
+	display: block;
+	width: 22px;
+	height: 18px;
+	--viz-gap: 2px;
+	--viz-segment: 5px;
+}
+.np .cover {
+	height: 100%;
+	aspect-ratio: 1;
+	max-width: 40%;
+	flex: none;
+	border-radius: var(--radius-lg);
+	background: var(--tile);
+	overflow: hidden;
+}
+.np .cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+.np h1 {
+	font: 600 46px/1.1 var(--font-sans);
+	margin: 4px 0 0;
+}
+.np .subtitle {
+	color: var(--dim);
+	margin: 0;
+}
+.np .byline {
+	color: var(--faint);
+	margin: 0;
+	font-size: 12px;
+}
+.np .scrubber-wrap {
+	align-self: stretch;
+	width: 100%;
+	margin-top: 14px;
+	--scrubber-height: 6px;
+	--scrubber-thumb: 12px;
+}
+.np .transport {
+	align-self: stretch;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+	margin-top: 16px;
+}
+/* Transport first, the two dropdowns as a quieter second group beside it. */
+.np .deck {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.np .options {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.np .transport .pill {
+	font-size: 11px;
+}
+.np .step {
+	position: relative;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border-radius: 50%;
+	border: none;
+	background: transparent;
+	color: var(--dim);
+	display: grid;
+	place-items: center;
+}
+.np .step .icon {
+	font-size: 30px;
+}
+.np .step-value {
+	position: absolute;
+	font-size: 9.5px;
+	font-weight: 600;
+	letter-spacing: -0.02em;
+}
+.np .step:hover,
+.np .jump:hover:not(:disabled) {
+	color: var(--text);
+}
+.np .jump {
+	width: 40px;
+	height: 40px;
+	font-size: 21px;
+}
+.np .play {
+	width: 62px;
+	height: 62px;
+	border-radius: 50%;
+	background: var(--a);
+	border: none;
+	color: var(--bg);
+	font-size: 30px;
+	display: grid;
+	place-items: center;
+	box-shadow: 0 6px 20px -8px var(--a);
+}
+.np .play:hover {
+	filter: brightness(1.08);
+}
+.np .hints {
+	margin: 10px 0 0;
+	font-size: 10.5px;
+	color: var(--faint);
+}
+
+.np .table {
+	display: flex;
+	flex-direction: column;
+}
+.np .index {
+	width: 26px;
+	flex: none;
+	color: var(--faint);
+	display: flex;
+	align-items: center;
+}
+.np .track-title {
+	flex: 1;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: 13px;
+}
+.np .track-length {
+	flex: none;
+	color: var(--faint);
+	font-size: 11px;
+}
+.np .right {
+	position: relative;
+	z-index: 1;
+	min-height: 0;
+	overflow-y: auto;
+	background: var(--sidebar);
+	border-left: 1px solid var(--line);
+	padding: 24px 20px;
+	display: flex;
+	flex-direction: column;
+}
+.np .tabs {
+	display: flex;
+	gap: 18px;
+	border-bottom: 1px solid var(--line);
+	padding-bottom: 8px;
+	margin-bottom: 10px;
+}
+.np .tab {
+	background: none;
+	border: none;
+	color: var(--dim);
+	font: 500 12.5px var(--font-sans);
+	padding: 0;
+}
+.np .tab.active {
+	color: var(--text);
+}
+.np .times {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 6px;
+	font-size: 11px;
+	color: var(--faint);
+}
+.np .icon-btn:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+.np .bookmark-row {
+	display: flex;
+	justify-content: space-between;
+	padding: 8px 6px;
+}
+.np .bookmark-card {
+	margin-top: auto;
+	padding: 12px;
+	border-radius: var(--radius-md);
+	background: var(--panel);
+	border: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.np .bookmark-card .title {
+	font: 500 12.5px var(--font-sans);
+}
+
+/* The track rows: the playing one shows a small visualizer instead of its number. */
+.np .row-viz {
+	display: none;
+}
+.np [role='row'][aria-current='true'] .row-viz {
+	display: block;
+}
+.np [role='row'][aria-current='true'] .num {
+	display: none;
+}
+.np .speed,
+.np .sleep {
+	height: 28px;
+	padding: 0 10px;
+	background: var(--panel);
+	color: var(--text);
+	border: 1px solid var(--line);
+}
+@media (max-width: 900px) {
+	.np {
+		grid-template-columns: 1fr;
+		height: auto;
+		min-height: 100dvh;
+	}
+	.np .left {
+		padding: 20px 16px;
+	}
+	.np h1 {
+		font-size: 30px;
+	}
+	.np .transport {
+		flex-wrap: wrap;
+	}
+	.np .right {
+		border-left: none;
+		border-top: 1px solid var(--line);
+	}
+}

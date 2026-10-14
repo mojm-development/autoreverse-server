@@ -559,3 +559,14 @@ pub async fn unheard_episode_count(db: &PgPool, user_id: i32) -> Result<i64, sql
     .fetch_one(db)
     .await
 }
+
+/// The newest present top-level items (the start page's "Neu im Bestand").
+pub async fn recently_added(db: &PgPool, limit: i64) -> Result<Vec<Item>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT * FROM items WHERE parent_id IS NULL AND missing_since IS NULL
+         ORDER BY added_at DESC, id DESC LIMIT $1",
+    )
+    .bind(limit)
+    .fetch_all(db)
+    .await
+}

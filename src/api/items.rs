@@ -105,6 +105,7 @@ async fn detail(
 struct ChildrenOut {
     items: Vec<ItemSummary>,
     /// Seconds per child id; a child without tracks falls back to its feed's claim, else is absent.
+    #[serde(serialize_with = "crate::serialize::js_number_map")]
     durations: HashMap<i32, f64>,
 }
 

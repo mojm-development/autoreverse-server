@@ -220,9 +220,10 @@ async fn the_detail_carries_description_tracks_and_chapters(db: PgPool) {
     assert_eq!(body["title"], "Der Schwarm");
     assert_eq!(body["tracks"][0]["duration"], 42.0);
     assert_eq!(body["tracks"][0]["position"], 1);
+    // Whole seconds go out without a fraction, like JSON.stringify in legacy.
     assert_eq!(
         body["chapters"],
-        json!([{ "title": "Prolog", "start": 0.0, "end": 42.0 }])
+        json!([{ "title": "Prolog", "start": 0, "end": 42 }])
     );
 }
 

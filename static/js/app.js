@@ -92,3 +92,13 @@ document.addEventListener('htmx:afterSwap', renderThemeToggles);
 // `htmx:load` fires on content an outerHTML swap put in place (the old element, where
 // `afterSwap` fires, is already detached by then).
 document.addEventListener('htmx:load', renderScanLog);
+
+// A short confirmation ("Gespeichert") fades after a moment, like legacy's status line.
+function clearFlashes() {
+	for (const flash of document.querySelectorAll('[data-flash]')) {
+		flash.removeAttribute('data-flash');
+		setTimeout(() => (flash.textContent = ''), 2500);
+	}
+}
+document.addEventListener('DOMContentLoaded', clearFlashes);
+document.addEventListener('htmx:load', clearFlashes);

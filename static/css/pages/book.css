@@ -139,6 +139,33 @@
 	font-weight: 500;
 }
 
+.book-page .actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 14px;
+}
+.book-page .primary,
+.book-page .outline {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 36px;
+	padding: 0 16px;
+	border-radius: var(--radius-pill);
+	font: 500 13px var(--font-sans);
+	border: none;
+}
+.book-page .primary {
+	background: var(--a);
+	color: var(--bg);
+}
+.book-page .outline {
+	background: transparent;
+	border: 1px solid var(--line-strong);
+	color: var(--text);
+}
 @media (max-width: 700px) {
 	.book-page {
 		padding: 18px 16px;

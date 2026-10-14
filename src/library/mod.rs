@@ -3,5 +3,6 @@
 pub mod artist_covers;
 pub mod like;
 pub mod paths;
+pub mod playback;
 pub mod queries;
 pub mod sorting;

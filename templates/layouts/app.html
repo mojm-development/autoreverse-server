@@ -1,6 +1,6 @@
 {#- Logged-in pages: sidebar + main (legacy library/+layout.svelte). Needs `shell: Shell`. -#}
-{% extends "base.html" %}
-{% block body %}
+{% extends "layouts/player.html" %}
+{% block page %}
 <div class="shell">
 	{% include "partials/sidebar.html" %}
 	<main>{% block content %}{% endblock %}</main>

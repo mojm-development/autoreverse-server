@@ -83,6 +83,43 @@
 .album-page [role='row'][aria-current='true'] .index {
 	color: var(--a);
 }
+.album-page .actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 14px;
+}
+.album-page .primary,
+.album-page .outline {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 36px;
+	padding: 0 16px;
+	border-radius: var(--radius-pill);
+	font: 500 13px var(--font-sans);
+	border: none;
+}
+.album-page .primary {
+	background: var(--a);
+	color: var(--bg);
+}
+.album-page .outline {
+	background: transparent;
+	border: 1px solid var(--line-strong);
+	color: var(--text);
+}
+/* The playing track shows a play icon instead of its number. */
+.album-page .index .icon {
+	display: none;
+}
+.album-page [role='row'][aria-current='true'] .index .icon {
+	display: block;
+}
+.album-page [role='row'][aria-current='true'] .index .num {
+	display: none;
+}
 @media (max-width: 700px) {
 	.album-page {
 		padding: 18px 16px 24px;

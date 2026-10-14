@@ -13,6 +13,9 @@ use axum::{Router, routing::get, routing::post};
 
 use super::layout::Shell;
 use crate::api::scan::{cancel_scan, start_scan};
+use crate::auth::preferences::{
+    Preferences, SKIP_MAX, SKIP_MIN, SPEED_MAX, SPEED_MIN, set_preferences,
+};
 use crate::auth::{WebAdmin, WebUser};
 use crate::error::WebResult;
 use crate::library::paths::{LibraryPaths, get_library_paths, set_library_paths};
@@ -28,6 +31,7 @@ pub fn router() -> Router<AppState> {
         .route("/settings/scan/card", get(scan_card))
         .route("/settings/scan/start", post(scan_start))
         .route("/settings/scan/cancel", post(scan_cancel))
+        .route("/settings/playback", get(playback).post(playback_action))
 }
 
 pub struct Section {
@@ -195,6 +199,89 @@ async fn libraries_action(
             render_libraries(&state, &admin, &uri, None).await
         }
     }
+}
+
+#[derive(Template)]
+#[template(path = "pages/settings/playback.html")]
+struct PlaybackPage {
+    shell: Shell,
+    sections: Vec<&'static Section>,
+    prefs: Preferences,
+    speed_min: f64,
+    speed_max: f64,
+    skip_min: i32,
+    skip_max: i32,
+    saved: bool,
+    error: Option<&'static str>,
+}
+
+async fn render_playback(
+    state: &AppState,
+    user: &WebUser,
+    uri: &Uri,
+    saved: bool,
+    error: Option<&'static str>,
+) -> WebResult<Html<String>> {
+    // The shell carries the stored preferences already (for the player); the form shows them.
+    let (shell, sections) = settings_shell(state, user, uri).await?;
+    let page = PlaybackPage {
+        prefs: shell.preferences,
+        shell,
+        sections,
+        speed_min: SPEED_MIN,
+        speed_max: SPEED_MAX,
+        skip_min: SKIP_MIN,
+        skip_max: SKIP_MAX,
+        saved,
+        error,
+    };
+    Ok(Html(page.render()?))
+}
+
+/// Settings → Wiedergabe: speed and skip distances, for every user.
+async fn playback(
+    State(state): State<AppState>,
+    user: WebUser,
+    uri: Uri,
+) -> WebResult<Html<String>> {
+    render_playback(&state, &user, &uri, false, None).await
+}
+
+/// A form number the way `Number()` reads it: an empty field is 0. `None` if it is no number.
+fn form_number(form: &HashMap<String, String>, key: &str) -> Option<f64> {
+    let raw = form.get(key).map_or("", |v| v.trim());
+    if raw.is_empty() {
+        return Some(0.0);
+    }
+    raw.parse::<f64>().ok().filter(|n| n.is_finite())
+}
+
+/// Stores the form's values, clamped into their bounds (legacy's default action), and shows
+/// the page again with "Gespeichert".
+async fn playback_action(
+    State(state): State<AppState>,
+    user: WebUser,
+    body: Bytes,
+) -> WebResult<Html<String>> {
+    let uri: Uri = "/settings/playback".parse().expect("static uri");
+    let form: HashMap<String, String> = serde_urlencoded::from_bytes(&body).unwrap_or_default();
+    let values = (
+        form_number(&form, "playbackSpeed"),
+        form_number(&form, "skipBack"),
+        form_number(&form, "skipForward"),
+    );
+    let (Some(speed), Some(back), Some(forward)) = values else {
+        return render_playback(
+            &state,
+            &user,
+            &uri,
+            false,
+            Some("Bitte nur Zahlen eingeben."),
+        )
+        .await;
+    };
+    set_preferences(&state.db, user.id, speed, back, forward).await?;
+    render_playback(&state, &user, &uri, true, None).await
 }
 
 #[derive(Template)]

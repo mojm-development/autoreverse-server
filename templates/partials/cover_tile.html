@@ -1,5 +1,6 @@
-{#- legacy CoverTile.svelte for a book (`book: BookRow`). The play and pick buttons join with
-    playback and bulk editing. -#}
+{#- legacy CoverTile.svelte for a book (`book: BookRow`), with its play button. The pick button
+    joins with bulk editing. -#}
+{% import "partials/ui.html" as ui %}
 <figure class="cover-tile">
 	<div class="art">
 		{% if book.has_cover %}
@@ -12,6 +13,7 @@
 			<span class="progress-fill" style="width: {{ book.percent }}%"></span>
 		</span>
 		{% endif %}
+		<button class="play" aria-label="Abspielen" title="Abspielen" data-action="play" data-item-id="{{ book.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
 	</div>
 	<figcaption>
 		<span class="title">{{ book.title }}</span>

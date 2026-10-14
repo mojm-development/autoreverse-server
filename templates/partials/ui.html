@@ -6,3 +6,13 @@
 {% macro brand_mark(size) -%}
 <img src="/logo.png" alt="" width="{{ size }}" height="{{ size }}" class="mark" />
 {%- endmacro %}
+{#- legacy Visualizer.svelte: CSS bounce while playing, the real spectrum once the player has an
+    analyser (static/js/player/visualizer.js fills in the heights). -#}
+{% macro visualizer(bars, label) -%}
+<span class="viz" role="img" aria-label="Pausiert" data-viz data-viz-label="{{ label }}">{% for i in 0..bars %}<span class="bar" style="--i: {{ i }}"></span>{% endfor %}</span>
+{%- endmacro %}
+{#- legacy Scrubber.svelte: a slider that seeks on release (pointer) or per key. `kind` tells
+    static/js/player/ui.js what it controls. -#}
+{% macro scrubber(kind, label) -%}
+<div class="scrubber" role="slider" tabindex="0" aria-label="{{ label }}" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00" data-scrubber="{{ kind }}"><span class="ticks" data-scrubber-ticks></span><div class="fill"></div><div class="thumb"></div></div>
+{%- endmacro %}

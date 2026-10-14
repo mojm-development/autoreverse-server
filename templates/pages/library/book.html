@@ -1,9 +1,10 @@
-{#- legacy library/books/[id]/+page.svelte, without the player actions and the editor. -#}
+{#- legacy library/books/[id]/+page.svelte, without "Lesezeichen setzen" (slice 5) and the editor
+    (slice 8). static/js/player follows the player here while it plays this book. -#}
 {% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
 {% block title %}{{ book.title }} · Autoreverse{% endblock %}
-{% block head %}<link rel="stylesheet" href="/css/pages/book.css" />{% endblock %}
 {% block content %}
-<div class="content book-page" style="--a: var(--book)">
+<div class="content book-page" style="--a: var(--book)" data-live-item data-item-id="{{ book.id }}" data-kind="book" data-total="{{ total }}">
 	<div class="hero">
 		<div class="cover">
 			{% if book.cover_path.is_some() %}<img src="/items/{{ book.id }}/cover" alt="" />{% endif %}
@@ -15,16 +16,20 @@
 			</div>
 			<h1>{{ book.title }}</h1>
 			<p class="subline">{{ subline }}</p>
+			<div class="actions">
+				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} {{ play_label }}</button>
+				<button class="outline" data-action="restart">{% call ui::icon("previous") %}{% endcall %} Von vorn</button>
+			</div>
 		</div>
 	</div>
 
 	<div class="progress-row">
-		<span class="chapter-name">{{ current_chapter }}</span>
-		<span class="progress-meta mono">{{ progress_meta }}</span>
+		<span class="chapter-name" data-live-chapter-name>{{ current_chapter }}</span>
+		<span class="progress-meta mono" data-live-meta>{{ progress_meta }}</span>
 	</div>
 	<div class="scrubber">
 		{% for tick in ticks %}<span class="tick" style="left: {{ tick }}%"></span>{% endfor %}
-		<div class="fill" style="width: {{ percent }}%"></div>
+		<div class="fill" style="width: {{ percent }}%" data-live-fill></div>
 	</div>
 
 	<div data-tabs>
@@ -36,21 +41,13 @@
 		</div>
 
 		<div data-tab-panel="chapters">
-			<div class="table chapter-list" role="table" aria-label="Kapitel">
-				{% for chapter in chapters %}
-				<div role="row" class="row" title="{{ chapter.title }}">
-					<span class="index mono">{{ chapter.number }}</span>
-					<span class="title">{{ chapter.label }}</span>
-					<span class="cell state">{{ chapter.state }}</span>
-					<span class="cell mono">{{ chapter.start }}</span>
-				</div>
-				{% endfor %}
-			</div>
+			{% include "partials/chapter_list.html" %}
 		</div>
 		<div data-tab-panel="bookmarks" hidden>
 			<div class="table" role="table" aria-label="Lesezeichen">
 				{% for bookmark in bookmarks %}
-				<div role="row" class="row">
+				<div role="row" class="row clickable">
+					<button type="button" class="activator bare" aria-label="Lesezeichen {{ bookmark.title }} abspielen" data-action="play-from" data-position="{{ bookmark.position_secs }}"></button>
 					<span class="title">{{ bookmark.title }}</span>
 					<span class="cell mono">{{ bookmark.position }}</span>
 				</div>

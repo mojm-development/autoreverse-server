@@ -2,7 +2,6 @@
 {% extends "layouts/app.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}{% if let Some(series) = series %}{{ series }}{% else %}Bibliothek{% endif %} · Autoreverse{% endblock %}
-{% block head %}<link rel="stylesheet" href="/css/pages/books.css" /><script src="/js/books.js" defer></script>{% endblock %}
 {% block content %}
 <div class="content books-page" style="--a: var(--book)">
 	<header>

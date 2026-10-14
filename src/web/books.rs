@@ -1,5 +1,5 @@
-//! `/library/books` and `/library/books/{id}` (legacy `library/books/**`). Playing, bookmarking
-//! and editing join with their slices; until then the pages only show.
+//! `/library/books` and `/library/books/{id}` (legacy `library/books/**`). Playing is wired up by
+//! static/js/player through `data-action` buttons; bookmarking and editing join with their slices.
 
 use std::collections::HashMap;
 
@@ -315,11 +315,35 @@ pub struct ChapterRow {
     /// "gehört" once the saved position is past it.
     pub state: &'static str,
     pub start: String,
+    /// Seconds, for the player script.
+    pub start_secs: f64,
+    pub end_secs: f64,
+}
+
+impl ChapterRow {
+    /// The rows of a chapter list, with "gehört" up to `position`.
+    pub fn list(rows: &[queries::Chapter], item_title: &str, position: f64) -> Vec<ChapterRow> {
+        let titles: Vec<String> = rows.iter().map(|c| c.title.clone()).collect();
+        let labels = chapter_labels(&titles, Some(item_title));
+        rows.iter()
+            .enumerate()
+            .map(|(i, c)| ChapterRow {
+                number: i + 1,
+                title: c.title.clone(),
+                label: labels.get(i).cloned().unwrap_or_else(|| c.title.clone()),
+                state: if position >= c.end { "gehört" } else { "" },
+                start: format_hms(c.start),
+                start_secs: c.start,
+                end_secs: c.end,
+            })
+            .collect()
+    }
 }
 
 pub struct BookmarkRow {
     pub title: String,
     pub position: String,
+    pub position_secs: f64,
 }
 
 pub struct SeriesRow {
@@ -335,6 +359,9 @@ struct BookPage {
     subline: String,
     chapters: Vec<ChapterRow>,
     chapter_count: usize,
+    /// "Weiter ab 1:02:03" with saved progress, else "Abspielen".
+    play_label: String,
+    total: f64,
     current_chapter: String,
     progress_meta: String,
     percent: u32,
@@ -382,19 +409,7 @@ async fn detail(
     } else {
         0
     };
-    let titles: Vec<String> = chapter_rows.iter().map(|c| c.title.clone()).collect();
-    let labels = chapter_labels(&titles, Some(&book.title));
-    let chapters: Vec<ChapterRow> = chapter_rows
-        .iter()
-        .enumerate()
-        .map(|(i, c)| ChapterRow {
-            number: i + 1,
-            title: c.title.clone(),
-            label: labels.get(i).cloned().unwrap_or_else(|| c.title.clone()),
-            state: if position >= c.end { "gehört" } else { "" },
-            start: format_hms(c.start),
-        })
-        .collect();
+    let chapters = ChapterRow::list(&chapter_rows, &book.title, position);
     let ticks = chapter_rows
         .iter()
         .map(|c| {
@@ -422,6 +437,11 @@ async fn detail(
         subline,
         chapter_count: chapters.len(),
         chapters,
+        play_label: match progress_row {
+            Some(p) => format!("Weiter ab {}", format_hms(p.position)),
+            None => "Abspielen".into(),
+        },
+        total,
         current_chapter: current.map(|c| c.title.clone()).unwrap_or_default(),
         progress_meta: format!(
             "{} übrig · {percent} %",
@@ -434,6 +454,7 @@ async fn detail(
             .map(|b| BookmarkRow {
                 title: b.title.clone(),
                 position: format_hms(b.position),
+                position_secs: b.position,
             })
             .collect(),
         series_books: series_rows

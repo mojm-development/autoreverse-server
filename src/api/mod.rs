@@ -6,6 +6,7 @@ pub mod auth;
 pub mod images;
 pub mod items;
 pub mod me;
+pub mod playback;
 pub mod scan;
 pub mod server;
 pub mod tracks;
@@ -23,5 +24,6 @@ pub fn router() -> Router<AppState> {
         .merge(artists::router())
         .merge(scan::router())
         .merge(me::router())
+        .merge(playback::router())
         .merge(server::router())
 }

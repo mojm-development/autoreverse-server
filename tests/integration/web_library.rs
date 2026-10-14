@@ -184,7 +184,7 @@ async fn the_book_page_shows_meta_chapters_and_series(db: PgPool) {
     assert!(html.contains(r#"role="table" aria-label="Kapitel""#));
     // The repeated book title is dropped from the labels.
     assert!(html.contains(r#"<span class="title">Kapitel 2</span>"#));
-    assert!(html.contains(r#"<span class="cell state">gehört</span>"#));
+    assert!(html.contains(r#"<span class="cell state" data-chapter-state>gehört</span>"#));
     assert!(html.contains("0:30:00"));
     assert!(html.contains("Band zwei"));
     assert!(html.contains("37 %"));

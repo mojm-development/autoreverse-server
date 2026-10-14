@@ -1,0 +1,28 @@
+{#- legacy settings/playback/+page.svelte. After saving, the player picks the new values up from
+    `#page` (static/js/player/main.js). -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Wiedergabe · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-playback">
+	<h1>Wiedergabe</h1>
+	<form method="POST" action="/settings/playback" class="form">
+		<label>
+			<span class="eyebrow">Geschwindigkeit</span>
+			<input type="range" name="playbackSpeed" min="{{ speed_min }}" max="{{ speed_max }}" step="0.05" value="{{ prefs.playback_speed }}" />
+		</label>
+		<label>
+			<span class="eyebrow">Zurückspringen (Sekunden)</span>
+			<input type="number" name="skipBack" min="{{ skip_min }}" max="{{ skip_max }}" value="{{ prefs.skip_back }}" />
+		</label>
+		<label>
+			<span class="eyebrow">Vorspringen (Sekunden)</span>
+			<input type="number" name="skipForward" min="{{ skip_min }}" max="{{ skip_max }}" value="{{ prefs.skip_forward }}" />
+		</label>
+		<div class="save">
+			<button type="submit" class="primary">Speichern</button>
+			<span class="saved" role="status" aria-live="polite"{% if saved %} data-flash{% endif %}>{% if saved %}Gespeichert{% endif %}</span>
+		</div>
+		{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+	</form>
+</div>
+{% endblock %}

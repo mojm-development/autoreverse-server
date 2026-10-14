@@ -273,6 +273,44 @@ img.mark {
 	height: 100%;
 	background: var(--a, var(--book));
 }
+/* The play button on the artwork: shown on hover or focus, always on touch screens. */
+.cover-tile .play {
+	position: absolute;
+	right: 8px;
+	bottom: 8px;
+	width: 38px;
+	height: 38px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: var(--a, var(--music));
+	color: var(--bg);
+	font-size: 19px;
+	display: grid;
+	place-items: center;
+	box-shadow: 0 8px 18px -8px rgb(0 0 0 / 0.8);
+	opacity: 0;
+	transform: translateY(6px);
+	transition:
+		opacity 120ms ease,
+		transform 120ms ease;
+}
+.cover-tile:hover .play,
+.cover-tile .play:focus-visible {
+	opacity: 1;
+	transform: none;
+}
+@media (hover: none) {
+	.cover-tile .play {
+		opacity: 1;
+		transform: none;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.cover-tile .play {
+		transition: none;
+	}
+}
 .cover-tile .placeholder {
 	background: var(--tile);
 	background-image: repeating-linear-gradient(135deg, var(--stripe) 0 1px, transparent 1px 7px);
@@ -308,6 +346,26 @@ img.mark {
 }
 [role='row'][aria-current='true'] {
 	background: color-mix(in oklab, var(--a) 12%, transparent);
+}
+/* A row that does something: an invisible button covers it, so the whole row is the target and
+   keyboard focus lands on one control per row. Content that must stay clickable sits `.above`. */
+.row.clickable {
+	position: relative;
+}
+.row .activator {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	width: 100%;
+	border-radius: inherit;
+}
+.row .activator:focus-visible {
+	outline: 2px solid var(--a, var(--book));
+	outline-offset: -2px;
+}
+.row.clickable .above {
+	position: relative;
+	z-index: 2;
 }
 
 /* SortToggle.svelte, ViewToggle.svelte */

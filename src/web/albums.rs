@@ -299,6 +299,7 @@ async fn more(
 }
 
 pub struct TrackRow {
+    pub id: i32,
     pub number: usize,
     pub title: String,
     pub duration: String,
@@ -350,6 +351,7 @@ async fn detail(
             .iter()
             .enumerate()
             .map(|(i, t)| TrackRow {
+                id: t.id,
                 number: i + 1,
                 title: t
                     .title

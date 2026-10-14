@@ -1,10 +1,10 @@
-{#- legacy library/albums/[id]/+page.svelte, without the player actions, favourites and the
-    editor. -#}
+{#- legacy library/albums/[id]/+page.svelte, without favourites (slice 5) and the editor
+    (slice 8). static/js/player marks the playing track. -#}
 {% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
 {% block title %}{{ album.title }} · Autoreverse{% endblock %}
-{% block head %}<link rel="stylesheet" href="/css/pages/album.css" />{% endblock %}
 {% block content %}
-<div class="content album-page" style="--a: var(--music)">
+<div class="content album-page" style="--a: var(--music)" data-live-item data-item-id="{{ album.id }}" data-kind="album">
 	<div class="hero">
 		<div class="cover">
 			{% if album.cover_path.is_some() %}<img src="/items/{{ album.id }}/cover" alt="" />{% endif %}
@@ -13,6 +13,10 @@
 			<span class="eyebrow">{{ eyebrow }}</span>
 			<h1>{{ album.title }}</h1>
 			<p class="subline">{{ subline }}</p>
+			<div class="actions">
+				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} Abspielen</button>
+				<button class="outline" data-action="shuffle">{% call ui::icon("shuffle") %}{% endcall %} Zufall</button>
+			</div>
 		</div>
 	</div>
 
@@ -21,8 +25,9 @@
 			<span></span><span>Titel</span><span>Interpret</span><span>Dauer</span>
 		</div>
 		{% for track in tracks %}
-		<div role="row" class="row">
-			<span class="index mono">{{ track.number }}</span>
+		<div role="row" class="row clickable" aria-current="false" data-track-row data-track-id="{{ track.id }}">
+			<button type="button" class="activator bare" aria-label="{{ track.title }} abspielen" data-action="play-track" data-track-id="{{ track.id }}"></button>
+			<span class="index mono"><span class="num">{{ track.number }}</span>{% call ui::icon("play") %}{% endcall %}</span>
 			<span class="title">{{ track.title }}</span>
 			<span class="cell">{{ artist }}</span>
 			<span class="cell mono">{{ track.duration }}</span>

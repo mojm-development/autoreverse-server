@@ -1,7 +1,6 @@
 {#- legacy settings/+layout.svelte. Needs `shell: Shell` and `sections`. -#}
-{% extends "base.html" %}
-{% block head %}<link rel="stylesheet" href="/css/pages/settings.css" />{% block page_head %}{% endblock %}{% endblock %}
-{% block body %}
+{% extends "layouts/player.html" %}
+{% block page %}
 <div class="shell">
 	{% include "partials/sidebar.html" %}
 	<div class="settings" style="--a: var(--book)">

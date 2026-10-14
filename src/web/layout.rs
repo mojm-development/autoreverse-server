@@ -5,6 +5,7 @@ use axum::http::Uri;
 use sqlx::PgPool;
 
 use crate::auth::WebUser;
+use crate::auth::preferences::Preferences;
 use crate::error::{WebError, WebResult};
 use crate::library::queries::{artist_count, library_counts, unheard_episode_count};
 
@@ -27,16 +28,20 @@ pub struct Shell {
     pub user_name: String,
     pub is_admin: bool,
     pub counts: SidebarCounts,
+    /// Handed to the web player on every page (`data-*` on `#page`), so a change in Settings →
+    /// Wiedergabe reaches a player that keeps running across page changes.
+    pub preferences: Preferences,
 }
 
 impl Shell {
     pub async fn load(db: &PgPool, user: &WebUser, uri: &Uri) -> WebResult<Shell> {
-        let row: Option<(String, bool)> =
-            sqlx::query_as("SELECT name, is_admin FROM users WHERE id = $1")
-                .bind(user.id)
-                .fetch_optional(db)
-                .await?;
-        let Some((user_name, is_admin)) = row else {
+        let row: Option<(String, bool, f64, i32, i32)> = sqlx::query_as(
+            "SELECT name, is_admin, playback_speed, skip_back, skip_forward FROM users WHERE id = $1",
+        )
+        .bind(user.id)
+        .fetch_optional(db)
+        .await?;
+        let Some((user_name, is_admin, playback_speed, skip_back, skip_forward)) = row else {
             return Err(WebError::redirect("/login"));
         };
         let (counts, artists, unread) = tokio::try_join!(
@@ -57,6 +62,11 @@ impl Shell {
                 podcasts: counts.podcast_count,
                 unread_episodes: unread,
                 books: counts.book_count,
+            },
+            preferences: Preferences {
+                playback_speed,
+                skip_back,
+                skip_forward,
             },
         })
     }
@@ -129,6 +139,7 @@ mod tests {
             user_name: name.into(),
             is_admin: false,
             counts: SidebarCounts::default(),
+            preferences: Preferences::default(),
         }
     }
 

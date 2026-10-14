@@ -25,6 +25,63 @@ pub fn iso<S: serde::Serializer>(d: &DateTime<Utc>, s: S) -> Result<S::Ok, S::Er
     s.serialize_str(&to_iso(*d))
 }
 
+/// A number the way `JSON.stringify` writes it: whole values without a fraction (`120`, not
+/// `120.0`), so the wire format matches legacy byte for byte. NaN and infinities become `null`.
+pub fn js_number<S: serde::Serializer>(n: &f64, s: S) -> Result<S::Ok, S::Error> {
+    const MAX_SAFE: f64 = 9_007_199_254_740_991.0;
+    if !n.is_finite() {
+        s.serialize_none()
+    } else if n.fract() == 0.0 && n.abs() <= MAX_SAFE {
+        s.serialize_i64(*n as i64)
+    } else {
+        s.serialize_f64(*n)
+    }
+}
+
+/// [`js_number`] for every value of a map.
+pub fn js_number_map<K, S>(map: &std::collections::HashMap<K, f64>, s: S) -> Result<S::Ok, S::Error>
+where
+    K: Serialize,
+    S: serde::Serializer,
+{
+    js_number_entries(map.len(), map.iter(), s)
+}
+
+/// [`js_number_map`] for an ordered map.
+pub fn js_number_map_btree<K, S>(
+    map: &std::collections::BTreeMap<K, f64>,
+    s: S,
+) -> Result<S::Ok, S::Error>
+where
+    K: Serialize,
+    S: serde::Serializer,
+{
+    js_number_entries(map.len(), map.iter(), s)
+}
+
+fn js_number_entries<'a, K, S>(
+    len: usize,
+    entries: impl Iterator<Item = (&'a K, &'a f64)>,
+    s: S,
+) -> Result<S::Ok, S::Error>
+where
+    K: Serialize + 'a,
+    S: serde::Serializer,
+{
+    use serde::ser::SerializeMap;
+    struct Js(f64);
+    impl Serialize for Js {
+        fn serialize<S2: serde::Serializer>(&self, s: S2) -> Result<S2::Ok, S2::Error> {
+            js_number(&self.0, s)
+        }
+    }
+    let mut out = s.serialize_map(Some(len))?;
+    for (k, v) in entries {
+        out.serialize_entry(k, &Js(*v))?;
+    }
+    out.end()
+}
+
 /// An item in a list. No `cover_path` (a server path), only whether there is one; no
 /// description (blurbs run long, a list would carry megabytes of prose).
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -82,6 +139,7 @@ pub struct TrackOut {
     pub id: i32,
     pub position: i32,
     pub title: Option<String>,
+    #[serde(serialize_with = "js_number")]
     pub duration: f64,
 }
 
@@ -119,7 +177,9 @@ impl From<&Track> for TrackDetail {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChapterOut {
     pub title: String,
+    #[serde(serialize_with = "js_number")]
     pub start: f64,
+    #[serde(serialize_with = "js_number")]
     pub end: f64,
 }
 
@@ -142,6 +202,19 @@ mod tests {
     fn drops_fractional_seconds() {
         let d = Utc.timestamp_millis_opt(1_792_002_177_123).unwrap();
         assert_eq!(to_iso(d), "2026-10-14T18:22:57Z");
+    }
+
+    #[test]
+    fn numbers_serialize_like_json_stringify() {
+        #[derive(Serialize)]
+        struct N(#[serde(serialize_with = "js_number")] f64);
+        let j = |n: f64| serde_json::to_string(&N(n)).unwrap();
+        assert_eq!(j(120.0), "120");
+        assert_eq!(j(0.0), "0");
+        assert_eq!(j(-0.0), "0");
+        assert_eq!(j(1.25), "1.25");
+        assert_eq!(j(1350.5), "1350.5");
+        assert_eq!(j(f64::NAN), "null");
     }
 
     #[test]

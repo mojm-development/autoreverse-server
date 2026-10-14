@@ -1,0 +1,38 @@
+{#- Every logged-in page: the swappable page plus the web player that outlives it (legacy root
+    +layout.svelte with MiniPlayerBar). Links and forms are boosted by htmx; static/js/player/
+    navigation.js swaps only `#page`, so the `<audio>` element and the mini bar below keep playing
+    across page changes, the way SvelteKit's client-side navigation did. Needs `shell: Shell`. -#}
+{% extends "base.html" %}
+{% block layout_head %}
+		{#- All page styles and page scripts up front: a boosted navigation swaps the body only,
+		    the head of the next page is never read. -#}
+		<link rel="stylesheet" href="/css/player.css" />
+		<link rel="stylesheet" href="/css/pages/library.css" />
+		<link rel="stylesheet" href="/css/pages/books.css" />
+		<link rel="stylesheet" href="/css/pages/book.css" />
+		<link rel="stylesheet" href="/css/pages/series.css" />
+		<link rel="stylesheet" href="/css/pages/albums.css" />
+		<link rel="stylesheet" href="/css/pages/album.css" />
+		<link rel="stylesheet" href="/css/pages/artists.css" />
+		<link rel="stylesheet" href="/css/pages/artist.css" />
+		<link rel="stylesheet" href="/css/pages/settings.css" />
+		<link rel="stylesheet" href="/css/pages/now-playing.css" />
+		<script src="/js/books.js" defer></script>
+		<script src="/js/artists.js" defer></script>
+		<script src="/js/series.js" defer></script>
+		<script type="module" src="/js/player/main.js"></script>
+{% endblock %}
+{% block body %}
+<div class="boost-root" hx-boost="true">
+	<div
+		id="page"
+		hx-history-elt
+		data-speed="{{ shell.preferences.playback_speed }}"
+		data-skip-back="{{ shell.preferences.skip_back }}"
+		data-skip-forward="{{ shell.preferences.skip_forward }}"
+	>
+		{% block page %}{% endblock %}
+	</div>
+	{% include "partials/mini_player.html" %}
+</div>
+{% endblock %}
