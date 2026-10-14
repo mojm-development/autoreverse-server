@@ -1,5 +1,5 @@
 {#- legacy CoverTile.svelte for an album (`album: AlbumRow`), inside its link, with its play
-    button. The pick button joins with bulk editing. -#}
+    button and, for Verwalter (`pickable`), the pick button of the bulk selection. -#}
 {% import "partials/ui.html" as ui %}
 <a href="/library/albums/{{ album.id }}" class="tile-link">
 	<figure class="cover-tile">
@@ -9,6 +9,7 @@
 			{% else %}
 			<div class="placeholder" style="--accent: var(--music)"></div>
 			{% endif %}
+			{% if pickable %}<button type="button" class="pick" aria-pressed="false" aria-label="{{ album.title }} auswählen" title="{{ album.title }} auswählen" data-pick="{{ album.id }}">{% call ui::icon("heart-filled") %}{% endcall %}</button>{% endif %}
 			<button class="play" aria-label="Abspielen" title="Abspielen" data-action="play" data-item-id="{{ album.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
 		</div>
 		<figcaption>

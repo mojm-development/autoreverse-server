@@ -1,5 +1,6 @@
-{#- legacy library/books/[id]/+page.svelte, without the editor (slice 8). static/js/player follows
-    the player here while it plays this book and sets bookmarks; the heart is static/js/app.js. -#}
+{#- legacy library/books/[id]/+page.svelte. static/js/player follows the player here while it plays
+    this book and sets bookmarks; the heart is static/js/app.js, "Bearbeiten" (Verwalter)
+    static/js/metadata. -#}
 {% extends "layouts/app.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}{{ book.title }} · Autoreverse{% endblock %}
@@ -20,6 +21,7 @@
 				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} {{ play_label }}</button>
 				<button class="outline" data-action="restart">{% call ui::icon("previous") %}{% endcall %} Von vorn</button>
 				{% include "partials/bookmark_button.html" %}
+				{% if shell.is_admin %}<button type="button" class="outline" data-editor-open>{% call ui::icon("settings") %}{% endcall %} Bearbeiten</button>{% endif %}
 				{% call ui::favorite("items", book.id, favorite, "Zu Favoriten hinzufügen", "Aus Favoriten entfernen", "") %}{% endcall %}
 				<button type="button" class="outline" data-playlist-pick data-pick-item="{{ book.id }}">{% call ui::icon("playlist-add") %}{% endcall %} Zur Playlist hinzufügen</button>
 			</div>
@@ -68,5 +70,6 @@
 		{% endif %}
 	</div>
 	{% include "partials/playlist_picker.html" %}
+	{% if let Some(editor) = editor %}{% include "partials/metadata_editor.html" %}{% endif %}
 </div>
 {% endblock %}

@@ -1,5 +1,5 @@
 //! `/library/books` and `/library/books/{id}` (legacy `library/books/**`). Playing is wired up by
-//! static/js/player through `data-action` buttons; bookmarking and editing join with their slices.
+//! static/js/player through `data-action` buttons, editing (Verwalter) by static/js/metadata.
 
 use std::collections::HashMap;
 
@@ -11,6 +11,7 @@ use axum::{Router, routing::get};
 
 use super::format::{chapter_labels, format_hms, format_hours, human_duration, volume};
 use super::layout::Shell;
+use super::metadata::{BulkEditor, MetadataEditor};
 use super::playlists::{PlaylistChoice, playlist_choices};
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
@@ -141,6 +142,9 @@ struct BooksPage {
     clear_series_href: String,
     filters: Vec<Filter>,
     empty: String,
+    /// Verwalter pick tiles for the bulk editor.
+    pickable: bool,
+    bulk: Option<BulkEditor>,
 }
 
 /// The current list's parameters, so a link can change one and keep the rest.
@@ -289,7 +293,10 @@ async fn list(
         })
         .collect();
 
+    let pickable = shell.is_admin;
     let page = BooksPage {
+        bulk: pickable.then(|| BulkEditor::new("book", total, None)),
+        pickable,
         shell,
         view: params.view,
         sort: params.sort.key(),
@@ -376,6 +383,8 @@ struct BookPage {
     playlists: Vec<PlaylistChoice>,
     /// The saved position: where "Lesezeichen setzen" marks while the book is not playing.
     bookmark_at: f64,
+    /// For Verwalter.
+    editor: Option<MetadataEditor>,
 }
 
 async fn detail(
@@ -450,7 +459,11 @@ async fn detail(
         format_hours(total)
     ));
 
+    let editor = shell
+        .is_admin
+        .then(|| MetadataEditor::new(&book, &track_rows, "Dateien"));
     let page = BookPage {
+        editor,
         shell,
         subline,
         chapter_count: chapters.len(),

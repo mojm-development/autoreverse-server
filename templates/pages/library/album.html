@@ -1,5 +1,5 @@
-{#- legacy library/albums/[id]/+page.svelte, without the editor (slice 8). static/js/player
-    marks the playing track; the hearts are handled by static/js/app.js. -#}
+{#- legacy library/albums/[id]/+page.svelte. static/js/player marks the playing track; the hearts
+    are handled by static/js/app.js, "Bearbeiten" (Verwalter) by static/js/metadata. -#}
 {% extends "layouts/app.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}{{ album.title }} · Autoreverse{% endblock %}
@@ -17,6 +17,7 @@
 				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} Abspielen</button>
 				<button class="outline" data-action="shuffle">{% call ui::icon("shuffle") %}{% endcall %} Zufall</button>
 				{% call ui::favorite("items", album.id, favorite, "Zu Favoriten hinzufügen", "Aus Favoriten entfernen", "") %}{% endcall %}
+				{% if shell.is_admin %}<button type="button" class="outline" data-editor-open>{% call ui::icon("settings") %}{% endcall %} Bearbeiten</button>{% endif %}
 				<button type="button" class="outline" data-playlist-pick data-pick-item="{{ album.id }}">{% call ui::icon("playlist-add") %}{% endcall %} Zur Playlist hinzufügen</button>
 			</div>
 		</div>
@@ -38,5 +39,6 @@
 		{% endfor %}
 	</div>
 	{% include "partials/playlist_picker.html" %}
+	{% if let Some(editor) = editor %}{% include "partials/metadata_editor.html" %}{% endif %}
 </div>
 {% endblock %}

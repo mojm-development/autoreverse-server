@@ -1,0 +1,82 @@
+{#- legacy SelectionBar.svelte + BulkEditor.svelte, for Verwalter on the books and albums lists.
+    The pick buttons on the tiles fill the selection (static/js/metadata/editor.js); the bar
+    opens the editor, a <template> cloned into <body>. Preview first (dry run), then "Anwenden",
+    then "Rückgängig" while the sheet is open. Needs `bulk: BulkEditor`. -#}
+<div class="selection-bar" role="status" data-selection-bar data-kind="{{ bulk.kind }}" data-total="{{ bulk.total }}"{% if let Some(filter) = bulk.filter_json %} data-filter="{{ filter }}"{% endif %} hidden>
+	<span class="count" data-selection-count></span>
+	<button type="button" class="link" data-select-all hidden></button>
+	<button type="button" class="link" data-selection-clear>Abwählen</button>
+	<button type="button" class="primary" data-selection-edit>Bearbeiten</button>
+</div>
+
+<template data-bulk-editor-template>
+<div class="bulk-editor" data-sheet data-bulk-editor data-kind="{{ bulk.kind }}">
+	<div class="backdrop" role="button" tabindex="-1" aria-label="Schließen" data-sheet-close></div>
+	<div class="sheet" role="dialog" aria-modal="true" aria-label="Mehrere bearbeiten">
+		<header>
+			<h2 data-bulk-heading></h2>
+			<button type="button" class="icon-btn" aria-label="Schließen" data-sheet-close>{% call ui::icon("expand") %}{% endcall %}</button>
+		</header>
+
+		<div class="body">
+			<div class="done" data-bulk-done hidden>
+				<p class="done-title" data-bulk-done-title></p>
+				<p class="done-text">
+					Die Änderung ist gespeichert. Solange dieses Fenster offen ist, kannst du sie in einem Zug
+					zurücknehmen.
+				</p>
+				<button type="button" class="outline" data-bulk-undo>Rückgängig</button>
+			</div>
+
+			<div data-bulk-form>
+				<p class="undone" data-bulk-undone hidden></p>
+
+				<p class="lead">
+					Nur angehakte Felder werden geschrieben. Was du hier setzt, gehört danach dir — der Scanner
+					überschreibt es nicht mehr.
+				</p>
+
+				<div class="fields" data-bulk-fields>
+					{% for field in bulk.fields %}
+					<div class="field" data-field="{{ field.wire }}" data-type="{{ field.kind }}">
+						<label class="check"><input type="checkbox" data-field-toggle /> {{ field.label }}</label>
+						<input type="{{ field.input_type }}" disabled data-field-value aria-label="{{ field.label }}" />
+					</div>
+					{% endfor %}
+				</div>
+
+				<h3>Suchen und ersetzen</h3>
+				<div class="replace">
+					<select data-replace-field aria-label="Feld">
+						{% for field in bulk.fields %}{% if field.is_text %}<option value="{{ field.wire }}">{{ field.label }}</option>{% endif %}{% endfor %}
+					</select>
+					<input placeholder="Suchen" data-replace-from />
+					<input placeholder="Ersetzen durch" data-replace-to />
+					<label class="check"><input type="checkbox" data-replace-regex /> Regex</label>
+				</div>
+
+				{% if bulk.kind == "book" %}
+				<h3>Serie &amp; Band</h3>
+				<div class="series">
+					<label class="check"><input type="radio" name="series-mode" value="off" checked data-series-mode /> Aus</label>
+					<label class="check"><input type="radio" name="series-mode" value="detect" data-series-mode /> Aus Ordnernamen erkennen</label>
+					<label class="check"><input type="radio" name="series-mode" value="assign" data-series-mode /> Serie zuweisen</label>
+					<input class="series-name" placeholder="Serienname" data-series-name hidden />
+					<input class="series-start" type="number" min="0" value="1" aria-label="Erste Bandnummer" data-series-start hidden />
+				</div>
+				<p class="lead" data-series-lead hidden></p>
+				{% endif %}
+
+				<div data-bulk-preview></div>
+			</div>
+		</div>
+
+		<footer>
+			<span class="error" data-sheet-error hidden></span>
+			<button type="button" class="outline" data-sheet-close data-bulk-cancel>Abbrechen</button>
+			<button type="button" class="outline" disabled data-bulk-preview-button>Vorschau</button>
+			<button type="button" class="primary" disabled data-bulk-apply>Anwenden</button>
+		</footer>
+	</div>
+</div>
+</template>

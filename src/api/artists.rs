@@ -1,26 +1,42 @@
-//! `GET /artists`, `GET /artists/{name}/cover`, `GET /artists/{name}/image`. Choosing an album or
-//! uploading a picture (`PUT`/`DELETE …/cover`, `POST …/image`) joins with metadata editing
-//! (slice 8).
+//! `GET /artists`, `GET|PUT|DELETE /artists/{name}/cover`, `GET|POST /artists/{name}/image`:
+//! an artist's picture, and choosing it — an album of theirs, or an uploaded image.
 
 use std::path::PathBuf;
 
-use axum::extract::{Path, State};
-use axum::response::Response;
+use axum::extract::multipart::{Multipart, MultipartRejection};
+use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::get};
 use serde::Serialize;
+use serde_json::{Value, json};
 
 use super::images::{cover_roots, serve_image};
-use crate::auth::ApiUser;
+use super::validate::ApiJson;
+use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
-use crate::library::artist_covers::{chosen_cover, effective_album, fallback_covers};
+use crate::library::artist_covers::{
+    MAX_IMAGE_BYTES, TOO_LARGE, chosen_cover, clear_cover, effective_album, fallback_covers,
+    select_album, store_image,
+};
 use crate::library::queries;
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/artists", get(list))
-        .route("/artists/{name}/cover", get(cover))
-        .route("/artists/{name}/image", get(image))
+        .route(
+            "/artists/{name}/cover",
+            get(cover).put(choose_album).delete(reset_cover),
+        )
+        .route(
+            "/artists/{name}/image",
+            get(image)
+                .post(upload)
+                // Room for the largest allowed picture plus the multipart framing; reading stops
+                // at the limit anyway.
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_LIMIT)),
+        )
 }
 
 #[derive(Serialize)]
@@ -109,4 +125,108 @@ async fn image(
     // The same roots `/items/{id}/cover` allows: an album cover is no less a stored path.
     let roots = cover_roots(&state.db, &state.config).await?;
     serve_image(&PathBuf::from(cover_path), &roots, NO_IMAGE, IMAGE_CACHE).await
+}
+
+/// The request body an upload may have.
+pub const UPLOAD_BODY_LIMIT: usize = MAX_IMAGE_BYTES + 1024 * 1024;
+
+/// The `image` field of a multipart upload.
+pub struct ImageUpload {
+    pub content_type: String,
+    /// The real size, or one past the limit when reading stopped there.
+    pub size: usize,
+    pub bytes: Vec<u8>,
+}
+
+fn upload_error(e: &axum::extract::multipart::MultipartError) -> ApiError {
+    if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
+        ApiError::new(StatusCode::PAYLOAD_TOO_LARGE, TOO_LARGE)
+    } else {
+        ApiError::unprocessable("Ungültiger Upload")
+    }
+}
+
+/// The first `image` field that is a file, read up to just past [`MAX_IMAGE_BYTES`]; `None`
+/// without one. A body that is no multipart form is 422 "Ungültiger Upload".
+pub async fn read_image_upload(
+    multipart: Result<Multipart, MultipartRejection>,
+) -> ApiResult<Option<ImageUpload>> {
+    let mut multipart = multipart.map_err(|_| ApiError::unprocessable("Ungültiger Upload"))?;
+    while let Some(mut field) = multipart.next_field().await.map_err(|e| upload_error(&e))? {
+        if field.name() != Some("image") {
+            continue;
+        }
+        if field.file_name().is_none() {
+            return Ok(None);
+        }
+        let content_type = field.content_type().unwrap_or("").to_owned();
+        let mut bytes = Vec::new();
+        while let Some(chunk) = field.chunk().await.map_err(|e| upload_error(&e))? {
+            bytes.extend_from_slice(&chunk);
+            if bytes.len() > MAX_IMAGE_BYTES {
+                break;
+            }
+        }
+        return Ok(Some(ImageUpload {
+            content_type,
+            size: bytes.len(),
+            bytes,
+        }));
+    }
+    Ok(None)
+}
+
+/// An album of the artist's as their picture.
+async fn choose_album(
+    State(state): State<AppState>,
+    _admin: ApiAdmin,
+    Path(name): Path<String>,
+    ApiJson(body): ApiJson<Value>,
+) -> ApiResult<Json<Value>> {
+    let artist = artist_name(name)?;
+    // `Number(body.item_id)`: a number, or a string holding one.
+    let item_id = match body.get("item_id") {
+        Some(Value::Number(n)) => n.as_f64(),
+        Some(Value::String(s)) => s.trim().parse::<f64>().ok(),
+        _ => None,
+    }
+    .filter(|n| n.fract() == 0.0 && *n > 0.0 && *n <= f64::from(i32::MAX))
+    .map(|n| n as i32)
+    .ok_or_else(|| ApiError::unprocessable("Ungültige Album-ID"))?;
+    select_album(&state.db, &artist, item_id).await?;
+    Ok(Json(json!({ "artist": artist, "item_id": item_id })))
+}
+
+/// Back to the random-but-stable album.
+async fn reset_cover(
+    State(state): State<AppState>,
+    _admin: ApiAdmin,
+    Path(name): Path<String>,
+) -> ApiResult<StatusCode> {
+    let artist = artist_name(name)?;
+    clear_cover(&state.db, &artist).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// An uploaded picture (multipart field `image`): JPEG, PNG, WebP or GIF up to 5 MB.
+async fn upload(
+    State(state): State<AppState>,
+    _admin: ApiAdmin,
+    Path(name): Path<String>,
+    multipart: Result<Multipart, MultipartRejection>,
+) -> ApiResult<Response> {
+    let artist = artist_name(name)?;
+    let upload = read_image_upload(multipart)
+        .await?
+        .ok_or_else(|| ApiError::unprocessable("Keine Bilddatei im Feld \"image\""))?;
+    store_image(
+        &state.db,
+        &artist,
+        &upload.content_type,
+        upload.size,
+        &upload.bytes,
+        &state.config.artists_dir,
+    )
+    .await?;
+    Ok((StatusCode::CREATED, Json(json!({ "artist": artist }))).into_response())
 }

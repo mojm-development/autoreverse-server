@@ -1,5 +1,5 @@
-//! `/library/albums` and `/library/albums/{id}` (legacy `library/albums/**`). Playing, favourites
-//! and editing join with their slices; until then the pages only show.
+//! `/library/albums` and `/library/albums/{id}` (legacy `library/albums/**`). Playing and the
+//! hearts are static/js/player and app.js, editing (Verwalter) static/js/metadata.
 
 use std::collections::HashMap;
 
@@ -12,6 +12,7 @@ use axum::{Router, routing::get};
 use super::books::Link;
 use super::format::{encode_component, format_hours, human_duration};
 use super::layout::Shell;
+use super::metadata::{BulkEditor, MetadataEditor};
 use super::playlists::{PlaylistChoice, playlist_choices};
 use crate::auth::WebUser;
 use crate::error::{WebError, WebResult};
@@ -200,6 +201,8 @@ struct AlbumsPage {
     clear_missing_href: String,
     more_href: Option<String>,
     empty: String,
+    pickable: bool,
+    bulk: Option<BulkEditor>,
 }
 
 async fn list(
@@ -242,7 +245,21 @@ async fn list(
     } else {
         format!("Nichts gefunden für „{}“.", params.q)
     };
+    let pickable = shell.is_admin;
+    let bulk = pickable.then(|| {
+        BulkEditor::new(
+            "album",
+            total,
+            Some(BulkEditor::album_filter(
+                &params.q,
+                params.artist.as_deref(),
+                params.missing,
+            )),
+        )
+    });
     let page = AlbumsPage {
+        pickable,
+        bulk,
         shell,
         heading: params.heading(),
         view: params.view,
@@ -267,6 +284,7 @@ async fn list(
 #[derive(Template)]
 #[template(path = "partials/album_page.html")]
 struct AlbumsChunk {
+    pickable: bool,
     view: &'static str,
     albums: Vec<AlbumRow>,
     more_href: Option<String>,
@@ -276,9 +294,10 @@ struct AlbumsChunk {
 /// `InfiniteScroll` + `/library/more`), swapped in by htmx in place of the old sentinel.
 async fn more(
     State(state): State<AppState>,
-    _user: WebUser,
+    user: WebUser,
     Query(query): Query<HashMap<String, String>>,
 ) -> WebResult<Html<String>> {
+    let pickable = is_admin(&state, user.id).await?;
     let params = ListParams::from_query(&query);
     let offset = query
         .get("offset")
@@ -293,6 +312,7 @@ async fn more(
     let ids: Vec<i32> = rows.iter().map(|r| r.id).collect();
     let durations = item_durations(&state.db, &ids).await?;
     let chunk = AlbumsChunk {
+        pickable,
         view: params.view,
         more_href: params.more_href(rows.len(), offset),
         albums: album_rows(&rows, &durations, offset + 1),
@@ -319,6 +339,18 @@ struct AlbumPage {
     tracks: Vec<TrackRow>,
     favorite: bool,
     playlists: Vec<PlaylistChoice>,
+    /// For Verwalter.
+    editor: Option<MetadataEditor>,
+}
+
+async fn is_admin(state: &AppState, user_id: i32) -> Result<bool, sqlx::Error> {
+    Ok(
+        sqlx::query_scalar::<_, bool>("SELECT is_admin FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&state.db)
+            .await?
+            .unwrap_or(false),
+    )
 }
 
 async fn detail(
@@ -351,7 +383,11 @@ async fn detail(
         track_rows.len(),
         format_hours(total)
     );
+    let editor = shell
+        .is_admin
+        .then(|| MetadataEditor::new(&album, &track_rows, "Titel"));
     let page = AlbumPage {
+        editor,
         shell,
         eyebrow,
         subline,

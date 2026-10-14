@@ -101,5 +101,6 @@
 	</div>
 	{% endif %}
 	{% endif %}
+	{% if let Some(bulk) = bulk %}{% include "partials/bulk_editor.html" %}{% endif %}
 </div>
 {% endblock %}

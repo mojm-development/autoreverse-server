@@ -65,5 +65,6 @@
 		{% endfor %}{% include "partials/more_sentinel.html" %}
 	</div>
 	{% endif %}
+	{% if let Some(bulk) = bulk %}{% include "partials/bulk_editor.html" %}{% endif %}
 </div>
 {% endblock %}

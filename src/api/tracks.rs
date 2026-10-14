@@ -1,5 +1,4 @@
-//! `GET /tracks/{id}` and `GET|HEAD /tracks/{id}/stream`. `PATCH` comes with metadata editing
-//! (slice 8).
+//! `GET|PATCH /tracks/{id}` and `GET|HEAD /tracks/{id}/stream`.
 
 use std::path::Path as FsPath;
 
@@ -7,17 +6,21 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Method, StatusCode, header};
 use axum::response::Response;
 use axum::{Json, Router, routing::get};
+use serde::Serialize;
+use serde_json::Value;
 
-use crate::auth::ApiUser;
+use super::validate::ApiJson;
+use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
+use crate::library::metadata::{TRACK_FIELDS, edit_track, parse_request};
 use crate::library::queries;
-use crate::serialize::TrackDetail;
+use crate::serialize::{TrackDetail, TrackOut};
 use crate::state::AppState;
 use crate::streaming::ranges::range_response;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/tracks/{id}", get(detail))
+        .route("/tracks/{id}", get(detail).patch(patch))
         // axum answers HEAD from the GET route; the handler skips opening the file for it.
         .route("/tracks/{id}/stream", get(stream))
 }
@@ -59,4 +62,36 @@ async fn detail(
 ) -> ApiResult<Json<TrackDetail>> {
     let row = find_track(&state, &raw_id).await?;
     Ok(Json(TrackDetail::from(&row)))
+}
+
+#[derive(Serialize)]
+struct EditedTrack {
+    #[serde(flatten)]
+    track: TrackOut,
+    disc: Option<i32>,
+    locked_fields: Vec<String>,
+    changed: Vec<String>,
+    batch_id: String,
+}
+
+/// Correcting a track's own metadata — its title, mostly, which is what a badly tagged rip gets
+/// wrong. Locked against the scanner like an item's fields.
+async fn patch(
+    State(state): State<AppState>,
+    admin: ApiAdmin,
+    Path(raw_id): Path<String>,
+    ApiJson(body): ApiJson<Value>,
+) -> ApiResult<Json<EditedTrack>> {
+    let request = parse_request(TRACK_FIELDS, &body)?;
+    let id: i32 = raw_id
+        .parse()
+        .map_err(|_| ApiError::not_found("Unbekannter Titel"))?;
+    let result = edit_track(&state.db, admin.id, id, request).await?;
+    Ok(Json(EditedTrack {
+        track: TrackOut::from(&result.row),
+        disc: result.row.disc,
+        locked_fields: result.row.locked_fields.clone(),
+        changed: result.changed,
+        batch_id: result.batch_id,
+    }))
 }

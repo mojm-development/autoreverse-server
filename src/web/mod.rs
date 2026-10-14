@@ -8,6 +8,7 @@ pub mod format;
 pub mod home;
 pub mod layout;
 pub mod login;
+pub mod metadata;
 pub mod player;
 pub mod playlists;
 pub mod podcasts;

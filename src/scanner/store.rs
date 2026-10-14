@@ -215,14 +215,19 @@ async fn store_one(
         .bind(item_id)
         .execute(&mut **tx)
         .await?;
+    // A track title or disc edited by hand stays, like an item's locked fields (legacy locked
+    // them in PATCH /tracks but rewrote them here anyway).
     for t in &entry.tracks {
         sqlx::query(
             "INSERT INTO tracks (item_id, position, path, duration, title, disc, mtime, size)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              ON CONFLICT (path) DO UPDATE SET item_id = excluded.item_id,
                  position = excluded.position, duration = excluded.duration,
-                 title = excluded.title, disc = excluded.disc, mtime = excluded.mtime,
-                 size = excluded.size",
+                 title = CASE WHEN 'title' = ANY(tracks.locked_fields)
+                     THEN tracks.title ELSE excluded.title END,
+                 disc = CASE WHEN 'disc' = ANY(tracks.locked_fields)
+                     THEN tracks.disc ELSE excluded.disc END,
+                 mtime = excluded.mtime, size = excluded.size",
         )
         .bind(item_id)
         .bind(t.position)

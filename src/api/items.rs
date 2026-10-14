@@ -1,17 +1,23 @@
-//! `GET /items`, `GET /items/{id}`, `GET /items/{id}/children`, `GET /items/{id}/cover`.
+//! `GET /items`, `GET|PATCH /items/{id}`, `GET /items/{id}/children`, `GET /items/{id}/cover`,
+//! and the bulk side of metadata editing: `POST /items/bulk`, `POST /items/bulk/undo`,
+//! `POST /items/series`, `DELETE /items/missing`.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use axum::extract::{Path as UrlPath, State};
 use axum::response::Response;
-use axum::{Json, Router, routing::get};
+use axum::routing::{delete, get, post};
+use axum::{Json, Router};
 use serde::Serialize;
+use serde_json::{Value, json};
 
 use super::images::{cover_roots, serve_image};
-use super::validate::{ApiQuery, QueryMap, int_param};
-use crate::auth::ApiUser;
+use super::validate::{ApiJson, ApiQuery, QueryMap, int_param};
+use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
+use crate::library::bulk_metadata::{BulkResult, UndoResult, bulk_edit, plan_series, undo_batch};
+use crate::library::metadata::{ITEM_FIELDS, edit_item, parse_request};
 use crate::library::queries::{self, Item, ItemsFilter, SortKey};
 use crate::serialize::{ChapterOut, ItemDetail, ItemSummary, TrackOut};
 use crate::state::AppState;
@@ -19,7 +25,12 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/items", get(list))
-        .route("/items/{id}", get(detail))
+        .route("/items/{id}", get(detail).patch(patch))
+        // Static segments beat the `{id}` capture.
+        .route("/items/bulk", post(bulk))
+        .route("/items/bulk/undo", post(undo))
+        .route("/items/series", post(series))
+        .route("/items/missing", delete(remove_missing))
         .route("/items/{id}/children", get(children))
         .route("/items/{id}/cover", get(cover))
 }
@@ -144,4 +155,78 @@ async fn cover(
         "private, max-age=86400",
     )
     .await
+}
+
+#[derive(Serialize)]
+struct EditedItem {
+    #[serde(flatten)]
+    item: ItemDetail,
+    locked_fields: Vec<String>,
+    changed: Vec<String>,
+    batch_id: String,
+}
+
+/// Hand-editing an item's metadata. Every field set here is locked against the scanner, which
+/// otherwise rewrites it from the files on the next scan; `reset` hands a field back. Verwalter
+/// only — this changes what everyone sees.
+async fn patch(
+    State(state): State<AppState>,
+    admin: ApiAdmin,
+    UrlPath(raw_id): UrlPath<String>,
+    ApiJson(body): ApiJson<Value>,
+) -> ApiResult<Json<EditedItem>> {
+    let request = parse_request(ITEM_FIELDS, &body)?;
+    let id: i32 = raw_id
+        .parse()
+        .map_err(|_| ApiError::not_found("Unbekanntes Item"))?;
+    let result = edit_item(&state.db, admin.id, id, request).await?;
+    Ok(Json(EditedItem {
+        item: ItemDetail::from(&result.row),
+        locked_fields: result.row.locked_fields.clone(),
+        changed: result.changed,
+        batch_id: result.batch_id,
+    }))
+}
+
+/// Editing many items in one go. Defaults to a dry run: the answer is the diff the apply would
+/// write, so nothing changes before someone has seen it. `dry_run: false` writes, and the
+/// `batch_id` it answers with is what undoes it.
+async fn bulk(
+    State(state): State<AppState>,
+    admin: ApiAdmin,
+    ApiJson(body): ApiJson<Value>,
+) -> ApiResult<Json<BulkResult>> {
+    Ok(Json(bulk_edit(&state.db, admin.id, &body).await?))
+}
+
+async fn undo(
+    State(state): State<AppState>,
+    _admin: ApiAdmin,
+    ApiJson(body): ApiJson<Value>,
+) -> ApiResult<Json<UndoResult>> {
+    let batch_id = body
+        .get("batch_id")
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| ApiError::unprocessable("batch_id fehlt"))?;
+    Ok(Json(undo_batch(&state.db, batch_id).await?))
+}
+
+/// Series and volume numbers for a selection of books: `detect` applies the scanner's own rules
+/// on demand, `assign` numbers a chosen series through. Dry run by default, undoable by batch id.
+async fn series(
+    State(state): State<AppState>,
+    admin: ApiAdmin,
+    ApiJson(body): ApiJson<Value>,
+) -> ApiResult<Json<BulkResult>> {
+    Ok(Json(plan_series(&state.db, admin.id, &body).await?))
+}
+
+/// Removes every item marked missing — not while a scan runs, which may just be finding them.
+async fn remove_missing(State(state): State<AppState>, _admin: ApiAdmin) -> ApiResult<Json<Value>> {
+    if state.scan.snapshot().running {
+        return Err(ApiError::conflict("Es läuft gerade ein Scan"));
+    }
+    let removed = queries::delete_missing(&state.db).await?;
+    Ok(Json(json!({ "removed": removed })))
 }

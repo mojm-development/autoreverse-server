@@ -4,11 +4,13 @@
 
 mod common;
 
+mod artist_covers;
 mod auth_api;
 mod bootstrap;
 mod collections_api;
 mod items_api;
 mod library_paths;
+mod metadata_api;
 mod music;
 mod passwords;
 mod playback_api;
@@ -23,6 +25,7 @@ mod tokens;
 mod web_auth;
 mod web_collections;
 mod web_library;
+mod web_metadata;
 mod web_music;
 mod web_playback;
 mod web_playlists;

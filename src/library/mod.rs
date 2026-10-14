@@ -2,8 +2,10 @@
 
 pub mod artist_covers;
 pub mod bookmarks;
+pub mod bulk_metadata;
 pub mod favorites;
 pub mod like;
+pub mod metadata;
 pub mod paths;
 pub mod playback;
 pub mod playlists;

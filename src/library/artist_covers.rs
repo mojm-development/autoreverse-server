@@ -1,10 +1,31 @@
 //! Which picture stands for an artist (legacy `library/artistCovers.ts`): an uploaded image, an
-//! album chosen by hand, or else one of their albums picked at random but stably. Reading only —
-//! choosing and uploading join with metadata editing (slice 8).
+//! album chosen by hand, or else one of their albums picked at random but stably.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+
+use crate::error::{ApiError, ApiResult};
+
+/// The image types an artist picture may have, with the extension it is stored under.
+pub const IMAGE_TYPES: [(&str, &str); 4] = [
+    ("image/jpeg", ".jpg"),
+    ("image/png", ".png"),
+    ("image/webp", ".webp"),
+    ("image/gif", ".gif"),
+];
+
+pub const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+pub const TOO_LARGE: &str = "Bild ist zu groß (maximal 5 MB)";
+
+/// The stored file's name: a hash of the artist (any name is a safe file name that way).
+pub fn image_file_name(artist: &str, extension: &str) -> String {
+    let digest = Sha256::digest(artist.as_bytes());
+    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    format!("{}{extension}", &hex[..32])
+}
 
 /// One `artist_covers` row: exactly one of `item_id` and `image_path` is set
 /// (`artist_cover_xor`).
@@ -66,6 +87,99 @@ pub fn effective_album(
     }
 }
 
+/// Replaces the artist's choice; an uploaded file the new choice no longer uses is deleted.
+async fn replace(
+    db: &PgPool,
+    artist: &str,
+    item_id: Option<i32>,
+    image_path: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    let previous = chosen_cover(db, artist).await?;
+    sqlx::query(
+        "INSERT INTO artist_covers (artist, item_id, image_path, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (artist) DO UPDATE SET item_id = excluded.item_id,
+             image_path = excluded.image_path, updated_at = now()",
+    )
+    .bind(artist)
+    .bind(item_id)
+    .bind(image_path)
+    .execute(db)
+    .await?;
+    if let Some(old) = previous.and_then(|p| p.image_path)
+        && Some(old.as_str()) != image_path
+    {
+        let _ = tokio::fs::remove_file(old).await;
+    }
+    Ok(())
+}
+
+/// Picks one of the artist's own albums as their picture.
+pub async fn select_album(db: &PgPool, artist: &str, item_id: i32) -> ApiResult<()> {
+    let found: Option<i32> =
+        sqlx::query_scalar("SELECT id FROM items WHERE id = $1 AND kind = 'album' AND artist = $2")
+            .bind(item_id)
+            .bind(artist)
+            .fetch_optional(db)
+            .await?;
+    if found.is_none() {
+        return Err(ApiError::unprocessable(
+            "Album gehört nicht zu diesem Interpreten",
+        ));
+    }
+    replace(db, artist, Some(item_id), None).await?;
+    Ok(())
+}
+
+/// Stores an uploaded picture under `artists_dir` and points the artist at it. `size` is the
+/// upload's size, which may be more than `bytes` holds when reading stopped at the limit.
+pub async fn store_image(
+    db: &PgPool,
+    artist: &str,
+    content_type: &str,
+    size: usize,
+    bytes: &[u8],
+    artists_dir: &Path,
+) -> ApiResult<PathBuf> {
+    let extension = IMAGE_TYPES
+        .iter()
+        .find(|(media, _)| *media == content_type)
+        .map(|(_, ext)| *ext)
+        .ok_or_else(|| ApiError::unprocessable("Nicht unterstütztes Bildformat"))?;
+    if size > MAX_IMAGE_BYTES {
+        return Err(ApiError::new(
+            axum::http::StatusCode::PAYLOAD_TOO_LARGE,
+            TOO_LARGE,
+        ));
+    }
+    if size == 0 {
+        return Err(ApiError::unprocessable("Leere Datei"));
+    }
+    tokio::fs::create_dir_all(artists_dir)
+        .await
+        .map_err(ApiError::internal)?;
+    let destination = artists_dir.join(image_file_name(artist, extension));
+    tokio::fs::write(&destination, bytes)
+        .await
+        .map_err(ApiError::internal)?;
+    let stored = destination.to_string_lossy().into_owned();
+    replace(db, artist, None, Some(&stored)).await?;
+    Ok(destination)
+}
+
+/// Back to the random-but-stable album; an uploaded file is deleted.
+pub async fn clear_cover(db: &PgPool, artist: &str) -> Result<(), sqlx::Error> {
+    let previous = chosen_cover(db, artist).await?;
+    sqlx::query("DELETE FROM artist_covers WHERE artist = $1")
+        .bind(artist)
+        .execute(db)
+        .await?;
+    if let Some(path) = previous.and_then(|p| p.image_path) {
+        let _ = tokio::fs::remove_file(path).await;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +201,16 @@ mod tests {
         );
         assert_eq!(effective_album(None, &fallback, "A"), Some(1));
         assert_eq!(effective_album(None, &fallback, "B"), None);
+    }
+
+    #[test]
+    fn file_names_are_a_hash_of_the_artist() {
+        let name = image_file_name("AC/DC", ".png");
+        assert_eq!(name.len(), 36);
+        assert!(name.ends_with(".png"));
+        assert!(!name.contains('/'));
+        assert_eq!(name, image_file_name("AC/DC", ".png"));
+        assert_ne!(name, image_file_name("ACDC", ".png"));
     }
 
     #[test]

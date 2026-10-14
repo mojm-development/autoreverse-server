@@ -300,7 +300,8 @@ async fn the_artist_page_is_for_admins_and_marks_the_current_choice(db: PgPool) 
     assert!(tour < autobahn);
     assert!(html.contains("1974 · gewählt"));
     assert_eq!(
-        html.matches(r#"class="album" aria-current="true""#).count(),
+        html.matches(r#"class="album bare" aria-pressed="true""#)
+            .count(),
         1
     );
 

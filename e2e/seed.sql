@@ -96,3 +96,24 @@ FROM playlists p, tracks t JOIN items i ON i.id = t.item_id
 	ON o.title = i.title
 WHERE p.name = 'E2E-Fixture-Playlist'
 ON CONFLICT (playlist_id, position) DO NOTHING;
+
+-- metadata: a book and an album to edit by hand, two albums and two books for the bulk editor
+-- and the series assistant, and an artist with two albums for the picture choice.
+INSERT INTO items (kind, title, sort_title, author, artist)
+SELECT t.kind, t.title, lower(t.title), t.author, t.artist
+FROM (VALUES
+	('book', 'E2E-Fixture-Book-Edit', 'E2E Fixture Author', NULL),
+	('album', 'E2E-Fixture-Album-Edit', NULL, 'E2E Edit Artist'),
+	('album', 'E2E-Bulk-Album-A', NULL, 'E2E Bulk Artist'),
+	('album', 'E2E-Bulk-Album-B', NULL, 'E2E Bulk Artist'),
+	('book', 'E2E-Series-Book-A', 'E2E Series Author', NULL),
+	('book', 'E2E-Series-Book-B', 'E2E Series Author', NULL),
+	('album', 'E2E-Cover-Album-Old', NULL, 'E2E Cover Artist'),
+	('album', 'E2E-Cover-Album-New', NULL, 'E2E Cover Artist')
+) AS t (kind, title, author, artist)
+WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.title = t.title);
+
+INSERT INTO tracks (item_id, position, path, duration, title)
+SELECT i.id, 1, '/fixtures/metadata/' || i.title || '/01.mp3', 120, 'Track aus der Datei'
+FROM items i WHERE i.title IN ('E2E-Fixture-Book-Edit', 'E2E-Fixture-Album-Edit')
+ON CONFLICT (path) DO NOTHING;
