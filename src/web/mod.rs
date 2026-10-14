@@ -3,6 +3,7 @@
 pub mod albums;
 pub mod artists;
 pub mod books;
+pub mod errors;
 pub mod favorites;
 pub mod format;
 pub mod home;

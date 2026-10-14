@@ -251,7 +251,8 @@
 	display: flex;
 	flex-direction: column;
 }
-.np .index {
+/* The album's track rows only: the chapter list keeps ChapterList's own right-aligned index. */
+.np [data-track-row] .index {
 	width: 26px;
 	flex: none;
 	color: var(--faint);
@@ -338,14 +339,6 @@
 }
 .np [role='row'][aria-current='true'] .num {
 	display: none;
-}
-.np .speed,
-.np .sleep {
-	height: 28px;
-	padding: 0 10px;
-	background: var(--panel);
-	color: var(--text);
-	border: 1px solid var(--line);
 }
 @media (max-width: 900px) {
 	.np {

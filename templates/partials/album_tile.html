@@ -10,7 +10,7 @@
 			<div class="placeholder" style="--accent: var(--music)"></div>
 			{% endif %}
 			{% if pickable %}<button type="button" class="pick" aria-pressed="false" aria-label="{{ album.title }} auswählen" title="{{ album.title }} auswählen" data-pick="{{ album.id }}">{% call ui::icon("heart-filled") %}{% endcall %}</button>{% endif %}
-			<button class="play" aria-label="Abspielen" title="Abspielen" data-action="play" data-item-id="{{ album.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
+			<button class="play" aria-label="{{ album.title }} abspielen" title="{{ album.title }} abspielen" data-action="play" data-item-id="{{ album.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
 		</div>
 		<figcaption>
 			<span class="title">{{ album.title }}</span>

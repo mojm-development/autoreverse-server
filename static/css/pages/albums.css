@@ -109,6 +109,29 @@
 	place-items: center;
 	color: var(--faint);
 }
+/* The row number turns into a play button under the pointer, the way a track list does. */
+.albums-page .row-play {
+	position: absolute;
+	inset: 0;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: var(--a);
+	color: var(--bg);
+	font-size: 14px;
+	display: grid;
+	place-items: center;
+	opacity: 0;
+}
+.albums-page .row:hover .row-play,
+.albums-page .row-play:focus-visible {
+	opacity: 1;
+}
+.albums-page .row:hover .number {
+	opacity: 0;
+}
 .albums-page .cover-thumb {
 	width: 36px;
 	height: 36px;
@@ -116,7 +139,7 @@
 	border-radius: var(--radius-sm);
 	background: var(--tile) center/cover;
 }
-.albums-page .title {
+.albums-page .row .title {
 	flex: 2;
 	min-width: 0;
 	white-space: nowrap;
@@ -138,9 +161,16 @@
 .albums-page .empty {
 	color: var(--faint);
 }
-/* InfiniteScroll.svelte: an invisible trip wire at the end of the list. */
+/* InfiniteScroll.svelte: an invisible trip wire at the end of the list, and below it the status
+   line (empty unless loading) that keeps the page's bottom spacing. */
 .albums-page .sentinel {
 	height: 1px;
+}
+.albums-page .list-status {
+	min-height: 18px;
+	margin: 14px 0 0;
+	color: var(--faint);
+	font-size: 11.5px;
 }
 @media (max-width: 700px) {
 	.albums-page {

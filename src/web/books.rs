@@ -46,6 +46,15 @@ impl Status {
         }
     }
 
+    /// The tile's play button: legacy said "fortsetzen" for a book being listened to.
+    pub fn play_verb(self) -> &'static str {
+        if self == Status::Listening {
+            "fortsetzen"
+        } else {
+            "abspielen"
+        }
+    }
+
     pub fn key(self) -> &'static str {
         match self {
             Status::Listening => "listening",

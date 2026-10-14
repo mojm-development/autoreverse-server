@@ -12,9 +12,12 @@
 	gap: 12px;
 	margin-bottom: 14px;
 }
-.playlists-page h1,
+/* Legacy left both headings at the browser's h1 (2em, bold): the overview keeps it whole, the detail
+   page keeps the size but drops the margins, since the eyebrow, subline and actions (new here) sit
+   right around it. */
 .playlist-page h1 {
-	font: 600 20px var(--font-sans);
+	font-size: 2em;
+	font-weight: bold;
 	margin: 0;
 }
 .playlists-page .pills {
@@ -113,15 +116,20 @@
 	align-items: center;
 	gap: 8px;
 }
-.playlist-page .rename summary {
+/* "Umbenennen" and "Löschen" are the outline pills of the album page's hero, so the row of actions
+   reads as one: same height, type and border as "Zufall" there. */
+.playlist-page .rename summary,
+.playlist-page .actions .danger {
 	display: inline-flex;
 	align-items: center;
-	height: 32px;
+	gap: 7px;
+	height: 36px;
 	padding: 0 16px;
 	border-radius: var(--radius-pill);
 	border: 1px solid var(--line-strong);
-	color: var(--dim);
-	font: 500 12px/1 var(--font-sans);
+	background: transparent;
+	color: var(--text);
+	font: 500 13px var(--font-sans);
 	cursor: pointer;
 	list-style: none;
 }
@@ -140,7 +148,7 @@
 	color: var(--bg);
 	font: 500 12px var(--font-sans);
 }
-.playlist-page .danger {
+.playlist-page .actions .danger {
 	color: var(--danger);
 	border-color: color-mix(in oklab, var(--danger) 40%, transparent);
 }

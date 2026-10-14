@@ -239,11 +239,19 @@
 	border-radius: var(--radius-md);
 	padding: 8px;
 }
-.bulk-editor .row {
+/* Not a ListRow: components.css's global .row (52px, padding, hover) must not reach the diff — in
+   legacy the two were scoped apart. */
+.bulk-editor .diff .row {
 	display: flex;
 	align-items: baseline;
 	gap: 12px;
+	height: auto;
+	padding: 0;
+	border-radius: 0;
 	font-size: 12px;
+}
+.bulk-editor .diff .row:hover {
+	background: none;
 }
 .bulk-editor .row-title {
 	flex: 1;

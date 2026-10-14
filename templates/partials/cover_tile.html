@@ -14,7 +14,7 @@
 			<span class="progress-fill" style="width: {{ book.percent }}%"></span>
 		</span>
 		{% endif %}
-		<button class="play" aria-label="Abspielen" title="Abspielen" data-action="play" data-item-id="{{ book.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
+		<button class="play" aria-label="{{ book.title }} {{ book.status.play_verb() }}" title="{{ book.title }} {{ book.status.play_verb() }}" data-action="play" data-item-id="{{ book.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
 	</div>
 	<figcaption>
 		<span class="title">{{ book.title }}</span>

@@ -166,6 +166,17 @@
 	border: 1px solid var(--line-strong);
 	color: var(--text);
 }
+/* The favourite heart (new here, legacy had it only on the album page): the album page's round,
+   outlined 36px button, so it lines up with the pills beside it. */
+.book-page .actions .icon-btn {
+	width: 36px;
+	height: 36px;
+	border: 1px solid var(--line);
+}
+.book-page .actions .icon-btn[aria-pressed='true'] {
+	color: var(--a);
+	border-color: var(--a);
+}
 @media (max-width: 700px) {
 	.book-page {
 		padding: 18px 16px;

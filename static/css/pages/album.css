@@ -134,7 +134,17 @@
 	flex: none;
 	width: 26px;
 }
+.album-page .icon-btn {
+	width: 36px;
+	height: 36px;
+	border: 1px solid var(--line);
+}
+.album-page .icon-btn[aria-pressed='true'] {
+	color: var(--a);
+	border-color: var(--a);
+}
 .album-page .icon-btn.small {
 	width: 26px;
 	height: 26px;
+	border: none;
 }

@@ -162,7 +162,17 @@ pub fn error_page(status: StatusCode, message: &str) -> Response {
         message,
     };
     match page.render() {
-        Ok(html) => (status, Html(html)).into_response(),
+        Ok(html) => {
+            let mut response = (status, Html(html)).into_response();
+            // Lets web::errors put the page into the app shell where legacy had a layout.
+            response
+                .extensions_mut()
+                .insert(crate::web::errors::ErrorPageInfo {
+                    status,
+                    message: message.to_owned(),
+                });
+            response
+        }
         Err(e) => {
             tracing::error!("rendering the error page failed: {e}");
             (status, message.to_owned()).into_response()

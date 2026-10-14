@@ -6,7 +6,8 @@
 .favorites-page h1,
 .bookmarks-page h1 {
 	font: 600 20px var(--font-sans);
-	margin: 0 0 16px;
+	/* Only the bottom: the top keeps the browser's h1 margin, as in legacy. */
+	margin-bottom: 16px;
 }
 .favorites-page h2 {
 	font: 600 13px var(--font-sans);
@@ -27,8 +28,8 @@
 	display: flex;
 	flex-direction: column;
 }
-.favorites-page .title,
-.bookmarks-page .title {
+.favorites-page .row .title,
+.bookmarks-page .row .title {
 	flex: 2;
 	min-width: 0;
 	white-space: nowrap;

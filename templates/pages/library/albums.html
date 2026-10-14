@@ -65,6 +65,7 @@
 		{% endfor %}{% include "partials/more_sentinel.html" %}
 	</div>
 	{% endif %}
+	<p class="list-status" role="status" aria-live="polite"></p>
 	{% if let Some(bulk) = bulk %}{% include "partials/bulk_editor.html" %}{% endif %}
 </div>
 {% endblock %}

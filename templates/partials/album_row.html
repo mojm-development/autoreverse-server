@@ -1,7 +1,8 @@
-{#- One album in the list view (legacy ListRow with href); the row-play button joins with
-    playback. -#}
+{#- One album in the list view (legacy ListRow with href). The row number turns into a play
+    button under the pointer, as in legacy. -#}
+{% import "partials/ui.html" as ui %}
 <a href="/library/albums/{{ album.id }}" role="row" class="row">
-	<span class="index mono"><span class="number">{{ album.number }}</span></span>
+	<span class="index mono"><span class="number">{{ album.number }}</span><button class="row-play" aria-label="{{ album.title }} abspielen" data-action="play" data-item-id="{{ album.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button></span>
 	<span class="cover-thumb"{% if album.has_cover %} style="background-image: url(/items/{{ album.id }}/cover)"{% endif %}></span>
 	<span class="title">{{ album.title }}</span>
 	<span class="cell">{% if album.artist.is_empty() %}—{% else %}{{ album.artist }}{% endif %}</span>

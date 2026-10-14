@@ -3,13 +3,6 @@
 	padding: 24px 32px;
 	overflow: hidden;
 }
-.home-page header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 12px;
-}
 .home-page .segment {
 	display: flex;
 	gap: 6px;
@@ -19,10 +12,6 @@
 	align-items: baseline;
 	gap: 10px;
 	margin: 24px 0 14px;
-}
-.home-page .section-head .meta {
-	color: var(--faint);
-	font-size: 11px;
 }
 .home-page .grid-3 {
 	display: grid;

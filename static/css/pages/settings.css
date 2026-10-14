@@ -288,13 +288,15 @@
 .settings-users summary::-webkit-details-marker {
 	display: none;
 }
+/* The pills of app.css's plain buttons, which legacy's only buttons here ("Nutzer anlegen", the
+   role toggle) were — the new ones (password, delete) join them in the same size. */
 .settings-users .outline,
 .settings-users .primary,
 .settings-users .danger {
-	height: 28px;
-	padding: 0 12px;
+	height: 32px;
+	padding: 0 16px;
 	border-radius: var(--radius-pill);
-	font: 500 12px var(--font-sans);
+	font: 500 12px/1 var(--font-sans);
 	white-space: nowrap;
 }
 .settings-users .outline {
@@ -302,7 +304,7 @@
 	align-items: center;
 	background: transparent;
 	border: 1px solid var(--line-strong);
-	color: var(--text);
+	color: var(--dim);
 }
 .settings-users .primary {
 	background: var(--a);
@@ -374,7 +376,6 @@
 	padding: 8px 6px;
 	border-top: 1px solid var(--line);
 	font-size: 12.5px;
-	vertical-align: top;
 }
 .settings-users .you {
 	color: var(--faint);

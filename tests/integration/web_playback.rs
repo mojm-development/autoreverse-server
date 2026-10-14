@@ -336,14 +336,39 @@ async fn tiles_carry_a_play_button(db: PgPool) {
     let (cookie, _) = cookie(&app, "oliver", false).await;
     let book = seed(app.db(), Seed::new("book", "Der Schwarm")).await;
     let album = seed(app.db(), Seed::new("album", "Autobahn")).await;
+    // Labelled with the title like legacy's CoverTile `playLabel`.
     let (_, html) = page(&app, "/library/books", &cookie).await;
     assert!(html.contains(&format!(
-        r#"aria-label="Abspielen" title="Abspielen" data-action="play" data-item-id="{book}""#
+        r#"aria-label="Der Schwarm abspielen" title="Der Schwarm abspielen" data-action="play" data-item-id="{book}""#
     )));
     let (_, html) = page(&app, "/library/albums", &cookie).await;
     assert!(html.contains(&format!(
-        r#"aria-label="Abspielen" title="Abspielen" data-action="play" data-item-id="{album}""#
+        r#"aria-label="Autobahn abspielen" title="Autobahn abspielen" data-action="play" data-item-id="{album}""#
     )));
+    // The list view's row number turns into a play button, as in legacy.
+    let (_, html) = page(&app, "/library/albums?view=list", &cookie).await;
+    assert!(html.contains(&format!(
+        r#"class="row-play" aria-label="Autobahn abspielen" data-action="play" data-item-id="{album}""#
+    )));
+}
+
+#[sqlx::test]
+async fn errors_under_library_and_settings_keep_the_app_shell(db: PgPool) {
+    // legacy library/+error.svelte and settings/+error.svelte rendered inside their layouts.
+    let app = TestApp::new(db);
+    let (cookie, _) = cookie(&app, "oliver", false).await;
+    let (status, html) = page(&app, "/library/books/999999", &cookie).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(html.contains(r#"class="error-page in-shell""#));
+    assert!(html.contains(r#"<nav class="sidebar""#));
+    assert!(html.contains("<title>Fehler 404 · Autoreverse</title>"));
+    // Logged out there is no shell to show: the standalone page, as before.
+    let response = app.get("/library/books/999999", None).await;
+    assert_ne!(
+        response.status(),
+        StatusCode::NOT_FOUND,
+        "logged out redirects to /login"
+    );
 }
 
 #[sqlx::test]

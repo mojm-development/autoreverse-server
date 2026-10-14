@@ -36,3 +36,17 @@
 	font: 500 12px/1 var(--font-sans);
 	margin-top: 6px;
 }
+
+/* library/+error.svelte and settings/+error.svelte: the same page inside the app shell — no brand,
+   left-aligned in the content area. */
+.error-page.in-shell {
+	max-width: none;
+	margin: 0;
+	padding: 64px 48px;
+}
+.error-page.in-shell h1 {
+	max-width: 34ch;
+}
+.error-page.in-shell .primary {
+	background: var(--a, var(--book));
+}

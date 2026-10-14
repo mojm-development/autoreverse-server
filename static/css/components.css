@@ -44,8 +44,9 @@ img.mark {
 	}
 }
 
-/* ThemeToggle.svelte — an icon rather than the word: three equal buttons sit in the account box. */
-.theme-toggle {
+/* ThemeToggle.svelte — an icon rather than the word: three equal buttons sit in the account box.
+   Two classes, like Svelte's scoped one, so app.css's `button:not(…)` (0,1,1) does not win. */
+.sidebar .theme-toggle {
 	flex: 1;
 	height: 30px;
 	padding: 0;
@@ -57,7 +58,7 @@ img.mark {
 	color: var(--dim);
 	font-size: 15px;
 }
-.theme-toggle:hover {
+.sidebar .theme-toggle:hover {
 	color: var(--text);
 	background: var(--panel-hi);
 	border-color: var(--line-strong);

@@ -26,6 +26,10 @@ pub fn app(state: AppState) -> Router {
         .fallback_service(static_files)
         .layer(middleware::from_fn_with_state(
             state.clone(),
+            web::errors::shell_errors,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
             reject_cross_site_forms,
         ))
         .layer(CatchPanicLayer::custom(panic_response))
