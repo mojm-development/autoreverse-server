@@ -1,6 +1,6 @@
-//! `/settings`: the overview, Bibliotheken (library roots) and Scan (legacy
-//! `routes/settings/**`). The other sections follow with their slices; until then the overview
-//! links to them anyway.
+//! `/settings`: the overview, Bibliotheken (library roots), Scan, Wiedergabe and Über (legacy
+//! `routes/settings/**`). Nutzer and Sicherheit live in `web/users.rs`, Podcast-Abos in
+//! `web/podcasts.rs`.
 
 use std::collections::HashMap;
 
@@ -19,7 +19,7 @@ use crate::auth::preferences::{
 use crate::auth::{WebAdmin, WebUser};
 use crate::error::WebResult;
 use crate::library::paths::{LibraryPaths, get_library_paths, set_library_paths};
-use crate::library::queries::{count_missing, delete_missing};
+use crate::library::queries::{LibraryCounts, count_missing, delete_missing, library_counts};
 use crate::scanner::state::{Phase, ScanState};
 use crate::state::AppState;
 
@@ -32,6 +32,7 @@ pub fn router() -> Router<AppState> {
         .route("/settings/scan/start", post(scan_start))
         .route("/settings/scan/cancel", post(scan_cancel))
         .route("/settings/playback", get(playback).post(playback_action))
+        .route("/settings/about", get(about))
 }
 
 pub struct Section {
@@ -282,6 +283,41 @@ async fn playback_action(
     };
     set_preferences(&state.db, user.id, speed, back, forward).await?;
     render_playback(&state, &user, &uri, true, None).await
+}
+
+#[derive(Template)]
+#[template(path = "pages/settings/about.html")]
+struct AboutPage {
+    shell: Shell,
+    sections: Vec<&'static Section>,
+    version: &'static str,
+    counts: LibraryCounts,
+    /// Admins only, like `user_count` in `GET /server/info`.
+    user_count: Option<i64>,
+    data_dir: Option<String>,
+}
+
+/// Settings → Über: version and what `/server/info` knows, for every user.
+async fn about(State(state): State<AppState>, user: WebUser, uri: Uri) -> WebResult<Html<String>> {
+    let (shell, sections) = settings_shell(&state, &user, &uri).await?;
+    let counts = library_counts(&state.db).await?;
+    let (user_count, data_dir) = if shell.is_admin {
+        let n: i64 = sqlx::query_scalar("SELECT count(*) FROM users")
+            .fetch_one(&state.db)
+            .await?;
+        (Some(n), Some(state.config.data_dir.display().to_string()))
+    } else {
+        (None, None)
+    };
+    let page = AboutPage {
+        shell,
+        sections,
+        version: crate::VERSION,
+        counts,
+        user_count,
+        data_dir,
+    };
+    Ok(Html(page.render()?))
 }
 
 #[derive(Template)]

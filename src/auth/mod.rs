@@ -1,6 +1,7 @@
 //! Users, passwords, tokens and the request guards.
 
 pub mod bootstrap;
+pub mod directory;
 pub mod login;
 pub mod passwords;
 pub mod preferences;

@@ -266,3 +266,215 @@
 	font-size: 12px;
 	margin: 0;
 }
+
+/* settings/users/+page.svelte (plus password and delete per account) */
+.settings-users h1 {
+	font: 600 20px var(--font-sans);
+	margin-bottom: 10px;
+}
+.settings-users .count {
+	color: var(--faint);
+	font-size: 13px;
+}
+.settings-users .create {
+	margin: 10px 0;
+}
+.settings-users summary {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	list-style: none;
+}
+.settings-users summary::-webkit-details-marker {
+	display: none;
+}
+.settings-users .outline,
+.settings-users .primary,
+.settings-users .danger {
+	height: 28px;
+	padding: 0 12px;
+	border-radius: var(--radius-pill);
+	font: 500 12px var(--font-sans);
+	white-space: nowrap;
+}
+.settings-users .outline {
+	display: inline-flex;
+	align-items: center;
+	background: transparent;
+	border: 1px solid var(--line-strong);
+	color: var(--text);
+}
+.settings-users .primary {
+	background: var(--a);
+	color: var(--bg);
+	border: none;
+}
+.settings-users .danger {
+	background: transparent;
+	color: var(--danger);
+	border: 1px solid color-mix(in oklab, var(--danger) 40%, transparent);
+}
+.settings-users .create-form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 10px;
+	margin-top: 10px;
+	max-width: 640px;
+}
+.settings-users .create-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1 1 160px;
+	min-width: 0;
+}
+.settings-users .create-form label.check {
+	flex: 0 0 auto;
+	flex-direction: row;
+	align-items: center;
+	height: 30px;
+	font-size: 12.5px;
+}
+.settings-users input[type='password'],
+.settings-users input:not([type]) {
+	height: 30px;
+	padding: 0 8px;
+	border-radius: 6px;
+	background: var(--panel);
+	border: 1px solid var(--line);
+	color: var(--text);
+	min-width: 0;
+}
+.settings-users .error,
+.settings-security .error {
+	color: var(--danger);
+	font-size: 12px;
+	margin: 0 0 8px;
+}
+.settings-users .success,
+.settings-security .success {
+	color: var(--book);
+	font-size: 12px;
+	margin: 0 0 8px;
+}
+.settings-users table {
+	width: 100%;
+	margin-top: 10px;
+	border-collapse: collapse;
+}
+.settings-users th {
+	text-align: left;
+	color: var(--faint);
+	font-size: 11px;
+	text-transform: uppercase;
+	padding: 6px;
+}
+.settings-users td {
+	padding: 8px 6px;
+	border-top: 1px solid var(--line);
+	font-size: 12.5px;
+	vertical-align: top;
+}
+.settings-users .you {
+	color: var(--faint);
+	font-size: 10px;
+	margin-left: 4px;
+}
+.settings-users .actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	justify-content: flex-end;
+}
+.settings-users .set-password form {
+	display: flex;
+	gap: 6px;
+	margin-top: 6px;
+}
+@media (max-width: 700px) {
+	.settings-users table,
+	.settings-users tbody,
+	.settings-users tr,
+	.settings-users td {
+		display: block;
+	}
+	.settings-users thead {
+		display: none;
+	}
+	.settings-users tr {
+		border-top: 1px solid var(--line);
+		padding: 8px 0;
+	}
+	.settings-users td {
+		border: none;
+		padding: 2px 0;
+	}
+	.settings-users .actions {
+		justify-content: flex-start;
+		margin-top: 6px;
+	}
+}
+
+/* settings/security/+page.svelte */
+.settings-security h1 {
+	font: 600 20px var(--font-sans);
+	margin-bottom: 16px;
+}
+.settings-security .form {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	max-width: 320px;
+}
+.settings-security .form label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.settings-security .form input {
+	height: 32px;
+	padding: 0 10px;
+	border-radius: var(--radius-md);
+	background: var(--panel);
+	border: 1px solid var(--line);
+	color: var(--text);
+}
+.settings-security .primary {
+	align-self: flex-start;
+	height: 32px;
+	padding: 0 16px;
+	border-radius: var(--radius-pill);
+	background: var(--a);
+	color: var(--bg);
+	border: none;
+}
+.settings-security .hint {
+	color: var(--faint);
+	font-size: 11.5px;
+	margin: 0;
+}
+
+/* settings/about/+page.svelte (plus what /server/info knows) */
+.settings-about h1 {
+	font: 600 20px var(--font-sans);
+	margin-bottom: 10px;
+}
+.settings-about .version {
+	color: var(--dim);
+	font-size: 13px;
+	margin-bottom: 16px;
+}
+.settings-about dl {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 6px 18px;
+	margin: 0 0 16px;
+	font-size: 12.5px;
+}
+.settings-about dt {
+	color: var(--faint);
+}
+.settings-about dd {
+	margin: 0;
+}

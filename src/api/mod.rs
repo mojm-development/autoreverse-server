@@ -15,6 +15,7 @@ pub mod scan;
 pub mod search;
 pub mod server;
 pub mod tracks;
+pub mod users;
 pub mod validate;
 
 use axum::Router;
@@ -34,6 +35,7 @@ pub fn router() -> Router<AppState> {
         .merge(podcasts::router())
         .merge(search::router())
         .merge(me::router())
+        .merge(users::router())
         .merge(playback::router())
         .merge(server::router())
 }
