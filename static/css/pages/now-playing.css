@@ -316,6 +316,11 @@
 	justify-content: space-between;
 	padding: 8px 6px;
 }
+/* The wrapper JS refreshes after "Lesezeichen setzen" must not become the flex item, or the card's
+   margin-top: auto no longer pins it to the bottom of the column. */
+.np [data-refresh='bookmark-card'] {
+	display: contents;
+}
 .np .bookmark-card {
 	margin-top: auto;
 	padding: 12px;

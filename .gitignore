@@ -35,3 +35,4 @@ playwright/.auth/
 
 # Rust build output
 /target
+e2e/design/out/

@@ -1,0 +1,12 @@
+{
+	"name": "autoreverse-design-parity",
+	"private": true,
+	"type": "module",
+	"description": "styles.mjs: static style comparison legacy vs. Rust (runs on the Mac, no browser).",
+	"devDependencies": {
+		"css-select": "5.2.2",
+		"htmlparser2": "9.1.0",
+		"lightningcss": "1.30.1",
+		"specificity": "1.0.0"
+	}
+}
