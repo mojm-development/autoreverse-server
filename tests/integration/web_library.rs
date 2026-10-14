@@ -203,7 +203,24 @@ async fn the_book_page_404s_for_anything_but_a_book(db: PgPool) {
         let (status, html) = page(&app, &uri, &cookie).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "{uri}");
         assert!(html.contains("Unbekanntes Hörbuch"));
+        // Inside the app shell, with the swappable #page: a boosted navigation to it swaps
+        // only the page and the player keeps playing (legacy library/+error.svelte).
+        assert!(html.contains(r#"class="error-page in-shell""#), "{uri}");
+        assert!(
+            html.contains(r#"id="page""#) && html.contains("data-mini-player"),
+            "{uri}"
+        );
     }
+    // In the settings the error keeps the settings navigation.
+    let request = axum::http::Request::get("/settings/nirgends")
+        .header(axum::http::header::COOKIE, &cookie)
+        .header(axum::http::header::ACCEPT, "text/html")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = app.send(request).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let html = body_text(response).await;
+    assert!(html.contains(r#"id="page""#) && html.contains("Seite nicht gefunden"));
 }
 
 #[sqlx::test]
