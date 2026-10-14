@@ -21,6 +21,7 @@ mod scan_api;
 mod scan_store;
 mod scanner_folders;
 mod server_info;
+mod startup;
 mod tokens;
 mod users_api;
 mod web_auth;

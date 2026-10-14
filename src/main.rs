@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use autoreverse_server::auth::bootstrap::ensure_first_admin;
 use autoreverse_server::cli::{self, Command};
-use autoreverse_server::{AppState, Config, app, db};
+use autoreverse_server::{AppState, Config, app, config, db};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -37,7 +37,13 @@ async fn main() -> ExitCode {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::from_env()?;
+    let mut config = Config::from_env()?;
+    let explicit = std::env::var_os("AUTOREVERSE_STATIC")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from);
+    let exe = std::env::current_exe().ok();
+    config.static_dir = config::find_static_dir(explicit.as_deref(), exe.as_deref())?;
+    tracing::info!("Statische Dateien aus {}", config.static_dir.display());
     let pool = db::connect(&config.database_url).await?;
     db::migrate(&pool).await?;
     ensure_first_admin(

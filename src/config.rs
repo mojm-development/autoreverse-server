@@ -4,7 +4,7 @@
 //! in `library_config`, not in the environment.
 
 use std::net::IpAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const DEFAULT_DATABASE_URL: &str =
     "postgresql://autoreverse:autoreverse@localhost:5434/autoreverse";
@@ -31,8 +31,8 @@ pub struct Config {
     /// TLS-terminating proxy: it decides the cookie's `Secure` flag and what the cross-site form
     /// check accepts as the server's own origin.
     pub origin: Option<String>,
-    /// CSS, JS, icons. Relative to the working directory; the container image puts it beside
-    /// the binary.
+    /// CSS, JS, icons. `AUTOREVERSE_STATIC`, else `static` (relative); the server resolves it
+    /// with [`find_static_dir`] at start.
     pub static_dir: PathBuf,
 }
 
@@ -42,6 +42,11 @@ pub enum ConfigError {
     Port(String),
     #[error("HOST ist keine gültige IP-Adresse: {0}")]
     Host(String),
+    #[error(
+        "Statische Dateien nicht gefunden (gesucht: {0}). AUTOREVERSE_STATIC auf das Verzeichnis \
+         `static` des Servers setzen."
+    )]
+    StaticMissing(String),
 }
 
 impl Config {
@@ -76,7 +81,8 @@ impl Config {
             host,
             port,
             origin: non_empty("ORIGIN").map(|o| o.trim_end_matches('/').to_owned()),
-            static_dir: PathBuf::from("static"),
+            static_dir: non_empty("AUTOREVERSE_STATIC")
+                .map_or_else(|| PathBuf::from("static"), PathBuf::from),
         })
     }
 
@@ -86,6 +92,41 @@ impl Config {
             .as_deref()
             .is_some_and(|o| o.starts_with("https://"))
     }
+}
+
+/// A file every static directory has; its absence means the wrong directory.
+const STATIC_MARKER: &str = "css/app.css";
+
+/// Where the CSS and JS are: `explicit` (`AUTOREVERSE_STATIC`) if given, else `static` beside the
+/// binary (an installed or container layout), else `static` in the working directory (`cargo run`).
+/// Started from elsewhere, the server used to serve pages without CSS and JS and say nothing; now
+/// it refuses to start.
+pub fn find_static_dir(
+    explicit: Option<&Path>,
+    exe: Option<&Path>,
+) -> Result<PathBuf, ConfigError> {
+    let candidates: Vec<PathBuf> = match explicit {
+        Some(dir) => vec![dir.to_path_buf()],
+        None => exe
+            .and_then(Path::parent)
+            .map(|dir| dir.join("static"))
+            .into_iter()
+            .chain([PathBuf::from("static")])
+            .collect(),
+    };
+    candidates
+        .iter()
+        .find(|dir| dir.join(STATIC_MARKER).is_file())
+        .cloned()
+        .ok_or_else(|| {
+            ConfigError::StaticMissing(
+                candidates
+                    .iter()
+                    .map(|dir| dir.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            )
+        })
 }
 
 /// `Math.max(0, Number(raw ?? 1) || 0)`: unset means hourly, anything that is not a positive
@@ -178,6 +219,52 @@ mod tests {
         let config = load(&[("ORIGIN", "https://audio.example.com/")]);
         assert!(config.secure_cookies());
         assert_eq!(config.origin.as_deref(), Some("https://audio.example.com"));
+    }
+
+    #[test]
+    fn static_dir_comes_from_the_environment() {
+        assert_eq!(load(&[]).static_dir, PathBuf::from("static"));
+        let config = load(&[("AUTOREVERSE_STATIC", "/srv/static")]);
+        assert_eq!(config.static_dir, PathBuf::from("/srv/static"));
+    }
+
+    fn static_tree(root: &Path) -> PathBuf {
+        let dir = root.join("static");
+        std::fs::create_dir_all(dir.join("css")).unwrap();
+        std::fs::write(dir.join("css/app.css"), "").unwrap();
+        dir
+    }
+
+    #[test]
+    fn finds_static_beside_the_binary_first() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = static_tree(root.path());
+        let exe = root.path().join("autoreverse-server");
+        assert_eq!(find_static_dir(None, Some(&exe)).unwrap(), dir);
+    }
+
+    #[test]
+    fn falls_back_to_the_working_directory() {
+        // Tests run in the crate root, where the real static/ lives.
+        let exe = Path::new("/nowhere/bin/autoreverse-server");
+        assert_eq!(
+            find_static_dir(None, Some(exe)).unwrap(),
+            PathBuf::from("static")
+        );
+    }
+
+    #[test]
+    fn an_explicit_static_dir_must_hold_the_assets() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = static_tree(root.path());
+        assert_eq!(find_static_dir(Some(&dir), None).unwrap(), dir);
+        let empty = root.path().join("leer");
+        let err = find_static_dir(Some(&empty), None).unwrap_err();
+        assert!(matches!(err, ConfigError::StaticMissing(ref tried) if tried.contains("leer")));
+        assert!(
+            err.to_string()
+                .starts_with("Statische Dateien nicht gefunden")
+        );
     }
 
     #[test]
