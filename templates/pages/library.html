@@ -1,0 +1,72 @@
+{#- legacy library/+page.svelte -#}
+{% extends "layouts/app.html" %}
+{% block title %}Start · Autoreverse{% endblock %}
+{% block content %}
+<div class="content home-page">
+	<header>
+		{#- The server's hour is only the fallback; static/js/pages.js greets by the visitor's clock. -#}
+		<h1 data-greeting="{{ name }}">{{ greeting }}, {{ name }}</h1>
+		{#- Legacy rendered the filter without wiring it up; so does this. -#}
+		<div class="segment" role="tablist">
+			<button type="button" role="tab" class="pill" aria-current="true">Alles</button>
+			<button type="button" role="tab" class="pill" aria-current="false">Musik</button>
+			<button type="button" role="tab" class="pill" aria-current="false">Podcasts</button>
+			<button type="button" role="tab" class="pill" aria-current="false">Hörbücher</button>
+		</div>
+	</header>
+
+	<section>
+		<div class="section-head">
+			<h2>Weiter hören</h2>
+			<span class="meta mono">{{ continue_entries.len() }} offen</span>
+		</div>
+		<div class="grid-3">
+			{% for entry in continue_entries %}
+			{#- legacy ContinueCard.svelte -#}
+			<a href="{{ entry.href }}" class="continue-card">
+				<div class="art">
+					{% if entry.has_cover %}
+					<img src="/items/{{ entry.id }}/cover" alt="" width="74" height="74" />
+					{% else %}
+					<div class="placeholder" style="--accent: var(--{{ entry.accent }})"></div>
+					{% endif %}
+				</div>
+				<div class="meta">
+					<span class="eyebrow" style="color: var(--{{ entry.accent }})">{{ entry.kind }}</span>
+					<span class="title">{{ entry.title }}</span>
+					<span class="subtitle">{{ entry.subtitle }}</span>
+					<div class="progress"><div class="fill" style="width: {{ entry.percent }}%"></div></div>
+					<span class="duration mono">{{ entry.duration }}</span>
+				</div>
+			</a>
+			{% endfor %}
+		</div>
+	</section>
+
+	<section>
+		<div class="section-head">
+			<h2>Neu im Bestand</h2>
+			<a href="/library/albums?sort=added">Alle ansehen</a>
+		</div>
+		<div class="grid-6">
+			{% for tile in recent %}
+			{% if let Some(href) = tile.href %}<a href="{{ href }}" class="tile-link">{% endif %}
+			<figure class="cover-tile">
+				<div class="art">
+					{% if tile.has_cover %}
+					<img src="/items/{{ tile.id }}/cover" alt="" width="100" height="100" />
+					{% else %}
+					<div class="placeholder" style="--accent: var(--{{ tile.accent }})"></div>
+					{% endif %}
+				</div>
+				<figcaption>
+					<span class="title">{{ tile.title }}</span>
+					<span class="subtitle">{{ tile.subtitle }}</span>
+				</figcaption>
+			</figure>
+			{% if tile.href.is_some() %}</a>{% endif %}
+			{% endfor %}
+		</div>
+	</section>
+</div>
+{% endblock %}

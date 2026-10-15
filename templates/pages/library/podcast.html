@@ -1,0 +1,63 @@
+{#- legacy library/podcasts/[id]/+page.svelte. Filter pills, the two-step "Abo kündigen" and the
+    search are static/js/podcasts.js; playing and downloading static/js/player. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ podcast.title }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="podcast-layout" style="--a: var(--podcast)">
+	{% include "partials/podcast_rail.html" %}
+	<div class="content podcast-page" data-podcast-page>
+		<header class="hero">
+			<div class="cover-lg"{% if podcast.cover_path.is_some() %} style="background-image: url(/items/{{ podcast.id }}/cover)"{% endif %}></div>
+			<div class="hero-meta">
+				<span class="eyebrow">Podcast</span>
+				<h1>{{ podcast.title }}</h1>
+				<p class="subline">
+					{{ episodes.len() }} {% if episodes.len() == 1 %}Folge{% else %}Folgen{% endif %}
+					{% if unheard_count > 0 %}<span class="dot">·</span> {{ unheard_count }} ungehört{% endif %}
+					<span class="dot">·</span> zuletzt geprüft {{ last_checked }}
+				</p>
+				<div class="actions">
+					<button type="button" class="primary" data-action="play-episode"{% if let Some(c) = continue_with %} data-episode-id="{{ c.id }}"{% else %} disabled{% endif %}>{% call ui::icon("play-filled") %}{% endcall %} {{ play_label() }}</button>
+					{% if shell.is_admin %}
+					<form method="POST" action="/library/podcasts/{{ podcast.id }}/refresh" data-podcast-refresh>
+						<button type="submit" class="outline">{% call ui::icon("download") %}{% endcall %} <span data-refresh-label>Aktualisieren</span></button>
+					</form>
+					<button type="button" class="outline" data-unsubscribe-ask>Abo kündigen</button>
+					<form method="POST" action="/library/podcasts/{{ podcast.id }}/unsubscribe" class="confirm" data-unsubscribe-confirm hidden>
+						<button type="submit" class="danger">Wirklich kündigen</button>
+						<button type="button" class="outline" data-unsubscribe-cancel>Abbrechen</button>
+					</form>
+					{% endif %}
+				</div>
+				{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+			</div>
+		</header>
+
+		{% if shell.is_admin %}
+		<form class="keep" method="POST" action="/library/podcasts/{{ podcast.id }}/keep">
+			<label for="keep">Folgen vorhalten</label>
+			<input id="keep" name="keep" type="number" min="0" max="{{ keep_max }}" placeholder="Standard ({{ keep_default }})" value="{{ keep_value }}" />
+			<button type="submit" class="secondary">Übernehmen</button>
+			<span class="keep-hint">Ältere Folgen werden gelöscht, sobald mehr geladen sind. Leer = Standard ({{ keep_default }}).</span>
+		</form>
+		{% endif %}
+
+		<div class="pills" role="group" aria-label="Folgen filtern">
+			{% for (key, label, count) in filters() %}
+			<button type="button" class="pill{% if loop.first %} active{% endif %}" aria-pressed="{{ loop.first }}" data-episode-filter="{{ key }}">{{ label }}<span class="pill-count mono">{{ count }}</span></button>
+			{% endfor %}
+		</div>
+
+		{% if episodes.is_empty() %}
+		<p class="empty">Dieser Feed hat noch keine Folgen geliefert.</p>
+		{% else %}
+		<p class="empty" data-filter-empty hidden>Keine Folge passt zu diesem Filter.</p>
+		<ul class="episodes">
+			{% for episode in episodes %}{% include "partials/episode_card.html" %}{% endfor %}
+		</ul>
+		{% endif %}
+	</div>
+</div>
+{% include "partials/playlist_picker.html" %}
+{% endblock %}

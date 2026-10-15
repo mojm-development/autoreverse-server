@@ -1,0 +1,21 @@
+{#- legacy PodcastRail.svelte. Needs `rail: Rail`; with `rail.add_form` the Verwalter's
+    "Feed-URL hinzufügen" form follows the list (legacy podcasts/[id]). -#}
+<div class="rail" data-refresh="podcast-rail">
+	<div class="rail-head"><span class="eyebrow">Abos · {{ rail.entries.len() }}</span></div>
+	{% for podcast in rail.entries %}
+	<a class="entry" href="/library/podcasts/{{ podcast.id }}" aria-current="{{ rail.is_active(podcast.id) }}">
+		<span class="cover"{% if podcast.has_cover %} style="background-image: url(&quot;/items/{{ podcast.id }}/cover&quot;)"{% endif %}></span>
+		<span class="meta">
+			<span class="name">{{ podcast.title }}</span>
+			<span class="sub mono">{{ podcast.episode_count }} Folgen{% if podcast.unheard_count > 0 %} · {{ podcast.unheard_count }} neu{% endif %}</span>
+		</span>
+		{% if podcast.unheard_count > 0 %}<span class="badge">{{ podcast.unheard_count }}</span>{% endif %}
+	</a>
+	{% endfor %}
+	{% if rail.add_form %}
+	<form class="add-feed" method="POST" action="/library/podcasts/subscribe">
+		<input type="url" name="feed_url" placeholder="Feed-URL hinzufügen" aria-label="Feed-URL" required />
+		<button type="submit">Abonnieren</button>
+	</form>
+	{% endif %}
+</div>

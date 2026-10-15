@@ -1,0 +1,27 @@
+{#- legacy MiniPlayerBar.svelte. Hidden until something plays; static/js/player/ui.js fills it in.
+    Both button sets are here, the player shows tracks (album) or skips (book, podcast) — and,
+    while a playlist plays, previous/next entry around the skips. -#}
+{% import "partials/ui.html" as ui %}
+<div class="mini-player" data-testid="mini-player" data-mini-player hidden>
+	<div class="transport">
+		<button class="icon-btn" aria-label="Vorheriger Titel" data-action="previous" data-by-track hidden>{% call ui::icon("previous") %}{% endcall %}</button>
+		<button class="icon-btn skip" aria-label="30 Sekunden zurück" data-action="skip-back" data-by-time>30</button>
+		<button class="play" aria-label="Abspielen" data-action="toggle">{% call ui::icon("play") %}{% endcall %}</button>
+		<button class="icon-btn skip" aria-label="15 Sekunden vor" data-action="skip-forward" data-by-time>15</button>
+		<button class="icon-btn" aria-label="Nächster Titel" data-action="next" data-by-track hidden>{% call ui::icon("next") %}{% endcall %}</button>
+	</div>
+	<div class="cover"><img alt="" data-mini-cover hidden /></div>
+	<div class="info">
+		<div class="line">
+			<span class="title" data-mini-title></span>
+			<span class="time mono" data-mini-time></span>
+		</div>
+		{% call ui::scrubber("mini", "Position") %}{% endcall %}
+	</div>
+	<span class="mini-viz" aria-hidden="true">{% call ui::visualizer(14, "Wiedergabe läuft") %}{% endcall %}</span>
+	<div class="extra">
+		<span class="pill mono" data-mini-speed>1,00×</span>
+		<a class="icon-btn" href="/library" aria-label="Großer Player" data-mini-expand>{% call ui::icon("expand") %}{% endcall %}</a>
+	</div>
+</div>
+<audio hidden data-player-audio></audio>

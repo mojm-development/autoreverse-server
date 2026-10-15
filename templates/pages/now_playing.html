@@ -1,0 +1,128 @@
+{#- legacy routes/(fullscreen)/library/[id]/player/+page.svelte: no sidebar, the mini player
+    hides while this page is shown. static/js/player/ui.js renders the live parts. -#}
+{% extends "layouts/player.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ item.title }} · Autoreverse{% endblock %}
+{% block page %}
+<div class="np" style="--a: var(--{{ accent }})" data-np data-item-id="{{ item.id }}" data-kind="{{ item.kind }}" data-title="{{ item.title }}" data-track-count="{{ tracks.len() }}">
+	<div class="ambient" aria-hidden="true">
+		<span class="blob a"></span>
+		<span class="blob b"></span>
+		<span class="blob c"></span>
+	</div>
+
+	<div class="left">
+		<div class="status-row">
+			<button class="back" title="Zurück (Esc)" data-action="close">
+				{% call ui::icon("back") %}{% endcall %}
+				<span>Zurück</span>
+			</button>
+			{% call ui::brand_mark(26) %}{% endcall %}
+			<span class="eyebrow">Läuft gerade · {{ kind_label }}</span>
+			<span class="session mono" data-np-session>Sitzung offen · 0 Min</span>
+		</div>
+
+		<div class="hero">
+			<div class="cover-row">
+				<div class="cover">
+					{% if has_cover %}<img src="/items/{{ item.id }}/cover" alt="" />{% endif %}
+				</div>
+				<div class="viz-panel">{% call ui::visualizer(40, "Wiedergabe läuft") %}{% endcall %}</div>
+			</div>
+			<h1 data-np-headline>{{ headline }}</h1>
+			<p class="subtitle" data-np-subtitle>{{ subtitle }}</p>
+			<p class="byline">{{ byline }}</p>
+
+			<div class="scrubber-wrap">
+				<div class="scrubber" role="slider" tabindex="0" aria-label="{% if by_track %}Position im Titel{% else %}Position im Hörbuch{% endif %}" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00:00" data-scrubber="full">
+					<span class="ticks">{% for tick in ticks %}<span class="tick" style="left: {{ tick }}%"></span>{% endfor %}</span>
+					<div class="fill"></div>
+					<div class="thumb"></div>
+				</div>
+				<div class="times mono">
+					<span data-np-elapsed>0:00:00</span>
+					<span data-np-total>0:00:00</span>
+				</div>
+			</div>
+
+			<div class="transport">
+				<div class="deck">
+					<button class="step" aria-label="{{ step_back }} Sekunden zurück" title="{{ step_back }} s zurück (←)" data-action="nudge-back" data-step="back">
+						{% call ui::icon("rewind") %}{% endcall %}
+						<span class="step-value mono">{{ step_back }}</span>
+					</button>
+					<button class="icon-btn jump" aria-label="{% if by_track %}Vorheriger Titel{% else %}Vorheriges Kapitel{% endif %}" title="{% if by_track %}Vorheriger Titel{% else %}Vorheriges Kapitel{% endif %} (Shift+Pfeil links)" data-action="jump-previous">
+						{% call ui::icon("previous") %}{% endcall %}
+					</button>
+					<button class="play" aria-label="Abspielen" title="Abspielen (Leertaste)" data-action="toggle">
+						{% call ui::icon("play-filled") %}{% endcall %}
+					</button>
+					<button class="icon-btn jump" aria-label="{% if by_track %}Nächster Titel{% else %}Nächstes Kapitel{% endif %}" title="{% if by_track %}Nächster Titel{% else %}Nächstes Kapitel{% endif %} (Shift+Pfeil rechts)" data-action="jump-next">
+						{% call ui::icon("next") %}{% endcall %}
+					</button>
+					<button class="step" aria-label="{{ step_forward }} Sekunden vor" title="{{ step_forward }} s vor (→)" data-action="nudge-forward" data-step="forward">
+						{% call ui::icon("forward") %}{% endcall %}
+						<span class="step-value mono">{{ step_forward }}</span>
+					</button>
+				</div>
+
+				<div class="options">
+					<select class="pill speed" aria-label="Geschwindigkeit" data-np-speed>
+						{% for speed in speeds %}<option value="{{ speed.value }}"{% if speed.selected %} selected{% endif %}>{{ speed.label }}</option>{% endfor %}
+					</select>
+					<select class="pill sleep" aria-label="Sleep-Timer" data-np-sleep>
+						<option value="0">Sleep-Timer</option>
+						<option value="15">15 Min</option>
+						<option value="30">30 Min</option>
+						<option value="45">45 Min</option>
+						<option value="60">60 Min</option>
+					</select>
+					{% include "partials/bookmark_button.html" %}
+				</div>
+			</div>
+			<p class="hints mono" data-np-hints>Leertaste Play · ← {{ step_back }} s · → {{ step_forward }} s · Shift+←/→ {{ list_label }} · Esc zurück</p>
+		</div>
+	</div>
+
+	<div class="right" data-tabs>
+		<div class="tabs">
+			<button class="tab active" data-tab="chapters">{{ list_label }}</button>
+			<button class="tab" data-tab="bookmarks">Lesezeichen · <span data-refresh="bookmark-count">{{ bookmarks.len() }}</span></button>
+		</div>
+		<div data-tab-panel="chapters">
+			{% if by_track %}
+			<div class="table" role="table" aria-label="Titel">
+				{% for track in tracks %}
+				<div role="row" class="row clickable" aria-current="false" data-track-row data-track-id="{{ track.id }}">
+					<button type="button" class="activator bare" aria-label="{{ track.title }} abspielen" data-action="play-track" data-track-id="{{ track.id }}"></button>
+					<span class="index mono"><span class="num">{{ track.number }}</span><span class="row-viz">{% call ui::visualizer(4, "Wiedergabe läuft") %}{% endcall %}</span></span>
+					<span class="track-title">{{ track.title }}</span>
+					<span class="mono track-length">{{ track.length }}</span>
+				</div>
+				{% endfor %}
+			</div>
+			{% else %}
+			{% include "partials/chapter_list.html" %}
+			{% endif %}
+		</div>
+		<div data-tab-panel="bookmarks" hidden>
+			<div class="table" role="table" aria-label="Lesezeichen" data-refresh="bookmark-list">
+				{% for bookmark in bookmarks %}
+				<button type="button" class="bookmark-row bare" role="row" data-action="play-from" data-position="{{ bookmark.position_secs }}">
+					<span>{{ bookmark.title }}</span>
+					<span class="mono">{{ bookmark.position }}</span>
+				</button>
+				{% endfor %}
+			</div>
+		</div>
+		<div data-refresh="bookmark-card">
+			{% if let Some(last) = bookmarks.last() %}
+			<div class="bookmark-card">
+				<span class="eyebrow">Zuletzt gesetzt</span>
+				<span class="title">{{ last.title }}</span>
+			</div>
+			{% endif %}
+		</div>
+	</div>
+</div>
+{% endblock %}

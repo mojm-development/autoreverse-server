@@ -1,0 +1,23 @@
+{#- legacy CoverTile.svelte for a book (`book: BookRow`), with its play button and, for
+    Verwalter (`pickable`), the pick button of the bulk selection. -#}
+{% import "partials/ui.html" as ui %}
+<figure class="cover-tile">
+	<div class="art">
+		{% if book.has_cover %}
+		<img src="/items/{{ book.id }}/cover" alt="" width="100" height="100" />
+		{% else %}
+		<div class="placeholder" style="--accent: var(--book)"></div>
+		{% endif %}
+		{% if pickable %}<button type="button" class="pick" aria-pressed="false" aria-label="{{ book.title }} auswählen" title="{{ book.title }} auswählen" data-pick="{{ book.id }}">{% call ui::icon("heart-filled") %}{% endcall %}</button>{% endif %}
+		{% if book.percent > 0 %}
+		<span class="progress" aria-hidden="true">
+			<span class="progress-fill" style="width: {{ book.percent }}%"></span>
+		</span>
+		{% endif %}
+		<button class="play" aria-label="{{ book.title }} {{ book.status.play_verb() }}" title="{{ book.title }} {{ book.status.play_verb() }}" data-action="play" data-item-id="{{ book.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
+	</div>
+	<figcaption>
+		<span class="title">{{ book.title }}</span>
+		<span class="subtitle">{{ book.author }}</span>
+	</figcaption>
+</figure>

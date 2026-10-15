@@ -1,0 +1,709 @@
+/*
+ * Styles of the shared components, moved out of the Svelte components (scoped there).
+ * Each section names its source. Selectors carry the component's root class so the former
+ * scoping still holds.
+ */
+
+/* Svelte rendered hidden things not at all; here they are in the markup with `hidden`, which a
+   component's own `display` would otherwise override. */
+[hidden] {
+	display: none !important;
+}
+
+/* Icon.svelte */
+.icon {
+	width: 1em;
+	height: 1em;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.6;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+/* BrandMark.svelte */
+img.mark {
+	display: block;
+	flex: none;
+	border-radius: 23%;
+}
+
+/* library/+layout.svelte */
+.shell {
+	display: grid;
+	grid-template-columns: var(--sidebar-width) 1fr;
+	min-height: 100vh;
+}
+.shell > main {
+	min-width: 0;
+	padding-bottom: var(--player-bar-height);
+}
+@media (max-width: 700px) {
+	/* On phones the sidebar gives way to the slim header, the area chips and the tab bar below,
+	   so main is the only grid item left — in legacy it then landed in the 216px sidebar column
+	   and every page was squeezed into it. */
+	.shell {
+		grid-template-columns: minmax(0, 1fr);
+		min-height: 0;
+	}
+	.shell > main {
+		padding-bottom: calc(
+			var(--player-bar-height) + var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px)
+		);
+	}
+}
+
+/* ThemeToggle.svelte — an icon rather than the word: three equal buttons sit in the account box.
+   Two classes, like Svelte's scoped one, so app.css's `button:not(…)` (0,1,1) does not win. */
+.sidebar .theme-toggle {
+	flex: 1;
+	height: 30px;
+	padding: 0;
+	display: grid;
+	place-items: center;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--line);
+	background: transparent;
+	color: var(--dim);
+	font-size: 15px;
+}
+.sidebar .theme-toggle:hover {
+	color: var(--text);
+	background: var(--panel-hi);
+	border-color: var(--line-strong);
+}
+
+/* Sidebar.svelte */
+.sidebar {
+	width: var(--sidebar-width);
+	display: flex;
+	flex-direction: column;
+	padding: 20px 12px 12px;
+	box-sizing: border-box;
+	position: sticky;
+	top: 0;
+	height: 100vh;
+	overflow-y: auto;
+	background: linear-gradient(
+		180deg,
+		color-mix(in oklab, var(--a) 22%, var(--sidebar)),
+		var(--sidebar) 52%
+	);
+	border-right: 1px solid var(--line);
+}
+.sidebar .brand {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	padding: 0 10px 18px;
+	color: inherit;
+}
+.sidebar .brand:hover .wordmark {
+	color: var(--a);
+}
+.sidebar .home {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	margin-bottom: 6px;
+}
+.sidebar .home .icon {
+	font-size: 15px;
+	flex: none;
+}
+.sidebar .wordmark {
+	font: 600 16px/1 var(--font-sans);
+	letter-spacing: -0.015em;
+}
+.sidebar .search-shortcut {
+	display: block;
+	margin: 0 4px 16px;
+	padding: 7px 10px;
+	border-radius: 8px;
+	background: var(--panel);
+	color: var(--faint);
+	font: 400 12.5px/1 var(--font-sans);
+}
+.sidebar .eyebrow {
+	padding: 20px 10px 8px;
+}
+.sidebar > a {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 10px;
+	border-radius: 7px;
+	font: 400 13.5px/1.2 var(--font-sans);
+	color: var(--dim);
+}
+.sidebar > a:hover {
+	background: var(--panel);
+	color: var(--text);
+}
+.sidebar > a[aria-current='true'] {
+	background: var(--a);
+	color: var(--bg);
+	font-weight: 500;
+}
+.sidebar .count {
+	margin-left: auto;
+	font-size: 11px;
+	color: var(--faint);
+}
+.sidebar .badge {
+	margin-left: auto;
+}
+/* Name and role get the first line to themselves; the three buttons share the second,
+   so nothing has to be truncated to fit the sidebar. */
+.sidebar .account {
+	margin-top: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 11px;
+	border-radius: var(--radius-md, 12px);
+	border: 1px solid var(--line);
+	background: color-mix(in oklab, var(--a) 6%, var(--panel));
+}
+.sidebar .identity {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	min-width: 0;
+}
+.sidebar .account-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.sidebar .avatar {
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: color-mix(in oklab, var(--a) 32%, transparent);
+	border: 1px solid color-mix(in oklab, var(--a) 45%, transparent);
+	display: grid;
+	place-items: center;
+	font: 600 11px var(--font-sans);
+	letter-spacing: 0.02em;
+	flex: none;
+}
+.sidebar .who {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.25;
+	overflow: hidden;
+	min-width: 0;
+}
+.sidebar .name,
+.sidebar .role {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.sidebar .name {
+	font: 600 12.5px var(--font-sans);
+}
+.sidebar .role {
+	font-size: 10px;
+	color: var(--faint);
+}
+.sidebar .logout-form {
+	display: contents;
+}
+.sidebar .account-btn {
+	flex: 1;
+	height: 30px;
+	display: grid;
+	place-items: center;
+	border-radius: var(--radius-pill, 999px);
+	border: 1px solid var(--line);
+	background: transparent;
+	color: var(--dim);
+	font-size: 15px;
+}
+.sidebar .account-btn:hover {
+	color: var(--text);
+	background: var(--panel-hi);
+	border-color: var(--line-strong);
+}
+
+/* Mobile navigation (≤ 700px): templates/partials/mobile_top.html, tab_bar.html, area_chips.html.
+   The sidebar does not fit a phone; its parts move to a slim header with the account menu, a tab
+   bar with the five areas, and a chip row with the current area's pages. None of it exists on
+   the desktop. */
+.m-top,
+.tabbar,
+.area-chips {
+	display: none;
+}
+.vh {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+@media (max-width: 700px) {
+	.sidebar {
+		display: none;
+	}
+
+	/* Header: brand left, avatar right; sticks to the top, translucent like a native bar. */
+	.m-top {
+		position: sticky;
+		top: 0;
+		z-index: 22;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		min-height: 52px;
+		padding: env(safe-area-inset-top, 0px) 6px 0 16px;
+		background: color-mix(in oklab, var(--bg) 84%, transparent);
+		-webkit-backdrop-filter: saturate(1.6) blur(18px);
+		backdrop-filter: saturate(1.6) blur(18px);
+		border-bottom: 1px solid var(--line);
+	}
+	.m-brand {
+		display: flex;
+		align-items: center;
+		gap: 9px;
+		min-height: 44px;
+		border-radius: var(--radius-md);
+	}
+	.m-brand .wordmark {
+		font: 600 17px/1 var(--font-sans);
+		letter-spacing: -0.015em;
+	}
+
+	.m-account {
+		position: relative;
+	}
+	.m-avatar {
+		list-style: none;
+		width: 44px;
+		height: 44px;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+	.m-avatar::-webkit-details-marker {
+		display: none;
+	}
+	.m-initials {
+		width: 32px;
+		height: 32px;
+		display: grid;
+		place-items: center;
+		border-radius: 50%;
+		background: color-mix(in oklab, var(--a) 32%, transparent);
+		border: 1px solid color-mix(in oklab, var(--a) 45%, transparent);
+		font: 600 11.5px var(--font-sans);
+		letter-spacing: 0.02em;
+		transition: box-shadow 150ms ease;
+	}
+	/* On the settings pages, which no tab stands for, the avatar shows where one is. */
+	.m-avatar[data-here] .m-initials,
+	.m-account[open] .m-initials {
+		box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--a);
+	}
+	.m-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 4px;
+		min-width: 232px;
+		padding: 6px;
+		display: flex;
+		flex-direction: column;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--line-strong);
+		background: var(--sidebar);
+		box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.55);
+		transform-origin: top right;
+		animation: m-menu-in 140ms ease-out;
+	}
+	.m-identity {
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		padding: 10px 12px 12px;
+		margin-bottom: 4px;
+		border-bottom: 1px solid var(--line);
+	}
+	.m-identity .name {
+		font: 600 14px/1.2 var(--font-sans);
+	}
+	.m-identity .role {
+		font-size: 10.5px;
+		color: var(--faint);
+	}
+	.m-logout {
+		display: contents;
+	}
+	.m-item,
+	.m-item.bare {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		width: 100%;
+		min-height: 44px;
+		padding: 0 12px;
+		border-radius: var(--radius-md);
+		color: var(--text);
+		font: 400 15px/1.2 var(--font-sans);
+	}
+	.m-item .icon {
+		font-size: 19px;
+		color: var(--dim);
+		flex: none;
+	}
+	.m-item:active,
+	.m-item:hover {
+		background: var(--panel-hi);
+	}
+	.m-item[aria-current='page'] .icon {
+		color: var(--a);
+	}
+
+	/* Chips: the area's pages, one swipe wide; each chip's hit area is 44px tall. */
+	.area-chips {
+		display: flex;
+		gap: 8px;
+		padding: 14px 16px 6px;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		scrollbar-width: none;
+	}
+	.area-chips::-webkit-scrollbar {
+		display: none;
+	}
+	.area-chips .pill {
+		position: relative;
+		flex: none;
+		height: 34px;
+		padding: 0 15px;
+		font-size: 13px;
+		color: var(--text);
+		background: var(--panel);
+		border-color: var(--line);
+	}
+	.area-chips .pill::after {
+		content: '';
+		position: absolute;
+		inset: -5px -4px;
+	}
+	.area-chips .pill[aria-current='true'] {
+		background: var(--a);
+		color: var(--bg);
+		border-color: transparent;
+		font-weight: 600;
+	}
+
+	/* The chips already open the page; its own top padding would leave a gap below them. */
+	.area-chips + .content,
+	.area-chips + .podcast-layout > .content,
+	.area-chips + .podcast-layout.overview > .rail {
+		padding-top: 12px;
+	}
+	/* Albums and Bibliothek keep the browser's large h1 margins on the desktop. */
+	.area-chips + .albums-page > header h1,
+	.area-chips + .books-page > header h1 {
+		margin: 4px 0 6px;
+	}
+
+	/* Tab bar: five equal tabs, fixed at the bottom above the home indicator. */
+	.tabbar {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 21;
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+		padding: 0 4px env(safe-area-inset-bottom, 0px);
+		background: color-mix(in oklab, var(--sidebar) 88%, transparent);
+		-webkit-backdrop-filter: saturate(1.6) blur(18px);
+		backdrop-filter: saturate(1.6) blur(18px);
+		border-top: 1px solid var(--line);
+	}
+	.tabbar a {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 3px;
+		min-width: 0;
+		min-height: 44px;
+		border-radius: var(--radius-md);
+		color: var(--faint);
+		-webkit-tap-highlight-color: transparent;
+		transition: color 150ms ease;
+	}
+	.tabbar .tab-icon {
+		position: relative;
+		display: grid;
+		place-items: center;
+		width: 52px;
+		height: 28px;
+		border-radius: var(--radius-pill);
+		transition: background-color 150ms ease;
+	}
+	.tabbar .tab-icon .icon {
+		font-size: 22px;
+	}
+	.tabbar .tab-label {
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font: 500 10.5px/1 var(--font-sans);
+		letter-spacing: 0.01em;
+	}
+	.tabbar a[aria-current='page'] {
+		color: var(--tab, var(--a));
+	}
+	.tabbar a[aria-current='page'] .tab-icon {
+		background: color-mix(in oklab, var(--tab, var(--a)) 18%, transparent);
+	}
+	.tabbar a[aria-current='page'] .tab-label {
+		font-weight: 600;
+	}
+	.tabbar .badge {
+		--a: var(--podcast);
+		position: absolute;
+		top: -3px;
+		left: calc(50% + 6px);
+		min-width: 18px;
+		justify-content: center;
+		padding: 3px 5px;
+		box-shadow: 0 0 0 2px var(--sidebar);
+	}
+
+	.m-brand:focus-visible,
+	.m-avatar:focus-visible,
+	.m-item:focus-visible,
+	.area-chips .pill:focus-visible,
+	.tabbar a:focus-visible {
+		outline: 2px solid var(--tab, var(--a));
+		outline-offset: 2px;
+	}
+	.tabbar a:focus-visible {
+		outline-offset: -2px;
+	}
+}
+@keyframes m-menu-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px) scale(0.97);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.m-menu {
+		animation: none;
+	}
+	.m-initials,
+	.tabbar a,
+	.tabbar .tab-icon {
+		transition: none;
+	}
+}
+
+/* CoverTile.svelte */
+.cover-tile {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 0;
+}
+.cover-tile figcaption {
+	min-width: 0;
+}
+.cover-tile .art {
+	position: relative;
+	display: block;
+	border-radius: var(--radius-md);
+}
+.cover-tile img,
+.cover-tile .placeholder {
+	display: block;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 1 / 1;
+	border-radius: var(--radius-md);
+	object-fit: cover;
+}
+.cover-tile .progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 4px;
+	background: rgb(0 0 0 / 0.45);
+	border-radius: 0 0 var(--radius-md) var(--radius-md);
+	overflow: hidden;
+}
+.cover-tile .progress-fill {
+	display: block;
+	height: 100%;
+	background: var(--a, var(--book));
+}
+/* The play button on the artwork: shown on hover or focus, always on touch screens. */
+.cover-tile .play {
+	position: absolute;
+	right: 8px;
+	bottom: 8px;
+	width: 38px;
+	height: 38px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: var(--a, var(--music));
+	color: var(--bg);
+	font-size: 19px;
+	display: grid;
+	place-items: center;
+	box-shadow: 0 8px 18px -8px rgb(0 0 0 / 0.8);
+	opacity: 0;
+	transform: translateY(6px);
+	transition:
+		opacity 120ms ease,
+		transform 120ms ease;
+}
+.cover-tile:hover .play,
+.cover-tile .play:focus-visible {
+	opacity: 1;
+	transform: none;
+}
+@media (hover: none) {
+	.cover-tile .play {
+		opacity: 1;
+		transform: none;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.cover-tile .play {
+		transition: none;
+	}
+}
+.cover-tile .placeholder {
+	background: var(--tile);
+	background-image: repeating-linear-gradient(135deg, var(--stripe) 0 1px, transparent 1px 7px);
+}
+.cover-tile .title {
+	display: block;
+	font: 500 12.5px/1.3 var(--font-sans);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.cover-tile .subtitle {
+	display: block;
+	font: 400 11px/1.2 var(--font-sans);
+	color: var(--dim);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ListRow.svelte */
+.row {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	height: 52px;
+	padding: 0 12px;
+	border-radius: var(--radius-sm);
+	color: inherit;
+}
+.row:hover {
+	background: var(--panel);
+}
+[role='row'][aria-current='true'] {
+	background: color-mix(in oklab, var(--a) 12%, transparent);
+}
+/* A row that does something: an invisible button covers it, so the whole row is the target and
+   keyboard focus lands on one control per row. Content that must stay clickable sits `.above`. */
+.row.clickable {
+	position: relative;
+}
+.row .activator {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	width: 100%;
+	border-radius: inherit;
+}
+.row .activator:focus-visible {
+	outline: 2px solid var(--a, var(--book));
+	outline-offset: -2px;
+}
+.row.clickable .above {
+	position: relative;
+	z-index: 2;
+}
+
+/* SortToggle.svelte, ViewToggle.svelte */
+.sort-toggle,
+.view-toggle {
+	display: flex;
+	gap: 4px;
+}
+.sort-toggle a,
+.view-toggle a {
+	display: inline-flex;
+	align-items: center;
+	height: 28px;
+	padding: 0 10px;
+	border-radius: var(--radius-md);
+	font: 500 11.5px var(--font-sans);
+	color: var(--dim);
+	border: 1px solid var(--line);
+}
+.sort-toggle a[aria-current='true'],
+.view-toggle a[aria-current='true'] {
+	background: var(--panel-hi);
+	color: var(--text);
+}
+
+/* The search field on the list pages (books, series). */
+.search-field {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 32px;
+	padding: 0 10px;
+	border-radius: var(--radius-md);
+	background: var(--panel);
+	border: 1px solid var(--line);
+	color: var(--faint);
+}
+.search-field:focus-within {
+	border-color: var(--line-strong);
+	color: var(--dim);
+}
+.search-field input {
+	width: 200px;
+	border: none;
+	background: transparent;
+	color: var(--text);
+	font: 400 12.5px var(--font-sans);
+	outline: none;
+}
+.search-field input::-webkit-search-cancel-button {
+	display: none;
+}
+
+/* The favourite heart: filled and in the accent while set. */
+.fav-toggle[aria-pressed='true'] {
+	color: var(--a, var(--music));
+}

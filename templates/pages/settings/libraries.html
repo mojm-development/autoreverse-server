@@ -1,0 +1,36 @@
+{#- legacy settings/libraries/+page.svelte -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Bibliotheken · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-libraries">
+	<h1>Bibliotheken</h1>
+
+	<form method="POST" action="?/savePaths" class="path-form">
+		<label>
+			<span class="eyebrow">Bücher-Pfad</span>
+			<input name="booksDir" value="{{ paths.books_dir.as_deref().unwrap_or("") }}" placeholder="/library/books" />
+		</label>
+		<label>
+			<span class="eyebrow">Musik-Pfad</span>
+			<input name="musicDir" value="{{ paths.music_dir.as_deref().unwrap_or("") }}" placeholder="/library/music" />
+		</label>
+		<button type="submit" class="primary">Speichern</button>
+		{% if let Some(error) = error %}<p class="error">{{ error }}</p>{% endif %}
+	</form>
+
+	{% include "partials/scan_card.html" %}
+
+	{% if missing > 0 %}
+	<div class="card warning">
+		<span>{{ missing }} Titel fehlen</span>
+		<a href="/library/albums?missing=true">Anzeigen</a>
+		<form method="POST" action="?/cleanupMissing">
+			<button type="submit">Aufräumen</button>
+		</form>
+	</div>
+	{% endif %}
+
+	<h2>Nutzer</h2>
+	<a href="/settings/users">Nutzer verwalten</a>
+</div>
+{% endblock %}

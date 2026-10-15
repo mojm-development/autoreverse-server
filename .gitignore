@@ -27,3 +27,12 @@ playwright/.auth/
 
 # Runtime data (AUTOREVERSE_DATA): covers, downloaded episodes
 /data
+
+
+# Added by cargo
+
+/target
+
+# Rust build output
+/target
+e2e/design/out/

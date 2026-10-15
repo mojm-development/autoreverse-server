@@ -1,0 +1,18 @@
+{#- legacy settings/about/+page.svelte, plus what GET /server/info reports. -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Über · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-about">
+	<h1>Über Autoreverse</h1>
+	<p class="version mono">autoreverse {{ version }}</p>
+	<dl aria-label="Server">
+		<dt>Hörbücher</dt><dd class="mono">{{ counts.book_count }}</dd>
+		<dt>Alben</dt><dd class="mono">{{ counts.album_count }}</dd>
+		<dt>Podcasts</dt><dd class="mono">{{ counts.podcast_count }}</dd>
+		<dt>Titel</dt><dd class="mono">{{ counts.track_count }}</dd>
+		{% if let Some(n) = user_count %}<dt>Nutzer</dt><dd class="mono">{{ n }}</dd>{% endif %}
+		{% if let Some(dir) = data_dir %}<dt>Datenverzeichnis</dt><dd class="mono">{{ dir }}</dd>{% endif %}
+	</dl>
+	<p><a href="https://github.com" target="_blank" rel="noopener">Projekt auf GitHub</a></p>
+</div>
+{% endblock %}

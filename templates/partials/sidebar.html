@@ -1,0 +1,67 @@
+{#- legacy Sidebar.svelte -#}
+{% import "partials/ui.html" as ui %}
+<nav class="sidebar" style="--a: var(--{{ shell.accent }})">
+	<a href="/library" class="brand" aria-label="Zur Startseite">
+		{% call ui::brand_mark(30) %}{% endcall %}
+		<span class="wordmark">Autoreverse</span>
+	</a>
+	<a href="/library/search" class="search-shortcut">Alles durchsuchen</a>
+
+	<a href="/library" class="home" aria-current="{{ shell.current("/library") }}">
+		{% call ui::icon("home") %}{% endcall %} Start
+	</a>
+
+	<div class="eyebrow" style="color: var(--music)">Musik</div>
+	<a href="/library/albums" aria-current="{{ shell.current("/library/albums") }}"
+		>Alben <span class="count mono">{{ shell.counts.albums }}</span></a
+	>
+	<a href="/library/artists" aria-current="{{ shell.current("/library/artists") }}"
+		>Interpreten <span class="count mono">{{ shell.counts.artists }}</span></a
+	>
+	<a href="/library/playlists" aria-current="{{ shell.current("/library/playlists") }}">Playlists</a>
+	<a href="/library/favorites" aria-current="{{ shell.current("/library/favorites") }}">Favoriten</a>
+
+	<div class="eyebrow" style="color: var(--podcast)">Podcasts</div>
+	<a href="/library/podcasts" aria-current="{{ shell.podcasts_current(false) }}">
+		Abos <span class="count mono">{{ shell.counts.podcasts }}</span>
+	</a>
+	<a href="/library/podcasts?filter=new" aria-current="{{ shell.podcasts_current(true) }}">
+		Neue Folgen {% if shell.counts.unread_episodes > 0 %}<span class="badge">{{ shell.counts.unread_episodes }}</span>{% endif %}
+	</a>
+
+	<div class="eyebrow" style="color: var(--book)">Hörbücher</div>
+	<a href="/library/books" aria-current="{{ shell.current("/library/books") }}"
+		>Bibliothek <span class="count mono">{{ shell.counts.books }}</span></a
+	>
+	<a href="/library/series" aria-current="{{ shell.current("/library/series") }}">Serien</a>
+	<a href="/library/bookmarks" aria-current="{{ shell.current("/library/bookmarks") }}">Lesezeichen</a>
+
+	<div class="account">
+		<div class="identity">
+			<span class="avatar">{{ shell.initials() }}</span>
+			<span class="who">
+				<span class="name">{{ shell.user_name }}</span>
+				<span class="role mono">{{ shell.role() }}</span>
+			</span>
+		</div>
+		<div class="account-actions">
+			{#- legacy ThemeToggle.svelte; static/js/app.js sets icon and title from the stored theme. -#}
+			<button
+				class="theme-toggle"
+				data-theme-toggle
+				aria-label="Thema wechseln"
+				title="Zu hellem Thema wechseln"
+			>
+				{% call ui::icon("moon") %}{% endcall %}
+			</button>
+			<a href="/settings" class="account-btn" aria-label="Einstellungen" title="Einstellungen">
+				{% call ui::icon("settings") %}{% endcall %}
+			</a>
+			<form method="POST" action="/logout" class="logout-form">
+				<button type="submit" class="account-btn" aria-label="Abmelden" title="Abmelden">
+					{% call ui::icon("logout") %}{% endcall %}
+				</button>
+			</form>
+		</div>
+	</div>
+</nav>

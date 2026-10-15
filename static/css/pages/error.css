@@ -1,0 +1,52 @@
+/* +error.svelte */
+.error-page {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 14px;
+	max-width: 480px;
+	margin: 0 auto;
+	padding: 96px 24px;
+}
+.error-page .brand {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	margin-bottom: 20px;
+}
+.error-page .wordmark {
+	font: 600 19px/1 var(--font-sans);
+}
+.error-page .code {
+	font-size: 13px;
+	color: var(--faint);
+}
+.error-page h1 {
+	font: 600 26px/1.3 var(--font-sans);
+	margin: 0;
+}
+.error-page .primary {
+	display: inline-flex;
+	align-items: center;
+	height: 32px;
+	padding: 0 16px;
+	border-radius: var(--radius-pill);
+	background: var(--book);
+	color: var(--bg);
+	font: 500 12px/1 var(--font-sans);
+	margin-top: 6px;
+}
+
+/* library/+error.svelte and settings/+error.svelte: the same page inside the app shell — no brand,
+   left-aligned in the content area. */
+.error-page.in-shell {
+	max-width: none;
+	margin: 0;
+	padding: 64px 48px;
+}
+.error-page.in-shell h1 {
+	max-width: 34ch;
+}
+.error-page.in-shell .primary {
+	background: var(--a, var(--book));
+}

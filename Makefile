@@ -1,11 +1,10 @@
-# Entwicklungsumgebung für Autoreverse Server.
+# Entwicklungsumgebung für Autoreverse Server (Rust).
 #
 # `make setup` einmal, danach `make dev`. Jedes Ziel, das die Datenbank braucht,
 # startet sie selbst — es gibt keine Reihenfolge, die man kennen müsste.
 #
-# Warum `set -a && source .env` statt `include .env`: Make übernähme die
-# Anführungszeichen aus der Datei wörtlich, DATABASE_URL käme mit Quotes bei
-# drizzle-kit an. Die Shell entfernt sie korrekt.
+# Der Server liest .env selbst (dotenvy). `cargo test` braucht keine .env: die
+# Datenbank-URL für die Tests steht in .cargo/config.toml (Postgres auf Port 5434).
 
 # macOS liefert GNU Make 3.81 aus, das kennt .ONESHELL noch nicht — jede Zeile eines
 # Rezepts läuft in ihrer eigenen Shell. Mehrzeilige Logik steht deshalb als eine
@@ -16,12 +15,11 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 DB_SERVICE := postgres
 DB_USER := autoreverse
-ENV := set -a && source .env && set +a
 
-.PHONY: help setup dev stop doctor \
-        db db-stop db-reset db-shell db-logs studio push generate migrate \
-        check lint format test test-unit test-integration test-e2e \
-        build preview stack stack-stop clean
+.PHONY: help setup dev run stop doctor \
+        db db-stop db-reset db-shell db-logs password \
+        check lint format test test-unit test-integration test-js test-e2e \
+        build image stack stack-stop clean
 
 help: ## Diese Übersicht
 	@echo "Autoreverse Server — Entwicklungsumgebung"
@@ -42,16 +40,15 @@ dev-library:
 	@echo "→ dev-library/{books,music,podcasts} angelegt."
 	@echo "  Die Pfade trägst du nach dem ersten Login unter Einstellungen → Bibliotheken ein."
 
-setup: .env dev-library ## Einmalig: .env, Abhängigkeiten, Datenbank, Schema
-	@bun install
+setup: .env dev-library ## Einmalig: .env, dev-library/, Datenbank, erster Build
 	@$(MAKE) --no-print-directory db
-	@$(MAKE) --no-print-directory push
+	@cargo build
 	@echo
 	@echo "Fertig. Weiter mit: make dev"
 
 doctor: ## Prüft, ob alles da ist, was die Umgebung braucht
 	@ok=0; \
-	for tool in bun docker ffmpeg ffprobe; do \
+	for tool in cargo docker ffmpeg ffprobe node; do \
 		if command -v $$tool >/dev/null; then echo "  ✓ $$tool"; \
 		else echo "  ✗ $$tool fehlt"; ok=1; fi; \
 	done; \
@@ -77,20 +74,22 @@ db: .env ## Startet Postgres im Hintergrund und wartet, bis sie antwortet
 db-stop: ## Hält Postgres an (Daten bleiben erhalten)
 	@$(COMPOSE) stop $(DB_SERVICE)
 
-db-reset: ## Wirft die Datenbank samt Inhalt weg und legt sie neu an
+# Das Schema legt der Server beim nächsten Start selbst an (eingebettete Migrationen).
+db-reset: ## Wirft die Datenbank samt Inhalt weg und legt sie leer neu an
 	@read -p "Alle lokalen Daten löschen? [j/N] " answer; \
 	if [ "$$answer" != "j" ]; then echo "Abgebrochen."; exit 0; fi; \
-	$(COMPOSE) down -v && $(MAKE) --no-print-directory db && $(MAKE) --no-print-directory push
+	$(COMPOSE) down -v && $(MAKE) --no-print-directory db
 
-# `ensureFirstAdmin` legt den Admin nur an, solange die Nutzertabelle leer ist —
-# eine Datenbank mit vergessenem Passwort ließe sich sonst nur per SQL retten.
+# Der erste Verwalter entsteht nur bei leerer Nutzertabelle aus .env — eine Datenbank mit
+# vergessenem Passwort ließe sich sonst nur per SQL retten. Das Passwort wird abgefragt,
+# nicht übergeben, damit es nicht in der Shell-History landet.
 # NAME statt USER: USER ist im Make immer belegt (der angemeldete Systemnutzer),
 # ein vergessenes NAME= würde sonst still am falschen Konto arbeiten.
-password: db ## Passwort setzen oder Verwalter anlegen: make password NAME=admin PASS=geheim123
-	@if [ -z "$(NAME)" ] || [ -z "$(PASS)" ]; then \
-		echo "Aufruf: make password NAME=admin PASS=mindestens8zeichen" >&2; exit 2; \
+password: db ## Passwort setzen oder Verwalter anlegen: make password NAME=admin
+	@if [ -z "$(NAME)" ]; then \
+		echo "Aufruf: make password NAME=admin" >&2; exit 2; \
 	fi; \
-	$(ENV) && bun run scripts/set-password.ts "$(NAME)" "$(PASS)" --admin
+	cargo run --quiet -- set-password "$(NAME)" --admin
 
 db-shell: ## psql in der laufenden Datenbank
 	@$(COMPOSE) exec $(DB_SERVICE) psql -U $(DB_USER) -d autoreverse
@@ -98,35 +97,16 @@ db-shell: ## psql in der laufenden Datenbank
 db-logs: ## Log der Datenbank
 	@$(COMPOSE) logs -f $(DB_SERVICE)
 
-studio: db ## Drizzle Studio im Browser
-	@$(ENV) && bun run db:studio
-
-# Für die Entwicklung ist `push` der richtige Weg: die Dev-Datenbank hat keinen
-# Migrationsverlauf, `migrate` würde auf ihr über bestehende Tabellen stolpern.
-# Fragt nach, wenn eine Änderung Daten kosten könnte — deshalb braucht es ein
-# Terminal. In CI: `bunx drizzle-kit push --force`.
-push: db ## Schema direkt in die Dev-Datenbank (fragt bei riskanten Änderungen nach)
-	@$(ENV) && bun run db:push
-
-generate: ## Migration aus den Schema-Änderungen erzeugen
-	@$(ENV) && bun run db:generate
-
-# Für eine Datenbank mit Migrationsverlauf — das Docker-Image tut das beim Start
-# selbst (AUTOREVERSE_AUTO_MIGRATE). Auf einer per `push` gepflegten Dev-Datenbank
-# schlägt es fehl, und das ist richtig so.
-migrate: db ## Migrationen anwenden (Produktion/Docker, nicht die Dev-Datenbank)
-	@$(ENV) && bun run db:migrate
-
 # --- Entwickeln -------------------------------------------------------------
 
-dev: db ## Startet den Dev-Server auf http://localhost:5173
-	@$(ENV) && bun run dev
+dev: .env db ## Startet den Server auf http://localhost:3000 (Templates sind einkompiliert: nach Änderungen neu starten)
+	@cargo run
 
-build: db ## Produktionsbuild (braucht DATABASE_URL für die Routenanalyse)
-	@$(ENV) && bun run build
+build: ## Release-Build nach target/release/autoreverse-server
+	@cargo build --release
 
-preview: build ## Baut und serviert auf http://localhost:4173
-	@$(ENV) && bun run preview
+image: ## Baut das Docker-Image autoreverse-server:dev
+	@docker build -t autoreverse-server:dev .
 
 stack: .env ## Der komplette Docker-Stack inklusive App auf http://localhost:8180
 	@$(COMPOSE) up --build
@@ -139,32 +119,37 @@ stop: ## Hält alles an, was dieses Projekt gestartet hat
 
 # --- Prüfen -----------------------------------------------------------------
 
-check: ## svelte-check / tsc
-	@bun run check
+check: ## cargo check für alle Targets
+	@cargo check --all-targets
 
-lint: ## prettier --check und eslint
-	@bun run lint
+lint: ## cargo fmt --check und clippy mit -D warnings
+	@cargo fmt --check
+	@cargo clippy --all-targets -- -D warnings
 
-format: ## prettier --write
-	@bun run format
+format: ## cargo fmt
+	@cargo fmt
 
-test-unit: ## Nur die reinen Unit-Tests (keine Datenbank nötig)
-	@bun run test:unit --run --project server tests/unit
-	@bun run test:unit --run --project client
+test-unit: ## Nur die Unit-Tests im Crate (keine Datenbank nötig)
+	@cargo test --lib --bins
 
-test-integration: ## Integrationstests (startet eigene Container über testcontainers)
-	@bun run test:unit --run --project server tests/integration
+test-integration: db ## Integrationstests (eine Wegwerf-Datenbank je Test auf Port 5434)
+	@cargo test --test integration
 
-test: ## Alles außer e2e: unit, integration, check, lint
-	@$(MAKE) --no-print-directory check
+test-js: ## JS-Tests der Browser-Module in static/js
+	@node --test 'tests/js/*.test.mjs'
+
+test: db ## Alles außer e2e: lint, cargo test, JS-Tests
 	@$(MAKE) --no-print-directory lint
-	@bun run test:unit --run
+	@cargo test
+	@$(MAKE) --no-print-directory test-js
 
-test-e2e: db ## Playwright gegen einen echten Build (nutzt die Dev-Datenbank)
-	@$(ENV) && bun run test:e2e
+# Nie mit einem Browser auf diesem Mac: das Skript fährt die Tart-VM auf Jarvis hoch.
+test-e2e: db ## Playwright in der Tart-VM auf Jarvis: make test-e2e [ARGS=tests/login.e2e.ts]
+	@e2e/run-on-jarvis.sh $(ARGS)
 
 # --- Aufräumen --------------------------------------------------------------
 
 clean: ## Entfernt Build-Ausgaben und Testartefakte
-	@rm -rf .svelte-kit build test-results playwright-report
-	@echo "→ .svelte-kit, build, test-results, playwright-report entfernt."
+	@cargo clean
+	@rm -rf e2e/test-results e2e/playwright-report e2e/design/out
+	@echo "→ target/, e2e/test-results, e2e/playwright-report, e2e/design/out entfernt."

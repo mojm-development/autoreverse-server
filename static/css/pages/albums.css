@@ -1,0 +1,187 @@
+/* library/albums/+page.svelte */
+.albums-page {
+	padding: 24px 32px 32px;
+}
+.albums-page header {
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	margin-bottom: 14px;
+}
+/* header only: the selection bar (bulk_editor.html) has its own .count */
+.albums-page header .count {
+	color: var(--faint);
+	font-size: 13px;
+}
+.albums-page .toolbar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 14px;
+}
+.albums-page .spacer {
+	flex: 1;
+}
+.albums-page .search-field input {
+	width: 190px;
+}
+/* What is filtering the list, and how to drop it. */
+.albums-page .chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 14px;
+}
+.albums-page .chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	height: 26px;
+	padding: 0 6px 0 10px;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--line);
+	background: var(--panel);
+	font-size: 11.5px;
+	color: var(--dim);
+}
+.albums-page .chip a {
+	display: grid;
+	place-items: center;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	color: var(--faint);
+	font-size: 12px;
+	line-height: 1;
+}
+.albums-page .chip a:hover {
+	background: var(--panel-hi);
+	color: var(--text);
+}
+.albums-page .grid-6 {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 22px 16px;
+}
+.albums-page .tile-link {
+	color: inherit;
+	min-width: 0;
+}
+.albums-page .table {
+	display: flex;
+	flex-direction: column;
+}
+.albums-page .table-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	height: 32px;
+	padding: 0 12px;
+	color: var(--faint);
+	font: 600 10px var(--font-sans);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	border-bottom: 1px solid var(--line);
+}
+.albums-page .table-head span:nth-child(1) {
+	width: 28px;
+}
+.albums-page .table-head span:nth-child(2) {
+	width: 36px;
+}
+.albums-page .table-head span:nth-child(3) {
+	flex: 2;
+}
+.albums-page .table-head span:nth-child(4),
+.albums-page .table-head span:nth-child(5) {
+	flex: 1;
+}
+.albums-page .table-head span:nth-child(6) {
+	flex: 1;
+	text-align: right;
+}
+.albums-page .index {
+	position: relative;
+	width: 28px;
+	height: 28px;
+	flex: none;
+	display: grid;
+	place-items: center;
+	color: var(--faint);
+}
+/* The row number turns into a play button under the pointer, the way a track list does. */
+.albums-page .row-play {
+	position: absolute;
+	inset: 0;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 50%;
+	background: var(--a);
+	color: var(--bg);
+	font-size: 14px;
+	display: grid;
+	place-items: center;
+	opacity: 0;
+}
+.albums-page .row:hover .row-play,
+.albums-page .row-play:focus-visible {
+	opacity: 1;
+}
+.albums-page .row:hover .number {
+	opacity: 0;
+}
+.albums-page .cover-thumb {
+	width: 36px;
+	height: 36px;
+	flex: none;
+	border-radius: var(--radius-sm);
+	background: var(--tile) center/cover;
+}
+.albums-page .row .title {
+	flex: 2;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.albums-page .cell {
+	flex: 1;
+	min-width: 0;
+	color: var(--dim);
+	font-size: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.albums-page .right {
+	text-align: right;
+}
+.albums-page .empty {
+	color: var(--faint);
+}
+/* InfiniteScroll.svelte: an invisible trip wire at the end of the list, and below it the status
+   line (empty unless loading) that keeps the page's bottom spacing. */
+.albums-page .sentinel {
+	height: 1px;
+	/* legacy's rootMargin 800px: the next page loads well before the end comes into view. Only
+	   rendered after a full page of 100, so the list is always taller than the lift. */
+	position: relative;
+	top: -800px;
+}
+.albums-page .list-status {
+	min-height: 18px;
+	margin: 14px 0 0;
+	color: var(--faint);
+	font-size: 11.5px;
+}
+@media (max-width: 700px) {
+	.albums-page {
+		padding: 18px 16px 24px;
+	}
+	.albums-page .search-field input {
+		width: 140px;
+	}
+}

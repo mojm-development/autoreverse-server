@@ -1,0 +1,20 @@
+{#- legacy CoverTile.svelte for an album (`album: AlbumRow`), inside its link, with its play
+    button and, for Verwalter (`pickable`), the pick button of the bulk selection. -#}
+{% import "partials/ui.html" as ui %}
+<a href="/library/albums/{{ album.id }}" class="tile-link" data-entry-key="{{ album.id }}">
+	<figure class="cover-tile">
+		<div class="art">
+			{% if album.has_cover %}
+			<img src="/items/{{ album.id }}/cover" alt="" width="100" height="100" loading="lazy" />
+			{% else %}
+			<div class="placeholder" style="--accent: var(--music)"></div>
+			{% endif %}
+			{% if pickable %}<button type="button" class="pick" aria-pressed="false" aria-label="{{ album.title }} auswählen" title="{{ album.title }} auswählen" data-pick="{{ album.id }}">{% call ui::icon("heart-filled") %}{% endcall %}</button>{% endif %}
+			<button class="play" aria-label="{{ album.title }} abspielen" title="{{ album.title }} abspielen" data-action="play" data-item-id="{{ album.id }}">{% call ui::icon("play-filled") %}{% endcall %}</button>
+		</div>
+		<figcaption>
+			<span class="title">{{ album.title }}</span>
+			<span class="subtitle">{{ album.artist }}</span>
+		</figcaption>
+	</figure>
+</a>

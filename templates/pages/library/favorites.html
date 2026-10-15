@@ -1,0 +1,47 @@
+{#- legacy library/favorites/+page.svelte -#}
+{% extends "layouts/app.html" %}
+{% block title %}Favoriten · Autoreverse{% endblock %}
+{% block content %}
+<div class="content favorites-page" style="--a: var(--music)">
+	<h1>Favoriten</h1>
+
+	{% if !items.is_empty() %}
+	<h2>Titel &amp; Alben</h2>
+	<div class="grid-6">
+		{% for item in items %}
+		<a href="{{ item.href }}" class="tile-link">
+			<figure class="cover-tile">
+				<div class="art">
+					{% if item.has_cover %}
+					<img src="/items/{{ item.id }}/cover" alt="" width="100" height="100" loading="lazy" />
+					{% else %}
+					<div class="placeholder" style="--accent: var(--{{ item.accent }})"></div>
+					{% endif %}
+				</div>
+				<figcaption>
+					<span class="title">{{ item.title }}</span>
+					<span class="subtitle">{{ item.subtitle }}</span>
+				</figcaption>
+			</figure>
+		</a>
+		{% endfor %}
+	</div>
+	{% endif %}
+
+	{% if !tracks.is_empty() %}
+	<h2>Songs</h2>
+	<div class="table" role="table" aria-label="Songs">
+		{% for track in tracks %}
+		<a href="{{ track.href }}" role="row" class="row">
+			<span class="title">{{ track.title }}</span>
+			<span class="cell">{{ track.item_title }}</span>
+		</a>
+		{% endfor %}
+	</div>
+	{% endif %}
+
+	{% if items.is_empty() && tracks.is_empty() %}
+	<p class="empty">Noch keine Favoriten.</p>
+	{% endif %}
+</div>
+{% endblock %}

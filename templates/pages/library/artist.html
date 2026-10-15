@@ -1,0 +1,56 @@
+{#- legacy library/artists/[name]/+page.svelte (Verwalter): upload a picture, pick one of the
+    artist's albums, or go back to the random-but-stable album. Plain forms (boosted by htmx);
+    select and upload lead back to the artists, a refused one shows here with its reason. -#}
+{% extends "layouts/app.html" %}
+{% block title %}{{ artist }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content artist-page" style="--a: var(--music)">
+	<header>
+		<h1>{{ artist }}</h1>
+		<a class="back" href="/library/artists">Zurück zu den Interpreten</a>
+	</header>
+
+	{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+	<section>
+		<h2>Eigenes Bild</h2>
+		<div class="custom">
+			<span class="preview">
+				{% if let Some(url) = custom_image_url %}<img src="{{ url }}" alt="" />{% endif %}
+			</span>
+			<form method="POST" action="{{ base }}/upload" enctype="multipart/form-data">
+				<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Bilddatei" />
+				<button type="submit" class="primary">Hochladen</button>
+			</form>
+		</div>
+		<p class="hint">JPEG, PNG, WebP oder GIF, höchstens 5 MB.</p>
+	</section>
+
+	<section>
+		<div class="section-head">
+			<h2>Album als Bild</h2>
+			<form method="POST" action="{{ base }}/reset">
+				<button type="submit" class="secondary">Auf Zufall zurücksetzen</button>
+			</form>
+		</div>
+		{% if albums.is_empty() %}
+		<p class="hint">Für diesen Interpreten ist kein Album in der Bibliothek.</p>
+		{% else %}
+		<div class="grid">
+			{% for album in albums %}
+			<form method="POST" action="{{ base }}/select">
+				<input type="hidden" name="item_id" value="{{ album.id }}" />
+				<button type="submit" class="album bare" aria-pressed="{{ album.active }}">
+					<span class="cover">
+						{% if album.has_cover %}<img src="/items/{{ album.id }}/cover" alt="" loading="lazy" />{% endif %}
+					</span>
+					<span class="title">{{ album.title }}</span>
+					<span class="year mono">{{ album.year }}{% if album.active %} · gewählt{% else if album.saved %} · gespeichert{% endif %}</span>
+				</button>
+			</form>
+			{% endfor %}
+		</div>
+		{% endif %}
+	</section>
+</div>
+{% endblock %}

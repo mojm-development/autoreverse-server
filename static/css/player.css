@@ -1,0 +1,225 @@
+/* The web player: MiniPlayerBar.svelte, Scrubber.svelte, Visualizer.svelte. */
+
+/* MiniPlayerBar.svelte */
+.mini-player {
+	position: fixed;
+	left: var(--sidebar-width);
+	right: 0;
+	bottom: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 0 24px;
+	border-top: 1px solid var(--line);
+	background: var(--sidebar);
+	height: 78px;
+}
+.mini-player[hidden] {
+	display: none;
+}
+.mini-player .transport {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.mini-player .extra {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.mini-player .extra .icon-btn {
+	width: 30px;
+	height: 30px;
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	border: 1px solid var(--line);
+	color: var(--dim);
+}
+.mini-player .extra .icon-btn:hover {
+	color: var(--text);
+	background: var(--panel);
+}
+.mini-player .icon-btn:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+.mini-player .skip {
+	font: 600 10.5px var(--font-mono);
+}
+.mini-player .play {
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border-radius: 50%;
+	background: var(--a, var(--book));
+	color: var(--bg);
+	display: grid;
+	place-items: center;
+	border: none;
+}
+.mini-player .mini-viz {
+	display: block;
+	flex: none;
+	width: 92px;
+	height: 30px;
+	--viz-gap: 3px;
+	--viz-segment: 6px;
+}
+.mini-player .cover {
+	width: 42px;
+	height: 42px;
+	flex: none;
+	border-radius: 6px;
+	background: var(--tile);
+	overflow: hidden;
+}
+.mini-player .cover img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.mini-player .info {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 0;
+}
+.mini-player .line {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+.mini-player .title {
+	font: 500 12.5px/1.2 var(--font-sans);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.mini-player .time {
+	margin-left: auto;
+	font-size: 10.5px;
+	color: var(--faint);
+	white-space: nowrap;
+}
+@media (max-width: 700px) {
+	.mini-player {
+		left: 0;
+		bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+		gap: 10px;
+		padding: 0 12px;
+	}
+	.mini-player .mini-viz {
+		display: none;
+	}
+	/* At 390px the info column would be ~60px wide and the time ran into the speed pill; without
+	   the cover and with tighter transport it gets ~120px. */
+	.mini-player .cover {
+		display: none;
+	}
+	.mini-player .transport {
+		gap: 8px;
+	}
+	.mini-player .time {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+}
+
+/* Scrubber.svelte — `role="slider"` keeps it apart from the book page's static progress bar. */
+.scrubber[role='slider'] {
+	position: relative;
+	width: 100%;
+	height: var(--scrubber-height, 4px);
+	border-radius: 99px;
+	background: var(--track);
+	touch-action: none;
+	cursor: pointer;
+}
+.scrubber[role='slider']::before {
+	content: '';
+	position: absolute;
+	inset: -8px 0;
+}
+.scrubber[role='slider']:focus-visible {
+	outline: 2px solid var(--a, var(--book));
+	outline-offset: 4px;
+}
+.scrubber[role='slider'] .fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 0;
+	background: var(--a, var(--book));
+	border-radius: 99px;
+}
+.scrubber[role='slider'] .tick {
+	position: absolute;
+	top: -2px;
+	width: 1px;
+	height: calc(var(--scrubber-height, 4px) + 4px);
+	background: var(--track-tick);
+}
+.scrubber[role='slider'] .thumb {
+	position: absolute;
+	top: 50%;
+	left: 0;
+	width: var(--scrubber-thumb, 10px);
+	height: var(--scrubber-thumb, 10px);
+	margin-left: calc(var(--scrubber-thumb, 10px) / -2);
+	transform: translateY(-50%);
+	border-radius: 50%;
+	background: var(--text);
+}
+
+/* Visualizer.svelte */
+.viz {
+	display: flex;
+	align-items: flex-end;
+	gap: var(--viz-gap, 3px);
+	width: 100%;
+	height: 100%;
+}
+.viz .bar {
+	flex: 1;
+	min-width: 2px;
+	height: 30%;
+	border-radius: 2px;
+	background-image: repeating-linear-gradient(
+		to top,
+		var(--a, var(--music)) 0 calc(var(--viz-segment, 10px) - 3px),
+		transparent calc(var(--viz-segment, 10px) - 3px) var(--viz-segment, 10px)
+	);
+	animation: viz-bounce 900ms ease-in-out infinite alternate;
+	animation-delay: calc(var(--i) * -170ms);
+	animation-play-state: paused;
+	opacity: 0.4;
+}
+.viz.playing .bar {
+	animation-play-state: running;
+	opacity: 1;
+}
+.viz.live .bar {
+	animation: none;
+	opacity: 1;
+	transition: height 60ms linear;
+}
+@keyframes viz-bounce {
+	from {
+		height: 18%;
+	}
+	to {
+		height: 100%;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	.viz .bar {
+		animation: none;
+		height: 55%;
+	}
+	.viz.live .bar {
+		transition: none;
+	}
+}

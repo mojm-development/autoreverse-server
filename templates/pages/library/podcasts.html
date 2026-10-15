@@ -1,0 +1,45 @@
+{#- legacy library/podcasts/+page.svelte: the rail, "Neue Folgen" (?filter=new), and for the
+    Verwalter the directory search. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{% if show_new %}Neue Folgen{% else %}Podcasts{% endif %} · Autoreverse{% endblock %}
+{% block content %}
+<div class="podcast-layout{% if !show_new %} overview{% endif %}" style="--a: var(--podcast)">
+	{% include "partials/podcast_rail.html" %}
+	<div class="content">
+		{% if show_new %}
+		<header class="head">
+			<div>
+				<h1>Neue Folgen</h1>
+				<p class="sub">{{ new_subline }}</p>
+			</div>
+			<a class="pill" href="/library/podcasts">Alle Abos</a>
+		</header>
+		{% if episodes.is_empty() %}
+		<div class="blank">
+			<span class="blank-icon">{% call ui::icon("podcast") %}{% endcall %}</span>
+			<p class="blank-title">Alles gehört</p>
+			<p class="blank-text">Neue Folgen deiner Abos erscheinen hier, sobald der Feed sie ausliefert.</p>
+		</div>
+		{% else %}
+		<ul class="episodes">
+			{% for episode in episodes %}{% include "partials/episode_card.html" %}{% endfor %}
+		</ul>
+		{% endif %}
+		{% else if !rail.entries.is_empty() %}
+		<p class="empty pick-hint">Wähle einen Podcast aus der Liste.</p>
+		{% else %}
+		<p class="empty">Noch keine Podcast-Abos.</p>
+		{% endif %}
+		{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+		{% if shell.is_admin %}
+		<section class="add-feed-section">
+			<h2>Podcast abonnieren</h2>
+			<p class="add-hint">Suche nach einem Namen oder füge die Adresse eines Feeds ein.</p>
+			{% include "partials/podcast_search.html" %}
+		</section>
+		{% endif %}
+	</div>
+</div>
+{% include "partials/playlist_picker.html" %}
+{% endblock %}

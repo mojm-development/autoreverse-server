@@ -1,0 +1,30 @@
+{#- Mobile (≤ 700px) only, hidden on the desktop where the sidebar holds all of this: a slim header
+    with the brand and the account menu. A <details> needs no script to open; static/js/pages.js
+    only closes it on a tap outside or Esc. -#}
+{% import "partials/ui.html" as ui %}
+<header class="m-top" style="--a: var(--{{ shell.accent }})">
+	<a href="/library" class="m-brand" aria-label="Zur Startseite">
+		{% call ui::brand_mark(26) %}{% endcall %}
+		<span class="wordmark">Autoreverse</span>
+	</a>
+	<details class="m-account" data-dismissable>
+		<summary class="m-avatar" aria-label="Konto: {{ shell.user_name }}"{% if shell.in_settings() %} data-here{% endif %}><span class="m-initials">{{ shell.initials() }}</span></summary>
+		<div class="m-menu">
+			<div class="m-identity">
+				<span class="name">{{ shell.user_name }}</span>
+				<span class="role mono">{{ shell.role() }}</span>
+			</div>
+			<a href="/settings" class="m-item"{% if shell.in_settings() %} aria-current="page"{% endif %}>
+				{% call ui::icon("settings") %}{% endcall %}<span>Einstellungen</span>
+			</a>
+			<button type="button" class="m-item bare" data-theme-toggle title="Zu hellem Thema wechseln">
+				{% call ui::icon("moon") %}{% endcall %}<span data-theme-label>Helles Thema</span>
+			</button>
+			<form method="POST" action="/logout" class="m-logout">
+				<button type="submit" class="m-item bare">
+					{% call ui::icon("logout") %}{% endcall %}<span>Abmelden</span>
+				</button>
+			</form>
+		</div>
+	</details>
+</header>

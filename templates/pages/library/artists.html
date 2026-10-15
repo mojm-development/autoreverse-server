@@ -1,0 +1,43 @@
+{#- legacy library/artists/+page.svelte. The search filters on the page (static/js/artists.js). -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Interpreten · Autoreverse{% endblock %}
+{% block content %}
+<div class="content artists-page" style="--a: var(--music)">
+	<header>
+		<h1>Interpreten <span class="count mono">{{ artists.len() }}</span></h1>
+		<span class="search-field">
+			{% call ui::icon("search") %}{% endcall %}
+			<input type="search" placeholder="Interpret suchen" data-artist-search />
+		</span>
+	</header>
+
+	{% if artists.is_empty() %}
+	<p class="empty">Noch keine Interpreten in der Bibliothek.</p>
+	{% else %}
+	<p class="empty" data-artist-empty hidden></p>
+	<ul class="grid" data-artist-grid>
+		{% for artist in artists %}
+		<li class="tile" data-artist data-search="{{ artist.search }}">
+			<a class="link" href="{{ artist.albums_href }}">
+				<span class="portrait">
+					{% if let Some(url) = artist.cover_url %}
+					<img src="{{ url }}" alt="" loading="lazy" />
+					{% else %}
+					<span class="initials">{{ artist.initials }}</span>
+					{% endif %}
+				</span>
+				<span class="name">{{ artist.name }}</span>
+				<span class="count-sub mono">{{ artist.count_line }}</span>
+			</a>
+			{% if shell.is_admin %}
+			<a class="edit" href="{{ artist.edit_href }}" aria-label="Bild für {{ artist.name }} wählen" title="Bild wählen">
+				{% call ui::icon("settings") %}{% endcall %}
+			</a>
+			{% endif %}
+		</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+</div>
+{% endblock %}

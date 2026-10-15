@@ -18,13 +18,17 @@ services:
       timeout: 3s
       retries: 10
 
+  # `make db` / `make dev` start only `postgres`; `make stack` builds and starts the app too.
   app:
     build: .
+    # The image runs as UID 1000. If the podcast folder on the host belongs to someone else,
+    # set that user here, e.g. user: '1001:1001'.
     ports:
       - '8180:3000'
     environment:
       DATABASE_URL: postgresql://autoreverse:autoreverse@postgres:5432/autoreverse
       AUTOREVERSE_DATA: /data
+      # The schema is migrated at every start (migrations are compiled in); there is no switch.
       # First-admin bootstrap, only used once against an empty `users` table — change these.
       AUTOREVERSE_ADMIN_USER: admin
       AUTOREVERSE_ADMIN_PASSWORD: change-me
@@ -40,18 +44,15 @@ services:
       - ${AUTOREVERSE_BOOKS_HOST:-./dev-library/books}:/library/books:ro
       - ${AUTOREVERSE_MUSIC_HOST:-./dev-library/music}:/library/music:ro
       # Downloaded podcast episodes, reachable from the host. Must be writable —
-      # unlike the two library mounts above. Files land here flat, named
-      # <episodeId>.<ext>. Covers stay in the named volume below.
+      # unlike the two library mounts above. Files land in one folder per podcast,
+      # <Podcast>/<Folge>.<ext>. Covers stay in the named volume below.
       - ${AUTOREVERSE_PODCASTS_HOST:-./dev-library/podcasts}:/data/podcasts
       - autoreverse-data:/data
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/login']
-      interval: 5s
-      timeout: 3s
-      retries: 10
+    # The image's HEALTHCHECK runs `autoreverse-server healthcheck` (GET /login on loopback);
+    # the slim runtime has no wget or curl.
 
 volumes:
   pgdata:

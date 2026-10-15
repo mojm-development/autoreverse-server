@@ -1,0 +1,9 @@
+{#- Mobile (≤ 700px) only: the current area's sub-navigation as a scrollable chip row at the top
+    of the content (the sidebar's entries under Musik / Podcasts / Hörbücher). -#}
+{% let chips = shell.chips() %}
+{% if !chips.is_empty() %}
+<nav class="area-chips" aria-label="{{ shell.area_label() }}" style="--a: var(--{{ shell.accent }})">
+	{% for chip in chips %}<a href="{{ chip.href }}" class="pill"{% if chip.current %} aria-current="true"{% endif %}>{{ chip.label }}</a>
+	{% endfor %}
+</nav>
+{% endif %}

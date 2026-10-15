@@ -1,0 +1,44 @@
+{#- legacy library/albums/[id]/+page.svelte. static/js/player marks the playing track; the hearts
+    are handled by static/js/app.js, "Bearbeiten" (Verwalter) by static/js/metadata. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ album.title }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content album-page" style="--a: var(--music)" data-live-item data-item-id="{{ album.id }}" data-kind="album">
+	<div class="hero">
+		<div class="cover">
+			{% if album.cover_path.is_some() %}<img src="/items/{{ album.id }}/cover" alt="" />{% endif %}
+		</div>
+		<div class="meta">
+			<span class="eyebrow">{{ eyebrow }}</span>
+			<h1>{{ album.title }}</h1>
+			<p class="subline">{{ subline }}</p>
+			<div class="actions">
+				<button class="primary" data-action="play">{% call ui::icon("play") %}{% endcall %} Abspielen</button>
+				<button class="outline" data-action="shuffle">{% call ui::icon("shuffle") %}{% endcall %} Zufall</button>
+				{% call ui::favorite("items", album.id, favorite, "Zu Favoriten hinzufügen", "Aus Favoriten entfernen", "") %}{% endcall %}
+				{% if shell.is_admin %}<button type="button" class="outline" data-editor-open>{% call ui::icon("settings") %}{% endcall %} Bearbeiten</button>{% endif %}
+				<button type="button" class="outline" data-playlist-pick data-pick-item="{{ album.id }}">{% call ui::icon("playlist-add") %}{% endcall %} Zur Playlist hinzufügen</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="table" role="table" aria-label="Titel">
+		<div class="table-head" role="row">
+			<span></span><span>Titel</span><span>Interpret</span><span></span><span>Dauer</span>
+		</div>
+		{% for track in tracks %}
+		<div role="row" class="row clickable" aria-current="false" data-track-row data-track-id="{{ track.id }}">
+			<button type="button" class="activator bare" aria-label="{{ track.title }} abspielen" data-action="play-track" data-track-id="{{ track.id }}"></button>
+			<span class="index mono"><span class="num">{{ track.number }}</span>{% call ui::icon("play") %}{% endcall %}</span>
+			<span class="title">{{ track.title }}</span>
+			<span class="cell">{{ artist }}</span>
+			<span class="cell fav above">{% call ui::favorite("tracks", track.id, track.favorite, "Titel favorisieren", "Titel aus Favoriten entfernen", "small") %}{% endcall %}<button type="button" class="icon-btn small" data-playlist-pick data-pick-track="{{ track.id }}" aria-label="{{ track.title }} zur Playlist hinzufügen" title="Zur Playlist hinzufügen">{% call ui::icon("playlist-add") %}{% endcall %}</button></span>
+			<span class="cell mono">{{ track.duration }}</span>
+		</div>
+		{% endfor %}
+	</div>
+	{% include "partials/playlist_picker.html" %}
+	{% if let Some(editor) = editor %}{% include "partials/metadata_editor.html" %}{% endif %}
+</div>
+{% endblock %}

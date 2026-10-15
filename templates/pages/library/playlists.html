@@ -1,0 +1,35 @@
+{#- legacy library/playlists/+page.svelte, plus the form that creates a playlist (legacy had none
+    in the web UI). -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Playlists · Autoreverse{% endblock %}
+{% block content %}
+<div class="content playlists-page" style="--a: var(--music)">
+	<header>
+		<h1>Playlists</h1>
+		<form method="POST" action="/library/playlists" class="create-playlist">
+			<input name="name" value="{{ name }}" placeholder="Neue Playlist" aria-label="Name der neuen Playlist" maxlength="100" required />
+			<button type="submit" class="primary">Anlegen</button>
+		</form>
+	</header>
+	{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+	<div class="pills">
+		<span class="pill active">Eigene</span>
+	</div>
+
+	{% if playlists.is_empty() %}
+	<p class="empty">Noch keine Playlists.</p>
+	{% else %}
+	<div class="grid">
+		{% for playlist in playlists %}
+		<a class="tile" href="/library/playlists/{{ playlist.id }}">
+			<div class="collage">{% call ui::icon("playlist") %}{% endcall %}</div>
+			<span class="title">{{ playlist.name }}</span>
+			<span class="subtitle">{{ playlist.subtitle }}</span>
+		</a>
+		{% endfor %}
+	</div>
+	{% endif %}
+</div>
+{% endblock %}

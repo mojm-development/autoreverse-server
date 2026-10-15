@@ -1,0 +1,17 @@
+{#- legacy settings/+layout.svelte. Needs `shell: Shell` and `sections`. -#}
+{% extends "layouts/player.html" %}
+{% block page %}
+{% include "partials/mobile_top.html" %}
+<div class="shell">
+	{% include "partials/sidebar.html" %}
+	<div class="settings" style="--a: var(--book)">
+		<nav class="subnav">
+			<a href="/settings">Übersicht</a>
+			{% for section in sections %}<a href="{{ section.href }}">{{ section.label }}</a>
+			{% endfor %}
+		</nav>
+		<div class="content">{% block content %}{% endblock %}</div>
+	</div>
+</div>
+{% include "partials/tab_bar.html" %}
+{% endblock %}

@@ -1,0 +1,104 @@
+/* library/search/+page.svelte */
+.search-page {
+	padding: 24px 32px;
+}
+.search-page .search-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 40px;
+	padding: 0 12px;
+	border-radius: var(--radius-md);
+	background: var(--panel);
+	border: 1px solid var(--line);
+	max-width: 480px;
+}
+.search-page .search-bar input {
+	flex: 1;
+	border: none;
+	background: transparent;
+	color: var(--text);
+	font: 400 13px var(--font-sans);
+	outline: none;
+}
+.search-page .hint {
+	color: var(--faint);
+	font-size: 10px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: 1px 5px;
+}
+.search-page .meta {
+	color: var(--dim);
+	font-size: 11.5px;
+	margin: 14px 0;
+}
+.search-page .pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 20px;
+}
+.search-page .pill {
+	display: inline-flex;
+	align-items: center;
+	height: 26px;
+	padding: 0 11px;
+	border-radius: var(--radius-pill);
+	font: 500 11.5px/1 var(--font-sans);
+	border: 1px solid var(--line-strong);
+	color: var(--dim);
+}
+.search-page .pill.active {
+	background: var(--a);
+	color: var(--bg);
+	border-color: transparent;
+}
+.search-page section {
+	margin-bottom: 26px;
+}
+.search-page .section-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid var(--line);
+	margin-bottom: 4px;
+}
+.search-page .count {
+	color: var(--faint);
+	font-size: 11px;
+}
+.search-page .dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	flex: none;
+}
+.search-page .title {
+	font: 500 13px var(--font-sans);
+	flex: 1;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.search-page .row-meta {
+	color: var(--dim);
+	font-size: 11.5px;
+	flex: 1;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.search-page .status {
+	color: var(--faint);
+	font-size: 11px;
+	flex: none;
+}
+@media (max-width: 700px) {
+	.search-page {
+		padding: 18px 16px 24px;
+	}
+}

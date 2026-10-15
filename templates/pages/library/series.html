@@ -1,0 +1,45 @@
+{#- legacy library/series/+page.svelte. The search filters on the page (static/js/series.js). -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Serien · Autoreverse{% endblock %}
+{% block content %}
+<div class="content series-page" style="--a: var(--book)">
+	<header>
+		<h1>Serien <span class="count mono">{{ total }}</span></h1>
+		<span class="search-field">
+			{% call ui::icon("search") %}{% endcall %}
+			<input type="search" placeholder="Serie oder Autor suchen" data-series-search />
+		</span>
+	</header>
+
+	{% if groups.is_empty() %}
+	<p class="empty">Keines deiner Hörbücher gehört zu einer Serie.</p>
+	{% else %}
+	<p class="empty" data-series-empty hidden></p>
+	{% for group in groups %}
+	<section class="author-group" data-series-group>
+		<h2 class="author-name">
+			{{ group.author }}
+			<span class="count mono" data-series-count>{{ group.shelves.len() }}</span>
+		</h2>
+		<ul class="grid">
+			{% for shelf in group.shelves %}
+			<li data-series-entry data-search="{{ shelf.search }}">
+				<a class="tile" href="{{ shelf.href }}">
+					<span class="stack">
+						{% for cover in shelf.covers %}<span class="spine" style="background-image: url(/items/{{ cover }}/cover); --i: {{ loop.index0 }}"></span>{% endfor %}
+						{% if shelf.covers.is_empty() %}<span class="spine empty-spine" style="--i: 0"></span>{% endif %}
+					</span>
+					<span class="body">
+						<span class="name">{{ shelf.series }}</span>
+						<span class="count-sub mono">{{ shelf.count_line }}</span>
+					</span>
+				</a>
+			</li>
+			{% endfor %}
+		</ul>
+	</section>
+	{% endfor %}
+	{% endif %}
+</div>
+{% endblock %}

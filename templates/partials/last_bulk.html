@@ -1,0 +1,11 @@
+{#- The user's last bulk change, undoable after its sheet was closed (new here; legacy only offered
+    "Rückgängig" inside the open sheet). Verwalter on the books and albums lists; the line is empty
+    and hidden unless there is something to say. static/js/metadata/editor.js sends
+    POST /items/bulk/undo and reloads the page, then reports the result here. Needs `bulk`. -#}
+<div class="last-bulk" data-last-bulk{% if bulk.last.is_none() %} hidden{% endif %}>
+	{% if let Some(last) = bulk.last %}
+	<span class="text">{{ last.text }}</span>
+	<button type="button" class="outline" data-last-bulk-undo data-batch-id="{{ last.batch_id }}">Rückgängig</button>
+	{% endif %}
+	<span class="result" role="status" aria-live="polite" data-last-bulk-result></span>
+</div>

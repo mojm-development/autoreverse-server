@@ -1,0 +1,48 @@
+{#- legacy ScanStatusCard.svelte. htmx re-fetches the card: every second while a scan runs,
+    every five seconds otherwise. The Protokoll toggle survives the swap (static/js/app.js). -#}
+<div
+	class="card scan-card"
+	id="scan-card"
+	hx-get="/settings/scan/card"
+	hx-trigger="every {{ card.poll_interval() }}"
+	hx-swap="outerHTML"
+>
+	{% if card.running %}
+	<span class="eyebrow">Scan läuft</span>
+	{% if card.has_progress %}
+	<p class="stat mono">{{ card.stat_line }}</p>
+	{% if card.determinate %}
+	<div class="bar" role="progressbar" aria-label="Scan-Fortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ card.percent }}">
+		<div class="fill" style="width: {{ card.percent }}%"></div>
+	</div>
+	{% else %}
+	<div class="bar indeterminate" role="progressbar" aria-label="Scan-Fortschritt">
+		<div class="fill"></div>
+	</div>
+	{% endif %}
+	{% endif %}
+	{% else %}
+	<span class="eyebrow">Kein Scan aktiv</span>
+	{% endif %}
+	{% if let Some(counts) = card.counts %}
+	<div class="report mono">
+		<span>neu {{ counts.new }}</span>
+		<span>geändert {{ counts.updated }}</span>
+		<span>unverändert {{ counts.unchanged }}</span>
+		<span>entfernt {{ counts.removed }}</span>
+		<span>übersprungen {{ counts.skipped }}</span>
+	</div>
+	{% endif %}
+	<div class="actions">
+		{% if card.running %}
+		<button class="outline" hx-post="/settings/scan/cancel" hx-target="#scan-card" hx-swap="outerHTML">Abbrechen</button>
+		{% else %}
+		<button class="primary" hx-post="/settings/scan/start" hx-target="#scan-card" hx-swap="outerHTML">Scan starten</button>
+		{% endif %}
+		<button class="link" type="button" data-scan-log-toggle>Protokoll</button>
+	</div>
+	<div class="log mono" data-scan-log hidden>
+		{% if let Some(error) = card.last_error %}<p>Fehler: {{ error }}</p>{% endif %}
+		<p>Übersprungen: {{ card.skipped_line }}</p>
+	</div>
+</div>
