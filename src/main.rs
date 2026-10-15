@@ -15,6 +15,8 @@ async fn main() -> ExitCode {
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| EnvFilter::new("autoreverse_server=info,tower_http=warn")),
         )
+        // No colour codes in `docker logs` or a journal, only on a terminal.
+        .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let command = match cli::parse(&args) {
@@ -24,8 +26,21 @@ async fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    if let Command::SetPassword { name, admin } = command {
-        return set_password(&name, admin).await;
+    match command {
+        Command::SetPassword { name, admin } => return set_password(&name, admin).await,
+        Command::Healthcheck => {
+            // Same PORT rule as `Config` (default 3000); the probe always goes to loopback.
+            let port = std::env::var("PORT")
+                .ok()
+                .and_then(|p| p.trim().parse().ok())
+                .unwrap_or(3000);
+            return if cli::healthcheck(port) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            };
+        }
+        Command::Serve => {}
     }
     match run().await {
         Ok(()) => ExitCode::SUCCESS,

@@ -1,5 +1,6 @@
 //! Command line: without arguments the binary serves; `set-password <name> [--admin]` replaces
-//! legacy `scripts/set-password.ts`.
+//! legacy `scripts/set-password.ts`; `healthcheck` probes a running server (the Docker
+//! `HEALTHCHECK`, since the slim runtime image has neither wget nor curl).
 //!
 //! `ensure_first_admin` only acts on an empty user table, so a database whose admin password is
 //! lost is otherwise only reachable through SQL. Unlike the script, the password is not an
@@ -12,18 +13,22 @@ use sqlx::PgPool;
 
 use crate::auth::directory::{SetPasswordOutcome, set_password_or_create, valid_password};
 
-pub const USAGE: &str = "Aufruf: autoreverse-server [set-password <name> [--admin]]";
+pub const USAGE: &str = "Aufruf: autoreverse-server [set-password <name> [--admin] | healthcheck]";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Serve,
     SetPassword { name: String, admin: bool },
+    Healthcheck,
 }
 
 /// The command from the arguments after the program name. `Err` carries the message for stderr.
 pub fn parse(args: &[String]) -> Result<Command, String> {
     match args.split_first() {
         None => Ok(Command::Serve),
+        Some((first, rest)) if first == "healthcheck" && rest.is_empty() => {
+            Ok(Command::Healthcheck)
+        }
         Some((first, rest)) if first == "set-password" => {
             let admin = rest.iter().any(|a| a == "--admin");
             let names: Vec<&String> = rest.iter().filter(|a| *a != "--admin").collect();
@@ -58,6 +63,30 @@ pub fn read_new_password() -> Result<String, String> {
     }
 }
 
+/// Whether the server on `127.0.0.1:port` answers `GET /login` with 200 within a few seconds.
+/// Plain HTTP/1.0 over a socket: the probe needs no client library and no TLS, it only runs
+/// inside the container next to the server.
+pub fn healthcheck(port: u16) -> bool {
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpStream};
+    use std::time::Duration;
+
+    let timeout = Duration::from_secs(3);
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
+        return false;
+    };
+    if stream.set_read_timeout(Some(timeout)).is_err()
+        || stream
+            .write_all(b"GET /login HTTP/1.0\r\nHost: localhost\r\n\r\n")
+            .is_err()
+    {
+        return false;
+    }
+    let mut head = [0u8; 12];
+    stream.read_exact(&mut head).is_ok() && head.starts_with(b"HTTP/1.") && &head[8..12] == b" 200"
+}
+
 /// Sets the password (or creates the user) and returns the line to print. `Err` is a message for
 /// stderr: a password outside 8–200 characters, or a database failure.
 pub async fn set_password(
@@ -90,6 +119,7 @@ mod tests {
     #[test]
     fn parses_serve_and_set_password() {
         assert_eq!(parse(&args(&[])), Ok(Command::Serve));
+        assert_eq!(parse(&args(&["healthcheck"])), Ok(Command::Healthcheck));
         assert_eq!(
             parse(&args(&["set-password", "oliver"])),
             Ok(Command::SetPassword {
@@ -114,8 +144,37 @@ mod tests {
             &["set-password", "a", "b"],
             &["set-password", "--admin"],
             &["set-password", "--force", "x"][..],
+            &["healthcheck", "x"],
         ] {
             assert_eq!(parse(&args(bad)), Err(USAGE.into()), "{bad:?}");
         }
+    }
+
+    /// A one-shot server that answers with `status_line`.
+    fn serve_once(status_line: &'static str) -> u16 {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let (mut conn, _) = listener.accept().unwrap();
+            let mut buf = [0u8; 256];
+            let _ = conn.read(&mut buf);
+            let _ = conn.write_all(format!("{status_line}\r\n\r\n").as_bytes());
+        });
+        port
+    }
+
+    #[test]
+    fn healthcheck_wants_a_200() {
+        assert!(healthcheck(serve_once("HTTP/1.1 200 OK")));
+        assert!(!healthcheck(serve_once(
+            "HTTP/1.1 500 Internal Server Error"
+        )));
+        let closed = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        assert!(!healthcheck(closed));
     }
 }

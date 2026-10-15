@@ -18,13 +18,17 @@ services:
       timeout: 3s
       retries: 10
 
+  # `make db` / `make dev` start only `postgres`; `make stack` builds and starts the app too.
   app:
     build: .
+    # The image runs as UID 1000. If the podcast folder on the host belongs to someone else,
+    # set that user here, e.g. user: '1001:1001'.
     ports:
       - '8180:3000'
     environment:
       DATABASE_URL: postgresql://autoreverse:autoreverse@postgres:5432/autoreverse
       AUTOREVERSE_DATA: /data
+      # The schema is migrated at every start (migrations are compiled in); there is no switch.
       # First-admin bootstrap, only used once against an empty `users` table — change these.
       AUTOREVERSE_ADMIN_USER: admin
       AUTOREVERSE_ADMIN_PASSWORD: change-me
@@ -47,11 +51,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/login']
-      interval: 5s
-      timeout: 3s
-      retries: 10
+    # The image's HEALTHCHECK runs `autoreverse-server healthcheck` (GET /login on loopback);
+    # the slim runtime has no wget or curl.
 
 volumes:
   pgdata:

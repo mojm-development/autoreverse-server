@@ -1,14 +1,10 @@
-.git
-.gitignore
-node_modules
-npm-debug.log
-dist
-build
-.env
-.env.local
-.vscode
-.idea
-*.swp
-*.swo
-*~
-.DS_Store
+# Allowlist: the build only needs the crate and the files served or compiled in. Everything else
+# (target/, legacy checkouts, e2e/node_modules, data/, dev-library/, .env) stays out of the
+# context, so it stays small and never leaks local secrets into a layer.
+*
+!Cargo.toml
+!Cargo.lock
+!src
+!templates
+!migrations
+!static
