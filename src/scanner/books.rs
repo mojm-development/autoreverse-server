@@ -431,19 +431,19 @@ fn known_per_folder(known: &KnownFiles) -> HashMap<&str, usize> {
     counts
 }
 
-/// What one item is made of: a folder, plus — for an album split into `CD1`, `CD2` … — its disc
-/// folders.
+/// What one item is made of: a folder, plus — for an album or audiobook split into `CD1`,
+/// `CD2` … — its disc folders.
 struct Unit {
     dir: PathBuf,
     discs: Vec<(PathBuf, i32)>,
 }
 
-/// Every folder as its own unit, except that for albums disc folders join their parent's: one
-/// album with several discs instead of one album per disc. The root itself is never an album
-/// of discs — its disc folders stay albums of their own.
-fn units(root: &Path, dirs: Vec<PathBuf>, kind: ItemKind) -> Vec<Unit> {
+/// Every folder as its own unit, except that disc folders join their parent's: one album or
+/// audiobook with several discs instead of one item per disc. The root itself is never an item
+/// of discs — its disc folders stay items of their own.
+fn units(root: &Path, dirs: Vec<PathBuf>) -> Vec<Unit> {
     let disc_of = |dir: &Path| -> Option<i32> {
-        if kind != ItemKind::Album || dir.parent() == Some(root) || dir == root {
+        if dir.parent() == Some(root) || dir == root {
             return None;
         }
         disc_number(&dir.file_name()?.to_string_lossy())
@@ -482,7 +482,7 @@ pub fn scan_tree(
     on_progress: impl Fn(usize, usize) + Sync,
     cancelled: impl Fn() -> bool + Sync,
 ) -> Vec<ScannedItem> {
-    let units = units(root, all_directories(root), kind);
+    let units = units(root, all_directories(root));
     let known_per_folder = known_per_folder(known);
     let processed = AtomicUsize::new(0);
     let outcomes: Vec<Option<io::Result<Option<ScannedItem>>>> = units
@@ -579,7 +579,7 @@ mod tests {
         .iter()
         .map(PathBuf::from)
         .collect();
-        let albums = units(root, dirs, ItemKind::Album);
+        let albums = units(root, dirs);
         let shape: Vec<(&str, Vec<i32>)> = albums
             .iter()
             .map(|u| {
@@ -599,8 +599,6 @@ mod tests {
                 ("/m/AC_DC/Back in Black", vec![]),
             ]
         );
-        let books = units(root, vec![PathBuf::from("/m/A/CD1")], ItemKind::Book);
-        assert_eq!(books.len(), 1, "audiobooks keep their disc folders apart");
     }
 
     #[test]
