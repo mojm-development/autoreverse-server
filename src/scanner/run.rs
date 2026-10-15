@@ -140,7 +140,8 @@ async fn run_passes(
                     &mut failures,
                     |processed, total| {
                         status.update_progress(|p| {
-                            p.processed = processed as u32;
+                            // Folders finish on several threads; a late report must not go back.
+                            p.processed = p.processed.max(processed as u32);
                             p.total = Some(total as u32);
                         })
                     },
