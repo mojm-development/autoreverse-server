@@ -82,6 +82,8 @@ pub async fn run_scan(app: AppState) {
     if let Err(e) = run_passes(&app, &passes, &mut guard.failures).await {
         status.lock().last_error = Some(e.to_string());
     }
+    // New and changed covers get their thumbnails now rather than on the first page visit.
+    crate::library::thumbs::spawn_render_ahead(app.db.clone(), app.config.thumbs_dir.clone());
 }
 
 async fn run_passes(

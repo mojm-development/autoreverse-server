@@ -78,4 +78,6 @@ pub async fn run_once(state: &AppState) {
         }
         Err(e) => tracing::error!("[podcasts] Aktualisierung fehlgeschlagen: {e}"),
     }
+    // A feed may have brought a new podcast cover.
+    crate::library::thumbs::spawn_render_ahead(state.db.clone(), config.thumbs_dir.clone());
 }
