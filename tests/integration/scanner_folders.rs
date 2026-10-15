@@ -50,6 +50,36 @@ fn derives_author_and_series_from_author_series_book_folders() {
 }
 
 #[test]
+fn an_audiobook_in_disc_folders_is_one_book_in_its_series_with_chapters_across_discs() {
+    let root = tempfile::tempdir().unwrap();
+    let book = root.path().join("Andreas Eschbach/Solarstation/Buch 1");
+    for (disc, title) in [
+        ("CD 2", "Kapitel 3"),
+        ("CD 1", "Kapitel 1"),
+        ("CD 1", "Kapitel 2"),
+    ] {
+        let file = format!("{}.mp3", title.replace(' ', "_"));
+        make_audio(
+            &book.join(disc).join(file),
+            &[
+                ("title", title),
+                ("album", &format!("Solarstation ({disc})")),
+            ],
+        );
+    }
+    let scanned = scan(root.path(), &KnownFiles::new());
+    assert_eq!(scanned.len(), 1);
+    let item = &scanned[0];
+    assert_eq!(item.source_path, book.to_str().unwrap());
+    assert_eq!(item.author.as_deref(), Some("Andreas Eschbach"));
+    assert_eq!(item.series.as_deref(), Some("Solarstation"));
+    let chapters: Vec<&str> = item.chapters.iter().map(|c| c.title.as_str()).collect();
+    assert_eq!(chapters, ["Kapitel 1", "Kapitel 2", "Kapitel 3"]);
+    let discs: Vec<Option<i32>> = item.tracks.iter().map(|t| t.disc).collect();
+    assert_eq!(discs, [Some(1), Some(1), Some(2)]);
+}
+
+#[test]
 fn synthesizes_one_chapter_per_track_for_more_than_one_file() {
     let root = tempfile::tempdir().unwrap();
     let book = root.path().join("A/B");
