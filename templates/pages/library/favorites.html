@@ -13,7 +13,7 @@
 			<figure class="cover-tile">
 				<div class="art">
 					{% if item.has_cover %}
-					<img src="/items/{{ item.id }}/cover" alt="" width="100" height="100" loading="lazy" />
+					<img src="/items/{{ item.id }}/cover?size=384" alt="" width="100" height="100" loading="lazy" />
 					{% else %}
 					<div class="placeholder" style="--accent: var(--{{ item.accent }})"></div>
 					{% endif %}

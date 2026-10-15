@@ -8,7 +8,7 @@
 <div class="content book-page" style="--a: var(--book)" data-live-item data-item-id="{{ book.id }}" data-kind="book" data-total="{{ total }}">
 	<div class="hero">
 		<div class="cover">
-			{% if book.cover_path.is_some() %}<img src="/items/{{ book.id }}/cover" alt="" />{% endif %}
+			{% if book.cover_path.is_some() %}<img src="/items/{{ book.id }}/cover?size=768" alt="" />{% endif %}
 		</div>
 		<div class="meta">
 			<div class="eyebrow-row">

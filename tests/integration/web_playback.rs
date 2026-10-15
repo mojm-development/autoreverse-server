@@ -89,7 +89,7 @@ async fn the_start_page_shows_continue_listening_and_the_newest_items(db: PgPool
     assert!(html.contains(&format!(
         r#"<a href="/library/books/{book}" class="continue-card">"#
     )));
-    assert!(html.contains(&format!(r#"src="/items/{book}/cover""#)));
+    assert!(html.contains(&format!(r#"src="/items/{book}/cover?size=256""#)));
     assert!(html.contains("Frank Schätzing"));
     assert!(html.contains(r#"style="width: 25.000%""#));
     assert!(html.contains("1.5 h"));
@@ -245,7 +245,7 @@ async fn the_fullscreen_player_shows_a_book_with_its_chapters(db: PgPool) {
     assert!(html.contains(r#"Lesezeichen · <span data-refresh="bookmark-count">1</span>"#));
     assert!(html.contains(r#"data-action="play-from" data-position="90""#));
     assert!(html.contains("Zuletzt gesetzt"));
-    assert!(html.contains(&format!(r#"src="/items/{book}/cover""#)));
+    assert!(html.contains(&format!(r#"src="/items/{book}/cover?size=768""#)));
 }
 
 #[sqlx::test]

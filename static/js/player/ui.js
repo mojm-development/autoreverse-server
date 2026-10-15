@@ -115,7 +115,7 @@ export function renderMiniPlayer(store, onFullscreenPage, queue = null) {
 
 	const cover = bar.querySelector('[data-mini-cover]');
 	if (cover) {
-		const src = `/items/${current.itemId}/cover`;
+		const src = `/items/${current.itemId}/cover?size=128`;
 		cover.hidden = !current.hasCover;
 		if (current.hasCover && cover.getAttribute('src') !== src) cover.setAttribute('src', src);
 	}

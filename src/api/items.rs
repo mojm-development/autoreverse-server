@@ -13,7 +13,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use super::images::{cover_roots, serve_image};
+use super::images::{cover_roots, serve_image, thumb_size};
 use super::validate::{ApiJson, ApiQuery, QueryMap, int_param};
 use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
@@ -277,7 +277,9 @@ async fn cover(
     State(state): State<AppState>,
     _user: ApiUser,
     UrlPath(id): UrlPath<String>,
+    ApiQuery(query): ApiQuery<QueryMap>,
 ) -> ApiResult<Response> {
+    let size = thumb_size(&query)?;
     let row = find_item(&state, &id).await?;
     let cover_path = queries::cover_path_for(&state.db, &row)
         .await?
@@ -288,6 +290,8 @@ async fn cover(
         &roots,
         "Kein Cover",
         "private, max-age=86400",
+        size,
+        &state.config.thumbs_dir,
     )
     .await
 }

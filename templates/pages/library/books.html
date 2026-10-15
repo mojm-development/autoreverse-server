@@ -82,7 +82,7 @@
 		</div>
 		{% for book in books %}
 		<a href="/library/books/{{ book.id }}" role="row" class="row" data-status="{{ book.status.key() }}">
-			<span class="cover-thumb"{% if book.has_cover %} style="background-image: url(/items/{{ book.id }}/cover)"{% endif %}></span>
+			<span class="cover-thumb"{% if book.has_cover %} style="background-image: url(/items/{{ book.id }}/cover?size=128)"{% endif %}></span>
 			<span class="title-cell">
 				<span class="title">{{ book.title }}</span>
 				{% if !book.band.is_empty() %}<span class="band">{{ book.band }}</span>{% endif %}

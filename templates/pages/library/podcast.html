@@ -8,7 +8,7 @@
 	{% include "partials/podcast_rail.html" %}
 	<div class="content podcast-page" data-podcast-page>
 		<header class="hero">
-			<div class="cover-lg"{% if podcast.cover_path.is_some() %} style="background-image: url(/items/{{ podcast.id }}/cover)"{% endif %}></div>
+			<div class="cover-lg"{% if podcast.cover_path.is_some() %} style="background-image: url(/items/{{ podcast.id }}/cover?size=384)"{% endif %}></div>
 			<div class="hero-meta">
 				<span class="eyebrow">Podcast</span>
 				<h1>{{ podcast.title }}</h1>

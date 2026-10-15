@@ -95,7 +95,7 @@ async fn favorites_shows_tiles_and_songs_or_the_empty_text(db: PgPool) {
     assert!(!html.contains("Noch keine Favoriten."));
     assert!(html.contains("Titel &amp; Alben"));
     assert!(html.contains(&format!("href=\"/library/albums/{album}\"")));
-    assert!(html.contains(&format!("src=\"/items/{album}/cover\"")));
+    assert!(html.contains(&format!("src=\"/items/{album}/cover?size=384\"")));
     assert!(html.contains(&format!("href=\"/library/books/{book}\"")));
     assert!(html.contains("--accent: var(--book)"));
     assert!(html.contains("Frank Schätzing"));

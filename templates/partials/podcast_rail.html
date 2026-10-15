@@ -4,7 +4,7 @@
 	<div class="rail-head"><span class="eyebrow">Abos · {{ rail.entries.len() }}</span></div>
 	{% for podcast in rail.entries %}
 	<a class="entry" href="/library/podcasts/{{ podcast.id }}" aria-current="{{ rail.is_active(podcast.id) }}">
-		<span class="cover"{% if podcast.has_cover %} style="background-image: url(&quot;/items/{{ podcast.id }}/cover&quot;)"{% endif %}></span>
+		<span class="cover"{% if podcast.has_cover %} style="background-image: url(&quot;/items/{{ podcast.id }}/cover?size=128&quot;)"{% endif %}></span>
 		<span class="meta">
 			<span class="name">{{ podcast.title }}</span>
 			<span class="sub mono">{{ podcast.episode_count }} Folgen{% if podcast.unheard_count > 0 %} · {{ podcast.unheard_count }} neu{% endif %}</span>

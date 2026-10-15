@@ -278,6 +278,41 @@ async fn serves_an_in_root_cover_with_type_and_cache_header(db: PgPool) {
 }
 
 #[sqlx::test]
+async fn serves_a_scaled_down_jpeg_for_a_size_and_keeps_it(db: PgPool) {
+    let library = TempLibrary::new();
+    let (app, token) = cover_app(db, &library).await;
+    let path = library.music().join("A/cover.png");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    image::RgbImage::new(1200, 1200).save(&path).unwrap();
+    let id = seed(
+        app.db(),
+        Seed {
+            cover_path: path.to_str(),
+            ..Seed::new("album", "X")
+        },
+    )
+    .await;
+
+    let response = app
+        .get(&format!("/items/{id}/cover?size=370"), Some(&token))
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(header_str(&response, header::CONTENT_TYPE), "image/jpeg");
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let thumb = image::load_from_memory(&body).unwrap();
+    assert_eq!((thumb.width(), thumb.height()), (384, 384));
+    let kept = std::fs::read_dir(library.data().join("thumbs")).unwrap();
+    assert_eq!(kept.count(), 1);
+
+    let invalid = app
+        .get(&format!("/items/{id}/cover?size=abc"), Some(&token))
+        .await;
+    assert_eq!(invalid.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[sqlx::test]
 async fn serves_a_cover_from_inside_the_books_root(db: PgPool) {
     let library = TempLibrary::new();
     let (app, token) = cover_app(db, &library).await;
