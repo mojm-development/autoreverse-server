@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Design parity check: runs the legacy SvelteKit server (legacy/, built beforehand) and the Rust
-# server side by side on this Mac with identical data, screenshots every page of both in the Tart
+# Design parity check: runs the legacy SvelteKit server and the Rust server side by side on this Mac with identical data, screenshots every page of both in the Tart
 # VM on Jarvis (never a browser on this Mac) and computes pixel diffs here.
 #
 #   e2e/design/compare.sh                  # all shots
 #   SHOTS=books,login e2e/design/compare.sh
 #
-# Needs: legacy/build (cd legacy && npm install && npm run build), node on PATH.
+# The legacy server is no longer in the tree. The script exports it from git (LEGACY_REV, default
+# 0b627bd — the last commit before the Rust rewrite) into $LEGACY_DIR and builds it there once;
+# later runs reuse that build as long as the revision matches.
+# Needs: node/npm on PATH (bun is used instead when installed, it honours legacy's bun.lock).
 # Output: $DESIGN_OUT (default e2e/design/out): <shot>__<viewport>__<theme>__{legacy,rust,diff}.png
 # and report.txt with the share of differing pixels per pair.
 #
@@ -27,6 +29,8 @@ VM="${E2E_VM:-autoreverse-e2e}"
 JARVIS="${E2E_JARVIS:-jarvis}"
 OUT="${DESIGN_OUT:-$E2E/design/out}"
 STATE="${TMPDIR:-/tmp}/autoreverse-design"
+LEGACY_REV="${LEGACY_REV:-0b627bd}"
+LEGACY_DIR="${LEGACY_DIR:-$STATE/legacy-src}"
 if [[ -z "${E2E_HOST_IP:-}" ]]; then
 	iface="$(route -n get default 2>/dev/null | awk '/interface:/ {print $2}')"
 	E2E_HOST_IP="$(ipconfig getifaddr "${iface:-en0}")"
@@ -95,17 +99,41 @@ populate() {
 		-d "{\"feed_url\":\"http://127.0.0.1:$FEEDS_PORT/feed.xml\"}" "http://127.0.0.1:$port/podcasts"
 }
 
+# fetch_legacy: git archive of LEGACY_REV into LEGACY_DIR, installed and built, unless a build of
+# exactly that revision is already there.
+fetch_legacy() {
+	local rev
+	rev="$(git -C "$ROOT" rev-parse --verify "$LEGACY_REV^{commit}")"
+	if [[ -d "$LEGACY_DIR/build" && "$(cat "$LEGACY_DIR/.rev" 2>/dev/null)" == "$rev" ]]; then
+		return
+	fi
+	log "Legacy-Stand ${rev:0:7} nach $LEGACY_DIR holen und bauen"
+	rm -rf "$LEGACY_DIR"
+	mkdir -p "$LEGACY_DIR"
+	git -C "$ROOT" archive "$rev" | tar -C "$LEGACY_DIR" -xf -
+	(
+		cd "$LEGACY_DIR"
+		export DATABASE_URL="postgresql://autoreverse:autoreverse@localhost:5434/$LEGACY_DB"
+		if command -v bun >/dev/null; then
+			bun install --frozen-lockfile && bun run build
+		else
+			npm install --no-audit --no-fund && npm run build
+		fi
+	) >"$STATE/legacy-build.log" 2>&1 || { log "Legacy-Build fehlgeschlagen, siehe $STATE/legacy-build.log"; exit 1; }
+	echo "$rev" >"$LEGACY_DIR/.rev"
+}
+
 if [[ -z "${DESIGN_SKIP_SETUP:-}" ]]; then
 	stop_servers
 	mkdir -p "$STATE"
-	[[ -d "$ROOT/legacy/build" ]] || { log "legacy/build fehlt (cd legacy && npm install && npm run build)"; exit 1; }
+	fetch_legacy
 	log "Rust-Server bauen"
 	cargo build --release --manifest-path "$ROOT/Cargo.toml" --quiet
 
 	log "Datenbanken neu anlegen"
 	psql_db -d autoreverse -c "DROP DATABASE IF EXISTS $RUST_DB WITH (FORCE)" -c "CREATE DATABASE $RUST_DB" \
 		-c "DROP DATABASE IF EXISTS $LEGACY_DB WITH (FORCE)" -c "CREATE DATABASE $LEGACY_DB"
-	(cd "$ROOT/legacy" && DATABASE_URL="postgresql://autoreverse:autoreverse@localhost:5434/$LEGACY_DB" \
+	(cd "$LEGACY_DIR" && DATABASE_URL="postgresql://autoreverse:autoreverse@localhost:5434/$LEGACY_DB" \
 		npx drizzle-kit push --force >/dev/null)
 
 	log "Podcast-Fixtures auf 127.0.0.1:$FEEDS_PORT"
@@ -131,7 +159,7 @@ if [[ -z "${DESIGN_SKIP_SETUP:-}" ]]; then
 	(cd "$STATE/legacy" && exec env "${common[@]}" PORT=$LEGACY_PORT AUTOREVERSE_DATA="$STATE/legacy/data" \
 		ORIGIN="http://$E2E_HOST_IP:$LEGACY_PORT" \
 		DATABASE_URL="postgresql://autoreverse:autoreverse@localhost:5434/$LEGACY_DB" \
-		node "$ROOT/legacy/build" >"$STATE/legacy.log" 2>&1) &
+		node "$LEGACY_DIR/build" >"$STATE/legacy.log" 2>&1) &
 	echo $! >"$STATE/legacy.pid"
 	wait_http "http://127.0.0.1:$RUST_PORT/login"
 	wait_http "http://127.0.0.1:$LEGACY_PORT/login"

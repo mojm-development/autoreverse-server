@@ -1,1 +1,0 @@
-ALTER TABLE "items" ADD COLUMN "feed_duration" double precision;
