@@ -52,21 +52,26 @@ dazu die Lücken aus dem Audit gegen legacy (`GET /library/more`, Download-Sperr
 alten Datenbank) und der Playlist-Player. `legacy/` ist gelöscht; der alte Stand ist
 `0b627bd`, `e2e/design/compare.sh` holt ihn bei Bedarf per `git archive`.
 
-- **Automatisch grün:** `cargo test` (185 Unit-, 406 Integrationstests), clippy `-D warnings`,
-  fmt, 62 JS-Tests (`node --test 'tests/js/*.test.mjs'`).
-- **E2E:** `e2e/run-on-jarvis.sh` komplett grün, 54 Specs (Playwright in der Tart-VM auf Jarvis).
-- **Design-Vergleich:** `e2e/design/compare.sh` gegen legacy `0b627bd`, 34 Ansichten × Desktop/Mobil
-  × hell/dunkel (136 Paare), einschließlich Mini-Player, Auswahlleiste, Metadaten- und
-  Masseneditor. Am Desktop sind 42 von 68 Paaren pixelgleich, die übrigen liegen unter 1,5 % und
-  unterscheiden sich nur durch neue Funktionen (Playlist-Anlegen und -Aktionen, Nutzeraktionen,
+- **Automatisch grün:** `cargo test` (186 Unit-, 411 Integrationstests), clippy `-D warnings`,
+  fmt, 63 JS-Tests (`node --test 'tests/js/*.test.mjs'`).
+- **E2E:** `e2e/run-on-jarvis.sh` komplett grün, 61 Tests (Playwright in der Tart-VM auf Jarvis).
+- **Design-Vergleich:** `e2e/design/compare.sh` gegen legacy `0b627bd`, 35 Ansichten × Desktop/Mobil
+  × hell/dunkel (140 Paare), einschließlich Mini-Player, Auswahlleiste, Metadaten- und
+  Masseneditor. Am Desktop sind 38 von 70 Paaren pixelgleich, die übrigen liegen unter 1,5 % und
+  unterscheiden sich nur durch die Suchdauer in ms, die Unterzeile „· 2 neu“ im Podcast-Rail (erst
+  seit dem Seed-Podcast sichtbar), neue Funktionen (Playlist-Anlegen und -Aktionen, Nutzeraktionen,
   Zähler auf „Über“, Favorit/Playlist-Knöpfe, „Lesezeichen setzen“), den gestapelten
   Sicherheitsdialog und die Akzentfarbe des Primärknopfs in den Editoren (in legacy durchsichtig).
-  Mobil nutzt Rust die volle Breite; legacy quetschte jede Seite in die 216-px-Sidebar-Spalte.
+  Mobil nutzt Rust die volle Breite mit eigener Navigation; legacy quetschte jede Seite in die
+  216-px-Sidebar-Spalte.
   Bildpaare: `docs/design-parity/`.
 - **Docker:** Image baut für arm64 (nativ) und amd64 (cross); Smoke-Test mit compose und frischer
   Datenbank lief (`/server/info`, API- und Formular-Login, `/login` mit CSS und htmx,
   `set-password` im Container, Healthcheck).
+- **Mobile Navigation (erledigt, 2026-10-15):** Bis 700 px ersetzen eine Tab-Leiste unten (Start,
+  Musik, Podcasts, Hörbücher, Suche; Badge für neue Folgen), eine Chip-Zeile mit den Seiten des
+  Bereichs und eine schmale Kopfzeile mit Konto-Menü die Sidebar. Die Zuordnung Route → Tab/Chip
+  steht in `src/web/layout.rs`; Einstellungsseiten markieren keinen Tab, sondern den Avatar.
+  Bildbelege: `docs/design-parity/mobile-*.png`.
 - **Offen:**
-  - Die mobile Navigationsleiste (die Sidebar als feste Leiste unten) ist wie in legacy breiter
-    als der Bildschirm; die hinteren Einträge sind nicht erreichbar. Braucht ein eigenes Design.
   - Das CI-Image (`.github/workflows/docker.yml`) ist erst beim nächsten Push auf `main` geprüft.

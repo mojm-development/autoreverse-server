@@ -29,6 +29,9 @@ function renderThemeToggles() {
 	for (const button of document.querySelectorAll('[data-theme-toggle]')) {
 		button.title = theme === 'dark' ? 'Zu hellem Thema wechseln' : 'Zu dunklem Thema wechseln';
 		setIcon(button, theme === 'dark' ? 'moon' : 'sun');
+		// The account menu on phones names the switch in words.
+		const label = button.querySelector('[data-theme-label]');
+		if (label) label.textContent = theme === 'dark' ? 'Helles Thema' : 'Dunkles Thema';
 	}
 }
 

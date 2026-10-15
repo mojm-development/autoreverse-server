@@ -1,5 +1,6 @@
 // Small page behaviours that need the browser rather than the server: the start page's greeting
-// by the visitor's clock, and the album list's infinite scroll (status line, no doubled tiles).
+// by the visitor's clock, the album list's infinite scroll (status line, no doubled tiles) and
+// closing the mobile account menu on a tap outside.
 // The decisions are plain functions so tests/js can check them without a DOM.
 
 /** legacy library/+page.svelte: by the hour on the visitor's clock, not the server's. */
@@ -45,7 +46,33 @@ function statusFor(element) {
 	return element?.closest('[data-paged-root]')?.querySelector('[data-paged-status]') ?? null;
 }
 
+/**
+ * The open menus (`<details data-dismissable>`) a click on `target` closes: all that do not
+ * contain it. A click inside a menu — its summary included — is left to the menu itself.
+ */
+export function menusToClose(openMenus, target) {
+	return [...openMenus].filter((menu) => !(target && menu.contains(target)));
+}
+
+function closeMenus(target) {
+	for (const menu of menusToClose(document.querySelectorAll('details[data-dismissable][open]'), target)) {
+		menu.open = false;
+	}
+}
+
 if (typeof document !== 'undefined') {
+	// The account menu on phones: a tap outside or Esc closes it, like a native menu. On
+	// pointerdown, not click: iOS Safari sends no click for a tap on plain text.
+	document.addEventListener('pointerdown', (event) => {
+		closeMenus(event.target instanceof Node ? event.target : null);
+	});
+	document.addEventListener('keydown', (event) => {
+		if (event.key !== 'Escape') return;
+		const open = document.querySelector('details[data-dismissable][open]');
+		if (!open) return;
+		open.open = false;
+		open.querySelector('summary')?.focus();
+	});
 	renderGreeting();
 	document.addEventListener('htmx:load', renderGreeting);
 	// InfiniteScroll.svelte: "Weitere Alben werden geladen…" while the next page is on its way.

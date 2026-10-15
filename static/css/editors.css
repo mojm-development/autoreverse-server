@@ -373,7 +373,9 @@
 }
 @media (max-width: 700px) {
 	.selection-bar {
-		bottom: calc(var(--player-bar-height) + var(--mobile-nav-height) + 12px);
+		bottom: calc(
+			var(--player-bar-height) + var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px) + 12px
+		);
 	}
 }
 

@@ -108,7 +108,7 @@
 @media (max-width: 700px) {
 	.mini-player {
 		left: 0;
-		bottom: var(--mobile-nav-height);
+		bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
 		gap: 10px;
 		padding: 0 12px;
 	}

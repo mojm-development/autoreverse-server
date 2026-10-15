@@ -4,7 +4,7 @@
 {% import "partials/ui.html" as ui %}
 {% block title %}{% if show_new %}Neue Folgen{% else %}Podcasts{% endif %} · Autoreverse{% endblock %}
 {% block content %}
-<div class="podcast-layout" style="--a: var(--podcast)">
+<div class="podcast-layout{% if !show_new %} overview{% endif %}" style="--a: var(--podcast)">
 	{% include "partials/podcast_rail.html" %}
 	<div class="content">
 		{% if show_new %}
@@ -27,7 +27,7 @@
 		</ul>
 		{% endif %}
 		{% else if !rail.entries.is_empty() %}
-		<p class="empty">Wähle einen Podcast aus der Liste.</p>
+		<p class="empty pick-hint">Wähle einen Podcast aus der Liste.</p>
 		{% else %}
 		<p class="empty">Noch keine Podcast-Abos.</p>
 		{% endif %}

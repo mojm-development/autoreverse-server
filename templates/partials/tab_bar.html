@@ -1,0 +1,13 @@
+{#- Mobile (≤ 700px) only: the five areas as a fixed tab bar; the mini player sits on top of it.
+    On the settings pages no tab is current — they are reached through the account menu, whose
+    avatar is marked there instead. -#}
+{% import "partials/ui.html" as ui %}
+<nav class="tabbar" aria-label="Bereiche" style="--a: var(--{{ shell.accent }})">
+	{% for tab in shell.tabs() %}
+	<a href="{{ tab.href }}"{% if tab.current %} aria-current="page"{% endif %}{% if !tab.accent.is_empty() %} style="--tab: var(--{{ tab.accent }})"{% endif %}>
+		<span class="tab-icon">{% call ui::icon(tab.icon) %}{% endcall %}{% if tab.badge > 0 %}<span class="badge" aria-hidden="true">{{ tab.badge }}</span>{% endif %}</span>
+		<span class="tab-label">{{ tab.label }}</span>
+		{%- if tab.badge > 0 %}<span class="vh">, {{ tab.badge }} neue Folgen</span>{% endif %}
+	</a>
+	{% endfor %}
+</nav>

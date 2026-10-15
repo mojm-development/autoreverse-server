@@ -224,7 +224,8 @@
 		border-bottom: 1px solid var(--line);
 	}
 	.settings > .content {
-		padding: 18px 16px var(--player-bar-height);
+		padding: 18px 16px
+			calc(var(--player-bar-height) + var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
 	}
 }
 

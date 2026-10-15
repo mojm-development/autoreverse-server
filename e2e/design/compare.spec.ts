@@ -132,6 +132,18 @@ const SHOTS: Shot[] = [
 			await page.waitForTimeout(500);
 		}
 	},
+	{
+		// Phones only: the account menu of the mobile header (legacy and the desktop have none, the
+		// shot then shows the plain page).
+		name: 'account-menu',
+		path: '/library/albums',
+		then: async (page) => {
+			const avatar = page.locator('.m-avatar');
+			if (!(await avatar.isVisible())) return;
+			await avatar.click();
+			await expect(page.locator('.m-menu')).toBeVisible();
+		}
+	},
 	{ name: 'settings', path: '/settings' },
 	{ name: 'settings-libraries', path: '/settings/libraries' },
 	{ name: 'settings-scan', path: '/settings/scan' },

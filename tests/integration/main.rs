@@ -29,6 +29,7 @@ mod web_auth;
 mod web_collections;
 mod web_library;
 mod web_metadata;
+mod web_mobile_nav;
 mod web_music;
 mod web_playback;
 mod web_playlists;

@@ -711,6 +711,23 @@
 	.podcast-layout .rail {
 		display: none;
 	}
+	/* The overview (Abos) is the list itself on a phone: the rail moves above the content, the
+	   detail pages keep it hidden and the chips lead back here. */
+	.podcast-layout.overview {
+		flex-direction: column;
+	}
+	.podcast-layout.overview .rail {
+		display: block;
+		width: auto;
+		padding: 18px 16px 8px;
+		border-right: none;
+	}
+	.podcast-layout.overview .rail .entry {
+		min-height: 56px;
+	}
+	.podcast-layout.overview .pick-hint {
+		display: none;
+	}
 	.podcast-layout .episode .cover {
 		width: 46px;
 		height: 46px;

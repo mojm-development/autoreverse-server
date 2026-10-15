@@ -46,7 +46,8 @@ test('search, preview, subscribe, play an episode, filter and unsubscribe', asyn
 	await page.getByRole('button', { name: 'Abonnieren' }).click();
 	await expect(page).toHaveURL(/\/library\/podcasts\/\d+$/);
 	await expect(page.getByRole('heading', { level: 1, name: 'E2E-Fixture-Podcast' })).toBeVisible();
-	await expect(page.getByText('Abos · 1')).toBeVisible();
+	// e2e/seed.sql holds one podcast already (mobile-nav's badge).
+	await expect(page.getByText('Abos · 2')).toBeVisible();
 
 	// Not downloaded yet: playing downloads it first, then the mini player takes over.
 	await page.getByRole('button', { name: 'E2E-Folge Zwei abspielen' }).click();
@@ -72,7 +73,7 @@ test('search, preview, subscribe, play an episode, filter and unsubscribe', asyn
 	await page.getByRole('button', { name: 'Abo kündigen' }).click();
 	await page.getByRole('button', { name: 'Wirklich kündigen' }).click();
 	await expect(page).toHaveURL(/\/library\/podcasts$/);
-	await expect(page.getByText('Abos · 0')).toBeVisible();
+	await expect(page.getByText('Abos · 1')).toBeVisible();
 });
 
 test.describe('as a non-admin', () => {

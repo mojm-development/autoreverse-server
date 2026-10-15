@@ -117,3 +117,17 @@ INSERT INTO tracks (item_id, position, path, duration, title)
 SELECT i.id, 1, '/fixtures/metadata/' || i.title || '/01.mp3', 120, 'Track aus der Datei'
 FROM items i WHERE i.title IN ('E2E-Fixture-Book-Edit', 'E2E-Fixture-Album-Edit')
 ON CONFLICT (path) DO NOTHING;
+
+-- mobile-nav: a podcast subscribed a week ago with two episodes from yesterday, unheard — the
+-- Podcasts tab's badge (and the sidebar's "Neue Folgen") show 2. Port 9 refuses instantly, so
+-- the hourly refresh fails quietly instead of reaching anywhere.
+INSERT INTO items (kind, title, sort_title, feed_url, added_at)
+SELECT 'podcast', 'E2E-Seed-Sendung', 'e2e-seed-sendung',
+	'http://127.0.0.1:9/seeded.xml', now() - interval '7 days'
+WHERE NOT EXISTS (SELECT 1 FROM items WHERE title = 'E2E-Seed-Sendung');
+
+INSERT INTO items (kind, parent_id, title, sort_title, guid, published_at)
+SELECT 'episode', p.id, e.title, lower(e.title), e.title, now() - interval '1 day'
+FROM items p, (VALUES ('E2E-Seeded-Folge-1'), ('E2E-Seeded-Folge-2')) AS e (title)
+WHERE p.title = 'E2E-Seed-Sendung'
+	AND NOT EXISTS (SELECT 1 FROM items i WHERE i.title = e.title);
