@@ -1,6 +1,8 @@
 //! Albums that exist more than once: the same artist and title in different folders. One copy
-//! stays, the others are hidden (`items.duplicate_of`), never deleted — the files are untouched
-//! and a hidden copy can be shown again.
+//! stays, the others are hidden (`items.duplicate_of`) with their files untouched, so a hidden
+//! copy can be shown again — or, on request, deleted from disk.
+
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, PgPool};
@@ -229,4 +231,134 @@ pub async fn unhide(db: &PgPool, id: i32) -> Result<bool, sqlx::Error> {
     .execute(db)
     .await?;
     Ok(result.rows_affected() > 0)
+}
+
+/// Why a hidden copy was not deleted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeleteRefused {
+    /// Not an album, or not hidden: only a copy whose original is settled may go.
+    NotHidden,
+    /// No music folder configured, or the copy's folder lies outside it (or is the folder
+    /// itself).
+    OutsideLibrary,
+    /// The files could not be removed — typically a library mounted read-only.
+    NotWritable,
+}
+
+impl DeleteRefused {
+    /// A short code for the page's address.
+    pub fn code(self) -> &'static str {
+        match self {
+            DeleteRefused::NotHidden => "nicht-ausgeblendet",
+            DeleteRefused::OutsideLibrary => "ausserhalb",
+            DeleteRefused::NotWritable => "schreibgeschuetzt",
+        }
+    }
+
+    /// The German message for a code from [`Self::code`].
+    pub fn message(code: &str) -> Option<&'static str> {
+        Some(match code {
+            "nicht-ausgeblendet" => "Nur ausgeblendete Kopien lassen sich löschen.",
+            "ausserhalb" => "Der Ordner liegt nicht im Musik-Ordner der Bibliothek.",
+            "schreibgeschuetzt" => {
+                "Die Dateien ließen sich nicht löschen. Ist der Musik-Ordner schreibgeschützt eingebunden?"
+            }
+            _ => return None,
+        })
+    }
+}
+
+/// Deletes a hidden copy for good: its audio files, its folder when nothing but leftovers (cover,
+/// playlists, notes) remains in it, and the item. A folder with subfolders stays — they may be
+/// other albums. Progress and favorites move to the kept album first.
+pub async fn delete_hidden_copy(
+    db: &PgPool,
+    id: i32,
+    music_root: Option<&Path>,
+) -> Result<Result<(), DeleteRefused>, sqlx::Error> {
+    let copy: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT source_path FROM items
+         WHERE id = $1 AND kind = 'album' AND duplicate_of IS NOT NULL",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?;
+    let Some(source_path) = copy else {
+        return Ok(Err(DeleteRefused::NotHidden));
+    };
+    let (Some(root), Some(dir)) = (music_root, source_path.map(PathBuf::from)) else {
+        return Ok(Err(DeleteRefused::OutsideLibrary));
+    };
+    let inside = match (root.canonicalize(), dir.canonicalize()) {
+        (Ok(root), Ok(dir)) => dir != root && dir.starts_with(&root),
+        _ => false,
+    };
+    if !inside {
+        return Ok(Err(DeleteRefused::OutsideLibrary));
+    }
+    let files: Vec<String> = sqlx::query_scalar("SELECT path FROM tracks WHERE item_id = $1")
+        .bind(id)
+        .fetch_all(db)
+        .await?;
+    let removed = tokio::task::spawn_blocking(move || remove_files(&dir, &files))
+        .await
+        .unwrap_or(false);
+    if !removed {
+        return Ok(Err(DeleteRefused::NotWritable));
+    }
+    let mut tx = db.begin().await?;
+    transfer_to_kept(&mut tx).await?;
+    sqlx::query("DELETE FROM items WHERE id = $1")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(Ok(()))
+}
+
+/// Removes `files` (a file already gone is fine) and then `dir`, unless it has subfolders.
+/// Whether every file is gone.
+fn remove_files(dir: &Path, files: &[String]) -> bool {
+    for file in files {
+        match std::fs::remove_file(file) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                tracing::warn!("{file} nicht gelöscht: {e}");
+                return false;
+            }
+        }
+    }
+    let has_subfolders = std::fs::read_dir(dir).is_ok_and(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .any(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+    });
+    if !has_subfolders && let Err(e) = std::fs::remove_dir_all(dir) {
+        tracing::warn!("Ordner {} nicht gelöscht: {e}", dir.display());
+    }
+    true
+}
+
+/// [`delete_hidden_copy`] for every hidden copy. How many were deleted, and the first refusal.
+pub async fn delete_all_hidden(
+    db: &PgPool,
+    music_root: Option<&Path>,
+) -> Result<(usize, Option<DeleteRefused>), sqlx::Error> {
+    let hidden: Vec<i32> = sqlx::query_scalar(
+        "SELECT id FROM items WHERE kind = 'album' AND duplicate_of IS NOT NULL ORDER BY id",
+    )
+    .fetch_all(db)
+    .await?;
+    let mut deleted = 0;
+    let mut refused = None;
+    for id in hidden {
+        match delete_hidden_copy(db, id, music_root).await? {
+            Ok(()) => deleted += 1,
+            Err(reason) => {
+                refused.get_or_insert(reason);
+            }
+        }
+    }
+    Ok((deleted, refused))
 }

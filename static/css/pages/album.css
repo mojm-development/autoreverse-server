@@ -61,6 +61,14 @@
 .album-page .table-head span:nth-child(n + 3) {
 	flex: 1;
 }
+.album-page .disc-row {
+	display: flex;
+	align-items: flex-end;
+	height: 40px;
+	padding: 0 12px 6px;
+	border-bottom: 1px solid var(--line);
+	color: var(--dim);
+}
 .album-page .index {
 	width: 24px;
 	flex: none;

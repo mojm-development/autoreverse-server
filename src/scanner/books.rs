@@ -4,10 +4,12 @@
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::UNIX_EPOCH;
 
 use rayon::prelude::*;
+use regex::Regex;
 
 use super::chapters::{ScannedChapter, read_chapters};
 use super::series::{SeriesSource, resolve_series};
@@ -204,7 +206,47 @@ pub fn scan_folder(
     known: &KnownFiles,
     known_per_folder: &HashMap<&str, usize>,
 ) -> io::Result<Option<ScannedItem>> {
-    let files = audio_files_in(dir);
+    scan_unit(root, dir, &[], kind, known, known_per_folder)
+}
+
+/// `CD1`, `CD 2`, `Disc 03`, `disk_4 (Bonus)`: a folder holding one disc of an album.
+static DISC_FOLDER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(?:cd|disc|disk)[\s._-]*0*([1-9][0-9]?)(?:$|[^0-9])").expect("valid regex")
+});
+
+/// "Bonfire (CD1)", "Bonfire - Disc 2": the disc marker a ripper leaves in each disc's album tag.
+static DISC_SUFFIX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)[\s._-]*[(\[]?(?:cd|disc|disk)[\s._-]*[0-9]{1,2}[)\]]?\s*$")
+        .expect("valid regex")
+});
+
+/// The disc number a folder name stands for, if it names a disc.
+pub fn disc_number(folder_name: &str) -> Option<i32> {
+    DISC_FOLDER
+        .captures(folder_name)
+        .and_then(|c| c[1].parse().ok())
+}
+
+/// One album from `dir` and its disc folders (`discs`, with their numbers): the files directly
+/// in `dir` first, then each disc. `None` if none of them holds audio files.
+fn scan_unit(
+    root: &Path,
+    dir: &Path,
+    discs: &[(PathBuf, i32)],
+    kind: ItemKind,
+    known: &KnownFiles,
+    known_per_folder: &HashMap<&str, usize>,
+) -> io::Result<Option<ScannedItem>> {
+    // The folder's number wins over the tag: discs ripped one at a time are often each tagged
+    // "disc 1", and their tracks would interleave.
+    let mut folder_disc: HashMap<String, u32> = HashMap::new();
+    let mut files = audio_files_in(dir);
+    for (disc_dir, number) in discs {
+        for file in audio_files_in(disc_dir) {
+            folder_disc.insert(file.clone(), *number as u32);
+            files.push(file);
+        }
+    }
     if files.is_empty() {
         return Ok(None);
     }
@@ -214,7 +256,10 @@ pub fn scan_folder(
     }
     let dir_str = dir.to_string_lossy().into_owned();
     let known_in_folder = known_per_folder.get(dir_str.as_str()).copied().unwrap_or(0);
-    let unchanged = known_in_folder == files.len()
+    // A merged album is always read: its files may still belong to the per-disc items an
+    // earlier scan made, and an unchanged pass would neither create it nor move them.
+    let unchanged = discs.is_empty()
+        && known_in_folder == files.len()
         && files
             .iter()
             .all(|f| known.get(f).is_some_and(|k| Some(k) == stats.get(f)));
@@ -272,9 +317,13 @@ pub fn scan_folder(
         .iter()
         .map(|path| {
             let (mtime, size) = stats[path];
+            let tags = read_tags(Path::new(path));
             RawTrack {
                 path: path.clone(),
-                tags: read_tags(Path::new(path)),
+                tags: TrackTags {
+                    disc: folder_disc.get(path).copied().or(tags.disc),
+                    ..tags
+                },
                 mtime,
                 size,
             }
@@ -283,7 +332,13 @@ pub fn scan_folder(
     let tracks = order_tracks(&raw, &files);
     let first = &raw[0].tags;
     let title_from_tag = first.album.is_some();
-    let base_title = first.album.clone().unwrap_or_else(|| folder_name.clone());
+    let mut base_title = first.album.clone().unwrap_or_else(|| folder_name.clone());
+    if !discs.is_empty() {
+        let stripped = DISC_SUFFIX.replace(&base_title, "").trim().to_owned();
+        if !stripped.is_empty() {
+            base_title = stripped;
+        }
+    }
 
     let (series, series_index, title) = match kind {
         ItemKind::Book => {
@@ -376,6 +431,44 @@ fn known_per_folder(known: &KnownFiles) -> HashMap<&str, usize> {
     counts
 }
 
+/// What one item is made of: a folder, plus — for an album split into `CD1`, `CD2` … — its disc
+/// folders.
+struct Unit {
+    dir: PathBuf,
+    discs: Vec<(PathBuf, i32)>,
+}
+
+/// Every folder as its own unit, except that for albums disc folders join their parent's: one
+/// album with several discs instead of one album per disc. The root itself is never an album
+/// of discs — its disc folders stay albums of their own.
+fn units(root: &Path, dirs: Vec<PathBuf>, kind: ItemKind) -> Vec<Unit> {
+    let disc_of = |dir: &Path| -> Option<i32> {
+        if kind != ItemKind::Album || dir.parent() == Some(root) || dir == root {
+            return None;
+        }
+        disc_number(&dir.file_name()?.to_string_lossy())
+    };
+    let mut discs: HashMap<PathBuf, Vec<(PathBuf, i32)>> = HashMap::new();
+    for dir in &dirs {
+        if let (Some(number), Some(parent)) = (disc_of(dir), dir.parent()) {
+            discs
+                .entry(parent.to_path_buf())
+                .or_default()
+                .push((dir.clone(), number));
+        }
+    }
+    for list in discs.values_mut() {
+        list.sort_by_key(|(dir, number)| (*number, dir.clone()));
+    }
+    dirs.into_iter()
+        .filter(|dir| disc_of(dir).is_none())
+        .map(|dir| Unit {
+            discs: discs.remove(&dir).unwrap_or_default(),
+            dir,
+        })
+        .collect()
+}
+
 /// Scans every folder under `root`, several at once (rayon, one thread per core): reading tags
 /// and ffprobe are per folder and independent. The result keeps the walk's order. A folder that
 /// fails is recorded in `failures` and left out. `on_progress(processed, total)` after each
@@ -389,27 +482,27 @@ pub fn scan_tree(
     on_progress: impl Fn(usize, usize) + Sync,
     cancelled: impl Fn() -> bool + Sync,
 ) -> Vec<ScannedItem> {
-    let dirs = all_directories(root);
+    let units = units(root, all_directories(root), kind);
     let known_per_folder = known_per_folder(known);
     let processed = AtomicUsize::new(0);
-    let outcomes: Vec<Option<io::Result<Option<ScannedItem>>>> = dirs
+    let outcomes: Vec<Option<io::Result<Option<ScannedItem>>>> = units
         .par_iter()
-        .map(|dir| {
+        .map(|unit| {
             if cancelled() {
                 return None;
             }
-            let outcome = scan_folder(root, dir, kind, known, &known_per_folder);
-            on_progress(processed.fetch_add(1, Ordering::Relaxed) + 1, dirs.len());
+            let outcome = scan_unit(root, &unit.dir, &unit.discs, kind, known, &known_per_folder);
+            on_progress(processed.fetch_add(1, Ordering::Relaxed) + 1, units.len());
             Some(outcome)
         })
         .collect();
     let mut results = Vec::new();
-    for (dir, outcome) in dirs.iter().zip(outcomes) {
+    for (unit, outcome) in units.iter().zip(outcomes) {
         match outcome {
             None | Some(Ok(None)) => {}
             Some(Ok(Some(item))) => results.push(item),
             Some(Err(e)) => failures.push(ScanFailure {
-                path: dir.to_string_lossy().into_owned(),
+                path: unit.dir.to_string_lossy().into_owned(),
                 message: reason(&e),
             }),
         }
@@ -450,6 +543,64 @@ mod tests {
 
     fn paths(tracks: &[ScannedTrack]) -> Vec<&str> {
         tracks.iter().map(|t| t.path.as_str()).collect()
+    }
+
+    #[test]
+    fn recognises_disc_folders_and_nothing_else() {
+        for (name, number) in [
+            ("CD1", Some(1)),
+            ("CD 2", Some(2)),
+            ("cd03", Some(3)),
+            ("Disc 4 - Bonus", Some(4)),
+            ("disk_12", Some(12)),
+            ("CD", None),
+            ("CD0", None),
+            ("CDs", None),
+            ("Discovery", None),
+            ("Bonfire", None),
+            ("CD123", None),
+        ] {
+            assert_eq!(disc_number(name), number, "{name}");
+        }
+    }
+
+    #[test]
+    fn disc_folders_join_their_parent_except_directly_under_the_root() {
+        let root = Path::new("/m");
+        let dirs: Vec<PathBuf> = [
+            "/m",
+            "/m/CD1",
+            "/m/AC_DC",
+            "/m/AC_DC/Bonfire",
+            "/m/AC_DC/Bonfire/CD2",
+            "/m/AC_DC/Bonfire/CD1",
+            "/m/AC_DC/Back in Black",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .collect();
+        let albums = units(root, dirs, ItemKind::Album);
+        let shape: Vec<(&str, Vec<i32>)> = albums
+            .iter()
+            .map(|u| {
+                (
+                    u.dir.to_str().unwrap(),
+                    u.discs.iter().map(|(_, n)| *n).collect(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            shape,
+            [
+                ("/m", vec![]),
+                ("/m/CD1", vec![]),
+                ("/m/AC_DC", vec![]),
+                ("/m/AC_DC/Bonfire", vec![1, 2]),
+                ("/m/AC_DC/Back in Black", vec![]),
+            ]
+        );
+        let books = units(root, vec![PathBuf::from("/m/A/CD1")], ItemKind::Book);
+        assert_eq!(books.len(), 1, "audiobooks keep their disc folders apart");
     }
 
     #[test]

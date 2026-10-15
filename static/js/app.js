@@ -150,3 +150,9 @@ function clearFlashes() {
 }
 document.addEventListener('DOMContentLoaded', clearFlashes);
 document.addEventListener('htmx:load', clearFlashes);
+
+// A form that destroys something asks first: `data-confirm` holds the question.
+document.addEventListener('submit', (event) => {
+	const form = event.target.closest('form[data-confirm]');
+	if (form && !confirm(form.dataset.confirm)) event.preventDefault();
+});
