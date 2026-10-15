@@ -1,4 +1,4 @@
-// Page behaviours of static/js/pages.js. Run: node --test tests/js
+// Page behaviours of static/js/pages.js. Run: node --test 'tests/js/*.test.mjs'
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { greetingFor, laterDuplicates } from '../../static/js/pages.js';

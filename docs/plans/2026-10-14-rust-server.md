@@ -44,3 +44,22 @@ Jede Scheibe ist durchgehend (Migration, Queries, API, HTML, Tests) und endet mi
   passende E2E-Specs auf Jarvis; danach ein Commit (Deutsch, Body = warum).
 - Hängt eine Scheibe, wird das im Commit und im PR vermerkt und die nächste begonnen.
 - Der Draft-PR enthält je Scheibe: Neu, Testschritte, automatisch abgedeckt, noch nicht.
+
+## Stand
+
+2026-10-15, nach Scheibe 10. Alle zehn Scheiben sind umgesetzt, dazu die Lücken aus dem Audit
+gegen legacy (`GET /library/more`, Download-Sperre je Folge, Randfälle der API, Erkennung einer
+alten Datenbank) und der Playlist-Player. `legacy/` ist gelöscht; der alte Stand ist
+`0b627bd`, `e2e/design/compare.sh` holt ihn bei Bedarf per `git archive`.
+
+- **Automatisch grün:** `cargo test` (185 Unit-, 406 Integrationstests), clippy `-D warnings`,
+  fmt, 62 JS-Tests (`node --test 'tests/js/*.test.mjs'`).
+- **Docker:** Image baut für arm64 (nativ) und amd64 (cross); Smoke-Test mit compose und frischer
+  Datenbank lief (`/server/info`, API- und Formular-Login, `/login` mit CSS und htmx,
+  `set-password` im Container, Healthcheck).
+- **Offen:**
+  - Kompletter E2E-Lauf (Playwright auf Jarvis) und der Pixel-Vergleich (`e2e/design/compare.sh`).
+    SSH zu Jarvis war in der Nacht gesperrt (1Password). Der Design-Vergleich lief nur statisch,
+    ohne Browser (`e2e/design/styles.mjs`).
+  - Draft-PR: nicht angelegt, der Branch ist nicht gepusht.
+  - Das CI-Image (`.github/workflows/docker.yml`) ist erst beim nächsten Push auf `main` geprüft.

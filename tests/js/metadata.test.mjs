@@ -1,6 +1,6 @@
 // The metadata editors' decisions (legacy MetadataEditor.svelte.test.ts and
 // BulkEditor.svelte.test.ts, against static/js/metadata/logic.js; the DOM wiring is covered by
-// the e2e spec metadata.e2e.ts). Run: node --test tests/js
+// the e2e spec metadata.e2e.ts). Run: node --test 'tests/js/*.test.mjs'
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

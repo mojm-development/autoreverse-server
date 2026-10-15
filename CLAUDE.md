@@ -4,153 +4,176 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Autoreverse Server: a self-hosted media server for audiobooks, music and podcasts. SvelteKit
-(Svelte 5, runes forced on for non-`node_modules` files in `vite.config.ts`) on `adapter-node`,
-Postgres via Drizzle, package manager and script runner is **bun**. One process serves both a
-JSON API for native clients and a server-rendered web UI.
+Autoreverse Server: a self-hosted media server for audiobooks, music and podcasts. One Rust
+binary (`autoreverse-server`: axum + tokio + sqlx/Postgres) serves both a JSON API for the native
+clients (the iOS app) and a server-rendered German web UI (askama templates, htmx, small vanilla
+JS modules). ffprobe/ffmpeg are external processes; nothing else runs beside it.
 
-The code is a port of an earlier Python/FastAPI+pydantic implementation. Comments across
-`src/lib/server/` refer to that "ground truth" (`api/auth.py`, `_run_scan`, `BackgroundTasks`) and
-to review IDs (`C-2`, `I-6`, `M-12`, `Ruling 8`). Those references explain _why_ a shape exists;
-the wire format is deliberately kept byte-compatible with the Python original, including its
-snake_case field names, except where a comment marks an intentional divergence.
+The code is a port of an earlier SvelteKit/TypeScript server, which in turn ported a Python/FastAPI
+one. Comments call the TS version **"legacy"** (`legacy routes/items/+server.ts`, `legacy
+scanState`) and sometimes cite review IDs (`C-2`, `I-6`, `Ruling 8`). Legacy is no longer in the
+tree: read it with `git show 0b627bd:<path>` (0b627bd is the last commit before the rewrite; files
+sit at the repo root there, not under `legacy/`). The JSON wire format is deliberately kept
+byte-compatible with legacy — snake_case fields, German `detail` texts, status codes — except where
+a comment or commit body marks an intentional divergence.
 
 ## Commands
 
 ```sh
-bun install
-bun run db:start          # docker compose up (Postgres on host port 5434)
-bun run db:push           # sync schema.ts to the dev DB, no migration file
-bun run dev               # http://localhost:5173
+make setup                # once: .env, dev-library/, Postgres
+make dev                  # cargo run on http://localhost:3000 (starts Postgres first)
+make help                 # everything else
 
-bun run lint              # prettier --check + eslint
-bun run format            # prettier --write
-bun run check             # svelte-check / tsc
-bun run build && bun run preview
+docker compose up -d postgres   # dev Postgres on host port 5434 (autoreverse/autoreverse)
+cargo run                       # serves; reads .env via dotenvy
+cargo run -- set-password <name> [--admin]   # password from a prompt or the first stdin line
 
-bun run db:generate       # generate a migration from schema.ts changes
-bun run db:migrate        # apply migrations
-bun run db:studio
+cargo test                                  # unit + integration (needs the Postgres on :5434)
+cargo test --lib scanner::tags              # one unit module
+cargo test --test integration podcasts::    # one integration module
+cargo clippy --all-targets -- -D warnings
+cargo fmt
+node --test 'tests/js/*.test.mjs'           # JS unit tests of static/js
+
+e2e/run-on-jarvis.sh [tests/login.e2e.ts]   # Playwright, browser in a Tart VM on Jarvis
+docker build -t autoreverse-server .        # the release image
 ```
 
-Tests:
+`.cargo/config.toml` points `DATABASE_URL` at the compose Postgres, so `cargo test` needs no
+setup beyond `docker compose up -d postgres`; an exported `DATABASE_URL` wins. `ffprobe`/`ffmpeg`
+must be on PATH (m4b chapters; `tests/integration/scan_api.rs` and `scanner_folders.rs` shell out
+to `ffmpeg` to build fixtures).
 
-```sh
-bun run test:unit --run                       # both vitest projects
-bun run test:unit --run tests/unit/tags       # one file / path filter
-bun run test:unit --run --project server      # 'server' (node) or 'client' (browser) only
-bun run test:e2e                              # playwright; builds + previews on :4173
-bunx playwright test tests/e2e/login.e2e.ts   # one e2e spec
-bun run test                                  # unit then e2e
-```
-
-`bun run build` and every `db:*` script need `DATABASE_URL` exported — bun only auto-loads `.env`
-for processes it runs itself, and `vite`/`drizzle-kit`/`node build` run under Node. Copy
-`.env.example` to `.env` and export, or use a process manager. `ffprobe`/`ffmpeg` must be on PATH
-(m4b chapter extraction; `tests/unit/tags.test.ts` also shells out to `ffmpeg` to build fixtures).
+**E2E never runs in a browser on this Mac.** `e2e/run-on-jarvis.sh` builds and starts the server
+locally on :3100 against a fresh database `autoreverse_e2e` (seeded from `e2e/seed.sql`), boots the
+Tart VM `autoreverse-e2e` on Jarvis, runs Playwright there and stops VM and server again. Only one
+VM at a time on Jarvis; the script waits. `e2e/design/compare.sh` screenshots legacy and Rust side
+by side the same way; it fetches legacy itself via `git archive 0b627bd` into a temp dir.
 
 ## Architecture
 
-### Routes are two things in one tree
+### Modules
 
-`src/routes/` holds the JSON API at the top level (`+server.ts`: `/items`, `/scan`, `/playlists`,
-…) and the German web UI under `/library`, `/settings`, `/login` (`+page.svelte` +
-`+page.server.ts`). Page `load` functions and form actions call `$lib/server/…` **directly**, not
-over HTTP; only a few interactive components `fetch()` the API from the browser.
-
-### The `_xxxHandler(db, event)` convention
-
-Every API route splits into a testable handler plus a thin binding — all 37 `+server.ts` files
-follow this, keep it:
-
-```ts
-export async function _itemsGetHandler(db: DrizzleDb, event: Pick<RequestEvent, 'locals' | 'url'>) {
-	try {
-		requireApiUser(event.locals);
-		…
-		return json(…);
-	} catch (e) {
-		if (e instanceof ApiError) return apiError(e.status, e.detail, e.retryAfter);
-		throw e;
-	}
-}
-export const GET: RequestHandler = (event) => _itemsGetHandler(defaultDb, event);
+```
+src/
+  main.rs       CLI dispatch (serve | set-password | healthcheck), migrations, first admin, serve
+  app.rs        app(state) -> Router: the router factory, plus the cross-cutting middleware
+  state.rs      AppState: pool, config, login throttle + semaphore, scan status, HTTP client
+  config.rs     env → Config; find_static_dir
+  db.rs         pool, embedded migrations, refuse a legacy (Drizzle) database
+  error.rs      ApiError / WebError and their responses
+  serialize.rs  wire format: rows in, snake_case JSON out, to_iso()
+  api/          JSON routes, one file per area (items, tracks, playback, podcasts, users, …)
+  web/          HTML routes, one file per area, plus layout, format helpers, error shell
+  auth/         sessions/extractors, tokens, argon2 passwords, throttle, bootstrap
+  library/      queries and mutations shared by api/ and web/ (progress, playlists, metadata …)
+  scanner/      the scan: walk, tags (lofty), chapters (ffprobe), covers, store, status
+  podcasts/     feeds (feed-rs), directory search, downloads, retention, the hourly job
+  streaming/    HTTP Range responses
+templates/      askama: base.html, layouts/, pages/, partials/ — compiled into the binary
+static/         css/ (tokens.css, app.css, components.css, pages/*.css), js/, icons
+migrations/     sqlx migrations — compiled into the binary, applied at every start
+tests/          integration/ (one test binary, a module per area), js/, fixtures/
+e2e/            Playwright specs, seed, run-on-jarvis.sh, design/ (parity tooling)
 ```
 
-Integration tests import the underscore-prefixed handler and invoke it through
-`tests/integration/_callRoute.ts` with a throwaway database — no HTTP server, no SvelteKit runtime.
-The `_` prefix is what makes SvelteKit accept a non-handler export from a `+server.ts`.
+`api/` and `web/` are thin: they parse, guard and render. Queries live in `library/`,
+`scanner/` and `podcasts/`, and web handlers call those **directly**, never the JSON API over HTTP.
+Only a few interactive pieces (`static/js/…`) `fetch()` the API from the browser.
 
-Errors: throw `ApiError(status, germanDetail, retryAfter?)` from `$lib/server/api/errors`, convert
-at the route boundary with `apiError()`. Every response body is `{ detail: string }` — including
-uncaught ones, which `handleError` in `src/hooks.server.ts` backfills. Page routes instead throw
-`redirect()` (see `requireWebUser` / `requireWebAdmin`). Use `readJson()` and `intParam()` from
-`$lib/server/api/validate` rather than bare `request.json()` / manual parsing, so malformed input
-becomes a 422 with `detail` instead of a 500.
+### Router factory
 
-Wire serialization lives in `$lib/server/api/serialize.ts`: camelCase Drizzle rows in, snake_case
-API objects out, timestamps through `toIso()` (which strips `.000` fractional seconds — strict
-ISO-8601 clients reject them). Do not hand-roll row→JSON mapping in a route.
+`app::app(state) -> Router` is the whole server: `api::router()` merged with `web::router()`,
+`static/` as the fallback service, then the middleware (error shell for web pages, cross-site
+form check, trailing-slash 308, panic → 500 `{detail}`, tracing). Each area exposes its own
+`router()`. Integration tests build the same router through `tests/integration/common.rs`
+(`TestApp`) and drive it with `tower::ServiceExt::oneshot` — no socket, no port.
+
+### Errors
+
+API handlers return `ApiResult<T>`; fail with `ApiError::new(status, "<deutscher Text>")` (helpers
+like `ApiError::unprocessable`, `with_retry_after` for 429/503). Every API error body is
+`{ "detail": "<German>" }`, including panics and internal errors (logged, sent as "Interner
+Serverfehler"). Parse request bodies and queries with the extractors in `api/validate.rs`
+(`ApiJson`, query helpers) so malformed input becomes a 422 with a German `detail`, never axum's
+English plain-text rejection or a 500.
+
+Web handlers return `WebResult<T>`: `WebError::Redirect` (303, e.g. no session),
+`WebError::Page(status, message)` for the error page inside the app or settings frame, and
+`WebError::Internal`. An `ApiError` converts into `WebError::Page`.
 
 ### Auth
 
-`src/hooks.server.ts` resolves a bearer header first, else the `autoreverse_session` cookie, into
-`locals.userId` / `locals.token` for every request — one resolver behind both API and web. Guards
-live in `$lib/server/auth/session.ts` (`requireApiUser`, `requireApiAdmin`, `requireWebUser`,
-`requireWebAdmin`). Passwords are argon2id (`@node-rs/argon2`) with a concurrency semaphore and a
-login throttle in `auth/semaphore.ts` + `auth/throttle.ts`. `init` in hooks also runs
-`ensureFirstAdmin` and, when `AUTOREVERSE_AUTO_MIGRATE` is set (the Docker image sets it), applies
-migrations — deliberately opt-in, since `db:push`-synced dev databases have no migration history.
+One resolver for both worlds: a `Bearer` header first, else the `autoreverse_session` cookie.
+Guards are extractors in `auth/session.rs`: `ApiUser` / `ApiAdmin` answer 401/403 with
+`{detail}`, `WebUser` / `WebAdmin` redirect (to `/login`, or `/library` for a non-admin).
+`Session` is the optional variant. Passwords are argon2id with a concurrency semaphore and a
+per-process login throttle (both in `AppState`). At start `ensure_first_admin` creates the admin
+from `AUTOREVERSE_ADMIN_USER`/`_PASSWORD`, only while the `users` table is empty;
+`autoreverse-server set-password` is the rescue path. A form POST whose `Origin` is not the
+server's own (`ORIGIN`, else `http://<Host>`) is refused, as SvelteKit did — behind a TLS proxy
+`ORIGIN` must be set.
 
 ### Scanning
 
-`scanner/run.ts` walks the books root and the music root as **two fully separate passes with
-distinct `root` arguments**. `root` scopes `markMissing`; merging the passes or swapping roots
-would flag the other library's items as missing. An unreadable root is skipped entirely rather
-than scanned as empty, for the same reason. Per-folder failures are collected and their items left
-untouched.
+`scanner/run.rs` walks the books root and the music root as **two fully separate passes with
+distinct `root` arguments**. `root` scopes the removal of vanished items; merging the passes or
+swapping roots would remove the other library's items. An unreadable root is skipped entirely
+rather than scanned as empty, for the same reason. Per-folder failures are collected and their
+items left untouched.
 
-Scan status is a module-level singleton in `$lib/server/admin/scanState.ts` — one per server
-process, mirroring FastAPI's `app.state`. `POST /scan` mutates it and fires `runScan()` without
-awaiting (the FastAPI `BackgroundTasks` equivalent), so `/scan/status` can poll live progress.
-**Consequence for tests: no two e2e specs may trigger a real scan concurrently** — real scans race
-through this singleton and through the `library_config` row.
+The scan status is one `ScanStatus` per process in `AppState::scan` (legacy kept it in a module
+singleton). `POST /scan` sets it and `tokio::spawn`s `run_scan` without awaiting, so
+`/scan/status` can poll live progress. Each test builds its own `AppState`, so integration tests
+don't share it — but **no two e2e specs may trigger a real scan concurrently**: they share one
+server and the one `library_config` row.
 
-### Library paths
+### Library paths and data
 
-The books and music roots are a single row in the `library_config` table
-(`$lib/server/settings/libraryPaths.ts`), configured at runtime under Settings → Bibliotheken, not
-via environment variables. Env only decides `AUTOREVERSE_DATA` (covers, downloaded episodes) and
-`DATABASE_URL`. Behind a reverse proxy `ORIGIN` must be set or form POSTs are rejected.
+The books and music roots are the single row in `library_config`, set at runtime under
+Einstellungen → Bibliotheken, not via env. Env decides `DATABASE_URL`, `AUTOREVERSE_DATA`
+(covers, artist images, downloaded episodes as `<Podcast>/<Folge>.<ext>`), the first admin,
+`AUTOREVERSE_PODCAST_REFRESH_HOURS`, `ORIGIN`, `HOST`/`PORT` and `AUTOREVERSE_STATIC` (else
+`static/` beside the binary, else `./static`; the server refuses to start without it).
+
+### Schema
+
+`migrations/` holds sqlx migrations, embedded with `sqlx::migrate!` and applied at every start
+(no switch). Never edit an applied migration — sqlx checksums them; add a new file. The schema
+was started afresh for Rust: a database from the TS version is detected and refused with a German
+hint instead of being migrated.
+
+### Web UI
+
+askama templates extend `templates/base.html` / `layouts/`; partials are rendered alone for
+htmx swaps. htmx is vendored (`static/js/htmx-2.0.4.min.js`), nothing loads from a CDN. Page JS
+lives in `static/js/` (player store and UI, metadata editors, infinite scroll, playlists). Styling
+is plain CSS: design tokens in `static/css/tokens.css` (dark by default,
+`:root[data-theme='light']` override, fixed accents `--music` / `--book` / `--podcast`), shared
+classes in `app.css` (`.eyebrow`, `.mono`, `.pill`, `.badge`), components in `components.css`,
+page styles in `css/pages/`. Prefer existing tokens and classes over new local values. Markup
+(classes, ARIA roles, texts) mirrors legacy so the e2e specs and the design comparison hold.
 
 ## Testing layers
 
-- `tests/unit/` — pure functions (tags, chapters, ranges, tokens, throttle), plain vitest.
-- `tests/integration/` — route handlers and query modules against a real Postgres.
-  `withTestDb()` in `tests/fixtures.ts` starts a fresh `PostgreSqlContainer` and runs
-  `drizzle-kit push` **per call**, so Docker is required and timeouts are raised to 60s in
-  `vite.config.ts`. Wrap each test's body in `withTestDb`.
-- `src/**/*.svelte.test.ts` — component tests, vitest `client` project, real Chromium via
-  `vitest-browser-svelte`.
-- `tests/e2e/` — Playwright against `bun run build && bun run preview`. Uses the **shared dev
-  Postgres on :5434**, not a container, so specs must be idempotent and must not assume a clean
-  database (`auth.setup.ts` creates its users only if absent). Authenticated specs inherit
-  `playwright/.auth/user.json`; a spec that needs to be logged out must opt out with
-  `test.use({ storageState: { cookies: [], origins: [] } })`.
-
-`expect: { requireAssertions: true }` is on — a test with no assertion fails.
+- Unit tests inline (`#[cfg(test)]`) for pure functions: tags, chapters, ranges, tokens,
+  throttle, config, formatting.
+- `tests/integration/` — one binary (`main.rs` + a module per area). `#[sqlx::test]` creates a
+  throwaway database per test on the compose Postgres and applies the migrations; requests go
+  through `TestApp` (`oneshot`). These port legacy's integration suites and assert exact German
+  texts and wire shapes.
+- `tests/js/` — `node --test`, for the browser modules in `static/js` that hold logic.
+- `e2e/` — Playwright, only via `e2e/run-on-jarvis.sh`. Specs must not assume a clean database
+  beyond what `e2e/seed.sql` sets up.
 
 ## Conventions
 
-- **All user-facing strings are German**, including API `detail` messages, and tests assert on the
-  exact wording. Code, comments and identifiers are English.
-- Prettier: tabs, single quotes, no trailing commas, 100 columns. Run `bun run format`.
-- Styling is plain CSS with design tokens in `src/lib/styles/tokens.css` (dark by default,
-  `:root[data-theme='light']` override, fixed per-content-type accents `--music` / `--book` /
-  `--podcast`) plus shared utility classes in `src/app.css` (`.eyebrow`, `.mono`, `.pill`,
-  `.badge`). Prefer existing tokens and classes over new local values.
-- Schema changes go in `src/lib/server/db/schema.ts` and must ship with a generated migration
-  (`bun run db:generate`); check constraints and partial/unique indexes are expressed there, not
-  in application code.
-- Commit messages are conventional-commit style with a scope where useful
-  (`fix(scanner): …`, `feat(scan): …`).
+- **All user-facing strings are German**, including API `detail` texts and log lines meant for
+  the operator; tests assert on the exact wording. Code, comments and identifiers are English.
+- The JSON API stays wire-compatible with the iOS app: same paths and methods, snake_case,
+  `{ "detail": … }` errors, timestamps through `serialize::to_iso` (whole seconds, `Z` — strict
+  ISO-8601 clients reject `.000`). Build responses in `serialize.rs`, not by hand in a route.
+- `cargo fmt` and `cargo clippy --all-targets -- -D warnings` must be clean. JS/CSS in `static/`
+  uses tabs and single quotes.
+- Commits: conventional commits in German with a scope (`fix(scanner): …`, `feat(podcasts): …`);
+  the subject says what, the body why (decisions, deviations from legacy, what is left open).

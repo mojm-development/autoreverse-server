@@ -1,5 +1,5 @@
 // Shortcuts, scrubber keys, formats, navigation and the visualizer's band split.
-// Run: node --test tests/js
+// Run: node --test 'tests/js/*.test.mjs'
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { shortcutFor, bindPlayerShortcuts } from '../../static/js/player/shortcuts.js';

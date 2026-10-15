@@ -8,8 +8,8 @@ cover art, and serves everything over HTTP with per-user playback progress, book
 and playlists. Podcasts are subscribed by feed, browsable through a directory search, and
 episodes can be downloaded to the server for offline access.
 
-It runs as a single Node process backed by Postgres. No transcoding daemon, no plugin system, no
-media-server sprawl — one container and a database.
+It is a single Rust binary backed by Postgres, with `ffprobe` as its only outside helper. No
+transcoding daemon, no plugin system, no media-server sprawl — one container and a database.
 
 > **Deutsche Fassung dieser Datei: [README.de.md](README.de.md).**
 > Note that the **web UI is currently German-only**; the JSON API is language-neutral.
@@ -19,8 +19,10 @@ media-server sprawl — one container and a database.
 ## Status
 
 Early but real. The scanner, player, podcast subscriptions, user management and the full API
-surface below all work; the project is at version `0.0.1` and the database schema may still change
-between releases without a migration path. Run it against data you have backups of.
+surface below all work. The server was rewritten from SvelteKit/TypeScript to Rust in version
+`0.1.0`; the API stayed wire-compatible, the database did not (see
+[Upgrading from the TypeScript version](#upgrading-from-the-typescript-version)). Run it against
+data you have backups of.
 
 ---
 
@@ -39,6 +41,7 @@ between releases without a migration path. Run it against data you have backups 
   their progress, bookmarks and favorites. A library root that cannot be read is skipped whole,
   and a folder that fails to scan is left alone, so an unreachable mount never empties anything
 - Scans are cancellable and report progress
+- Metadata editing in the web UI, for single items and in bulk, with undo
 
 **Playback**
 
@@ -59,9 +62,9 @@ between releases without a migration path. Run it against data you have backups 
 
 **Users**
 
-- Argon2id password hashing (`@node-rs/argon2`)
+- Argon2id password hashing
 - Bearer tokens for API clients, session cookies for the web UI, one resolver behind both
-- Login throttling
+- Login throttling (`429` with `Retry-After`)
 - Admin/non-admin split: user creation and library configuration are admin-only
 - Per-user playback preferences
 
@@ -72,8 +75,9 @@ between releases without a migration path. Run it against data you have backups 
 A ready-built image is published to GHCR as
 [`ghcr.io/mojm-development/autoreverse-server`](https://ghcr.io/mojm-development/autoreverse-server)
 (`latest` follows `main`; version tags follow releases). Save the following as `compose.yaml`,
-adjust the two media mounts and the admin credentials, and you are done — the image applies
-database migrations on boot, no manual schema step needed:
+adjust the two media mounts and the admin credentials, and you are done — the server applies its
+database migrations on every start, no manual schema step needed. Images exist for `linux/amd64`
+and `linux/arm64`:
 
 ```yaml
 name: autoreverse
@@ -115,8 +119,9 @@ services:
       # Settings → Bibliotheken to actually use them.
       - /srv/media/audiobooks:/library/books:ro
       - /srv/media/music:/library/music:ro
-      # Downloaded podcast episodes, reachable from the host. Writable, unlike the
-      # two mounts above. Drop this line to keep them inside the volume.
+      # Downloaded podcast episodes, reachable from the host. Writable for UID 1000
+      # (the container's user), unlike the two mounts above. Drop this line to keep
+      # them inside the volume.
       - /srv/media/podcasts:/data/podcasts
       - autoreverse-data:/data
     depends_on:
@@ -149,7 +154,8 @@ export AUTOREVERSE_PODCASTS_HOST=/srv/media/podcasts
 docker compose up -d
 ```
 
-Either way, the server is then on <http://localhost:8180>. Log in with the
+Either way, the server is then on <http://localhost:8180>. The image has a built-in health check
+(`autoreverse-server healthcheck`), so `docker compose ps` shows when it is ready. Log in with the
 `AUTOREVERSE_ADMIN_USER` / `AUTOREVERSE_ADMIN_PASSWORD` from your `compose.yaml` — **change those
 before the first start**, they create your admin account.
 
@@ -166,12 +172,17 @@ Then, still in the web UI:
 | Variable                            | Required        | Default                                                           | Purpose                                                                                                         |
 | ----------------------------------- | --------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                      | yes             | `postgresql://autoreverse:autoreverse@localhost:5434/autoreverse` | Postgres connection string.                                                                                     |
-| `AUTOREVERSE_DATA`                  | no              | `./data`                                                          | Base directory for server-managed files. `covers/`, `podcasts/` and `artists/` are created inside it.           |
+| `AUTOREVERSE_DATA`                  | no              | `./data` (`/data` in the image)                                   | Base directory for server-managed files. `covers/`, `podcasts/` and `artists/` are created inside it.           |
 | `AUTOREVERSE_ADMIN_USER`            | first boot only | —                                                                 | Username of the first admin account.                                                                            |
 | `AUTOREVERSE_ADMIN_PASSWORD`        | first boot only | —                                                                 | Password of that account.                                                                                       |
-| `AUTOREVERSE_AUTO_MIGRATE`          | no              | unset (`1` in the Docker image)                                   | Apply pending database migrations on boot. Leave unset for dev databases synced via `db:push`.                  |
 | `AUTOREVERSE_PODCAST_REFRESH_HOURS` | no              | `1`                                                               | How often the server refreshes every feed and applies the download retention. `0` turns the background job off. |
 | `ORIGIN`                            | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).            |
+| `HOST` / `PORT`                     | no              | `0.0.0.0` / `3000`                                                | Where the server listens.                                                                                       |
+| `AUTOREVERSE_STATIC`                | no              | `static/` beside the binary, else `./static` (`/app/static` in the image) | CSS, JS and icons. The server refuses to start if it cannot find them.                                  |
+| `RUST_LOG`                          | no              | `autoreverse_server=info,tower_http=warn`                         | Log filter.                                                                                                     |
+
+The old `AUTOREVERSE_AUTO_MIGRATE` switch is gone: migrations are compiled into the binary and
+always applied at start.
 
 See [`.env.example`](.env.example) for a copy-paste starting point.
 
@@ -186,23 +197,15 @@ environment:
 ```
 
 Skip this and the web UI login fails with **`Cross-site POST form submissions are forbidden`**.
-The reason: SvelteKit compares the browser's `Origin` header against the server's own origin on
-every form POST. Behind a TLS-terminating proxy the browser reports `https://your.domain` while
-the Node process, which only ever sees plain HTTP on port 3000, believes it is `http://…:3000`.
-The two disagree, so the POST is rejected. Only form submissions are affected — the JSON API
-authenticates fine, which is why the failure shows up at the login screen specifically.
+The reason: the server compares the browser's `Origin` header against its own origin on every
+form POST. Behind a TLS-terminating proxy the browser reports `https://your.domain` while the
+server, which only ever sees plain HTTP on port 3000, believes it is `http://<Host>`. The two
+disagree, so the POST is rejected. Only form submissions are affected — the JSON API
+authenticates fine, which is why the failure shows up at the login screen specifically. An
+`https://` `ORIGIN` also marks the session cookie `Secure`.
 
-If you would rather not hard-code the hostname, the alternative is to let the proxy tell the
-server (Caddy sets both headers by default):
-
-```yaml
-environment:
-  PROTOCOL_HEADER: x-forwarded-proto
-  HOST_HEADER: x-forwarded-host
-```
-
-Prefer `ORIGIN` where you can. The header variant trusts whatever sends those headers, so it is
-only safe if nothing but your proxy can reach the container.
+`X-Forwarded-*` headers are not evaluated; `ORIGIN` is the only way to tell the server its public
+URL.
 
 ### Getting at downloaded podcast episodes
 
@@ -215,10 +218,12 @@ volumes:
   - /srv/media/podcasts:/data/podcasts # writable, unlike the library mounts
 ```
 
-Two things to know before you do. The mount must be **writable** — the library mounts are `:ro`,
-this one cannot be. And the files are named after their episode id, not their title: `/data/podcasts/42.mp3`,
-not `Some Show - Episode 42.mp3`. They are the server's own storage that you are looking in on,
-not an export.
+Two things to know before you do. The mount must be **writable** by the container's user, UID
+1000 — the library mounts are `:ro`, this one cannot be. If the folder belongs to someone else on
+the host, set `user: '<uid>:<gid>'` on the service. And the files are the server's own storage
+that you are looking in on, not an export: one folder per podcast, named after the episode title
+(`/data/podcasts/Some Show/Episode 42.mp3`), with characters that are unsafe on common file
+systems replaced.
 
 Cached cover art (`$AUTOREVERSE_DATA/covers`) stays in the volume; it is derived data and is
 rebuilt on the next scan if you lose it.
@@ -237,14 +242,37 @@ On every boot the server checks whether the `users` table is empty. If it is, **
 first admin.
 
 If the table is empty and the variables are unset, the server still starts but logs a warning and
-nobody can log in — user creation is admin-only, so there is no second bootstrap path. Set both
-before the very first boot against a fresh database. Leaving them set afterwards is harmless; they
-are only read while the table is still empty.
+nobody can log in. Set both before the very first boot against a fresh database. Leaving them set
+afterwards is harmless; they are only read while the table is still empty.
+
+A forgotten password, or an install without any admin, is fixed from the command line — the
+password is asked for (or read from the first line of stdin), never passed as an argument:
+
+```sh
+docker compose exec app /app/autoreverse-server set-password admin --admin
+```
+
+This sets the password of an existing user (and signs out all of their sessions) or creates the
+user. `--admin` makes them an admin.
+
+### Upgrading from the TypeScript version
+
+Version `0.1.0` replaces the SvelteKit server with a Rust one. The HTTP API, the web UI and the
+file layout under `AUTOREVERSE_DATA` stay the same, but the database schema was started afresh
+and there is **no automatic upgrade**. Pointed at a database of the old version, the server
+refuses to start and says so. To move over:
+
+1. Create a new, empty database (with the compose file above: `docker compose down -v` drops the
+   old one together with everything in it) and point `DATABASE_URL` at it.
+2. Start the server; the first admin comes from `AUTOREVERSE_ADMIN_USER`/`_PASSWORD` as before.
+3. Enter the library paths again under _Settings → Bibliotheken_, scan, re-create the other users
+   and re-subscribe podcasts. Progress, bookmarks, favorites and playlists do not carry over.
 
 ### External dependency
 
 `ffprobe` (part of **ffmpeg**) must be on `PATH` for `.m4b` chapter extraction. The provided
-Docker image installs it; on a bare-metal install, install ffmpeg yourself. Without it, everything
+Docker image installs it; on a bare-metal install, install ffmpeg yourself and keep the `static/`
+directory next to the binary (or set `AUTOREVERSE_STATIC`). Without it, everything
 else still works — `.m4b` files simply arrive without chapters.
 
 ---
@@ -262,8 +290,9 @@ curl -s http://localhost:8180/items?kind=book -H "Authorization: Bearer $TOKEN"
 ```
 
 Web-UI requests are authenticated by the `autoreverse_session` cookie instead; both paths resolve
-to the same user. Errors come back as JSON with a `detail` field, and `retryAfter` where a
-throttle applies.
+to the same user. Errors come back as JSON with a German `detail` field, plus a `Retry-After`
+header where a throttle applies. Timestamps are ISO-8601 in UTC with whole seconds
+(`2026-10-14T18:22:57Z`).
 
 `/progress/continue` returns `duration` (the summed track durations) and `has_cover` alongside
 each entry, so a client can draw a progress bar without fetching the whole item.
@@ -280,14 +309,18 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `POST`                 | `/me/password`                                    | Change own password                                                    |
 | `GET` `PUT`            | `/me/playback`                                    | Playback preferences                                                   |
 | `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?missing=` |
-| `GET`                  | `/items/{id}`                                     | One item                                                               |
+| `GET` `PATCH`          | `/items/{id}`                                     | One item; edit its metadata (admin)                                    |
+| `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Bulk metadata edit and its undo (admin)                                |
+| `POST`                 | `/items/series`                                   | Detect or assign series and volume numbers, dry run by default (admin) |
 | `GET`                  | `/items/{id}/children`                            | Tracks / episodes of an item                                           |
 | `GET`                  | `/items/{id}/cover`                               | Cover image                                                            |
 | `DELETE`               | `/items/missing`                                  | Purge items whose files are gone (admin)                               |
 | `GET`                  | `/artists`                                        | Distinct artists                                                       |
+| `GET`                  | `/library/more`                                   | Next page of the web library grid (used by the web UI)                 |
 | `GET` `POST`           | `/artists/{name}/image`                           | Custom artist image; upload is admin, multipart `image`                |
 | `PUT` `DELETE`         | `/artists/{name}/cover`                           | Pick an album as the artist image, or reset to random (admin)          |
 | `GET`                  | `/search`                                         | Cross-library search                                                   |
+| `GET` `PATCH`          | `/tracks/{id}`                                    | One track; edit its metadata (admin)                                   |
 | `GET` `HEAD`           | `/tracks/{id}/stream`                             | Range-capable audio stream                                             |
 | `POST`                 | `/play/{itemId}`                                  | Open a playback session                                                |
 | `POST`                 | `/sessions/{sessionId}/close`                     | Close a playback session                                               |
@@ -304,73 +337,83 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Refresh / unsubscribe                                                  |
 | `POST`                 | `/episodes/{id}/download`                         | Download an episode to the server                                      |
 | `POST` `GET`           | `/scan`, `/scan/status`, `/scan/cancel`           | Library scan control (admin)                                           |
-| `GET` `POST`           | `/users`, `/users/{id}`                           | User administration (admin)                                            |
+| `GET` `POST`           | `/users`                                          | List / create users (admin)                                            |
+| `PATCH` `DELETE`       | `/users/{id}`                                     | Update / delete a user (admin)                                         |
 | `GET`                  | `/server/info`                                    | Library counts; user count for admins                                  |
 
 ---
 
 ## Development
 
-```sh
-bun install
-bun run db:start      # docker compose up -d postgres
-bun run db:push       # sync the Drizzle schema to that database
-bun run dev           # http://localhost:5173
-```
-
-### Build
+You need a Rust toolchain (stable, edition 2024), Docker for Postgres, ffmpeg, and Node for the JS
+tests. The `Makefile` wraps the usual steps (`make help`):
 
 ```sh
-bun run build
-bun run preview       # serve the production build locally
+make setup            # .env from .env.example, dev-library/, Postgres on port 5434, first build
+make dev              # cargo run on http://localhost:3000
 ```
 
-`bun run build` and every `db:*` script need `DATABASE_URL` in the environment. `adapter-node`
-produces a plain Node server, so nothing loads `.env` for you outside `vite dev` — export the
-variables or use a process manager that does. `bun run` does **not** close that gap: bun only
-auto-loads `.env` for processes it runs itself, and these scripts' binaries (`vite`,
-`drizzle-kit`, `node build`) run under Node.
-
-### Database
+Without make:
 
 ```sh
-bun run db:push       # dev schema sync, no migration file
-bun run db:generate   # create a migration from schema.ts changes
-bun run db:migrate    # apply migrations
-bun run db:studio     # Drizzle Studio
+cp .env.example .env
+docker compose up -d postgres   # Postgres on localhost:5434
+cargo run                       # applies the migrations, creates the first admin, serves on :3000
 ```
+
+Templates (askama) and migrations are compiled into the binary, so a template change needs a
+restart; CSS and JS in `static/` are served from disk.
 
 ### Tests
 
 ```sh
-bun run test:unit --run   # vitest; integration suites spin up Postgres via testcontainers (needs Docker)
-bun run test:e2e          # playwright (needs docker compose up -d postgres)
-bun run test              # both
+cargo test                      # unit + integration tests
+cargo test --test integration   # integration only: one throwaway database per test on :5434
+node --test 'tests/js/*.test.mjs'  # browser-side JS modules
+make test                       # fmt, clippy, cargo test, JS tests
 ```
+
+The integration tests drive the real router in-process against Postgres; `.cargo/config.toml`
+points them at the compose database, so `docker compose up -d postgres` is all they need.
+
+The Playwright end-to-end suite lives in `e2e/`. It runs the browser in a macOS VM on a separate
+build machine (`e2e/run-on-jarvis.sh`), not on the developer's desktop; adapt the script if you
+want to run it elsewhere.
 
 ### Checks
 
 ```sh
-bun run lint          # prettier --check + eslint
-bun run format        # prettier --write
-bun run check         # svelte-check / TypeScript
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 ```
+
+### Docker image
+
+```sh
+docker build -t autoreverse-server .
+```
+
+The `Dockerfile` cross-compiles in a `rust:*-slim` stage for the target architecture (no QEMU
+for the Rust build) and ships the binary with `static/` on `debian:trixie-slim` plus ffmpeg,
+running as UID 1000.
 
 ### Layout
 
 ```
-src/lib/server/
+src/
+  api/          JSON endpoints, one module per area
+  web/          server-rendered web UI (German), one module per area
   auth/         sessions, tokens, password hashing, login throttling, bootstrap
-  db/           Drizzle schema and connection
-  library/      queries, progress, bookmarks, favorites, playlists
-  podcasts/     feed parsing, directory search, episode downloads
+  library/      queries, progress, bookmarks, favorites, playlists, metadata editing
+  podcasts/     feed parsing, directory search, episode downloads, retention, refresh job
   scanner/      book and music scans, tags, chapters, covers
-  settings/     runtime-configured library paths
   streaming/    HTTP range responses
-src/lib/components/   Svelte UI components
-src/routes/           JSON API endpoints (+server.ts) and web UI pages
-drizzle/              generated migrations
-tests/                unit, integration and e2e suites
+  app.rs        the router; main.rs the command line
+templates/      askama templates
+static/         CSS, JS (htmx vendored), icons
+migrations/     sqlx migrations
+tests/          integration tests, JS tests, fixtures
+e2e/            Playwright specs
 ```
 
 ---
@@ -379,8 +422,11 @@ tests/                unit, integration and e2e suites
 
 Issues and pull requests are welcome.
 
-- Run `bun run lint`, `bun run check` and `bun run test:unit --run` before opening a PR.
-- Keep schema changes accompanied by a generated migration (`bun run db:generate`).
+- Run `make test` (or `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+  `cargo test`, `node --test 'tests/js/*.test.mjs'`) before opening a PR.
+- Schema changes go into a new file in `migrations/`; never edit one that has been released.
+- The API is used by native clients: keep paths, field names (snake_case) and status codes
+  compatible.
 - The UI is German; please match the existing wording and tone in user-facing strings.
 
 ---

@@ -1,4 +1,4 @@
-// The web player's store (legacy src/lib/player.svelte.test.ts). Run: node --test tests/js
+// The web player's store (legacy src/lib/player.svelte.test.ts). Run: node --test 'tests/js/*.test.mjs'
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
