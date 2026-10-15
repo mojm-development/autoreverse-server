@@ -605,6 +605,36 @@
 	border: 1px solid var(--line-strong);
 	color: var(--text);
 }
+.settings-duplicates .danger {
+	height: 30px;
+	padding: 0 14px;
+	border-radius: var(--radius-pill);
+	font: 500 12px var(--font-sans);
+	white-space: nowrap;
+	background: transparent;
+	border: 1px solid color-mix(in oklab, var(--danger) 50%, transparent);
+	color: var(--danger);
+}
+.settings-duplicates .hidden-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 28px 0 10px;
+}
+.settings-duplicates .hidden-head h2 {
+	margin: 0;
+}
+.settings-duplicates .notice {
+	color: var(--a);
+	font-size: 13px;
+	margin-bottom: 12px;
+}
+.settings-duplicates .error {
+	color: var(--danger);
+	font-size: 13px;
+	margin-bottom: 12px;
+}
 .settings-duplicates .hidden-list .copy {
 	border-bottom: 1px solid var(--line);
 	border-radius: 0;

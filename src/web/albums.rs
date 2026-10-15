@@ -1,7 +1,7 @@
 //! `/library/albums` and `/library/albums/{id}` (legacy `library/albums/**`). Playing and the
 //! hearts are static/js/player and app.js, editing (Verwalter) static/js/metadata.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use askama::Template;
 use axum::extract::{Path, Query, State};
@@ -326,7 +326,10 @@ async fn more(
 
 pub struct TrackRow {
     pub id: i32,
+    /// Counted per disc on an album with several.
     pub number: usize,
+    /// "CD 2" above the first track of each disc, when the album has more than one.
+    pub disc_label: Option<String>,
     pub title: String,
     pub duration: String,
     pub favorite: bool,
@@ -355,6 +358,37 @@ async fn is_admin(state: &AppState, user_id: i32) -> Result<bool, sqlx::Error> {
             .await?
             .unwrap_or(false),
     )
+}
+
+/// The rows of the track table. On an album with more than one disc each disc gets a heading
+/// and its own numbering; tracks without a disc count as the first.
+fn track_table(tracks: &[queries::Track], favorites: &HashSet<i32>) -> Vec<TrackRow> {
+    let disc = |t: &queries::Track| t.disc.unwrap_or(1);
+    let several = tracks.iter().any(|t| disc(t) != disc(&tracks[0]));
+    let mut number = 0;
+    tracks
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let starts_disc = i == 0 || disc(t) != disc(&tracks[i - 1]);
+            number = if several && starts_disc {
+                1
+            } else {
+                number + 1
+            };
+            TrackRow {
+                id: t.id,
+                number,
+                disc_label: (several && starts_disc).then(|| format!("CD {}", disc(t))),
+                title: t
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| format!("Titel {}", i + 1)),
+                duration: format_hours(t.duration),
+                favorite: favorites.contains(&t.id),
+            }
+        })
+        .collect()
 }
 
 async fn detail(
@@ -396,20 +430,7 @@ async fn detail(
         eyebrow,
         subline,
         artist: album.artist.clone().unwrap_or_else(|| "—".into()),
-        tracks: track_rows
-            .iter()
-            .enumerate()
-            .map(|(i, t)| TrackRow {
-                id: t.id,
-                number: i + 1,
-                title: t
-                    .title
-                    .clone()
-                    .unwrap_or_else(|| format!("Titel {}", i + 1)),
-                duration: format_hours(t.duration),
-                favorite: favorite_tracks.contains(&t.id),
-            })
-            .collect(),
+        tracks: track_table(&track_rows, &favorite_tracks),
         favorite,
         playlists,
         album,

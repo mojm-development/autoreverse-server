@@ -38,8 +38,8 @@ pub async fn known_files(db: &PgPool) -> Result<KnownFiles, sqlx::Error> {
         .collect())
 }
 
-/// The cover to store: the current one while its file exists, else a cover file in the folder,
-/// else a picture embedded in one of the first three tracks.
+/// The cover to store: the current one while its file exists, else a cover file in the folder
+/// or in the first track's folder, else a picture embedded in one of the first three tracks.
 async fn resolve_cover(
     item_id: i32,
     dir: &str,
@@ -56,7 +56,13 @@ async fn resolve_cover(
         {
             return Some(current.clone());
         }
+        // An album of discs often keeps its cover in the first disc's folder.
+        let first_folder = tracks
+            .first()
+            .and_then(|t| t.parent())
+            .map(Path::to_path_buf);
         find_cover_file(&dir)
+            .or_else(|| first_folder.as_deref().and_then(find_cover_file))
             .or_else(|| {
                 tracks
                     .iter()
@@ -242,6 +248,8 @@ async fn store_one(
         .await?;
     }
 
+    absorb_emptied_subfolders(tx, item_id, entry).await?;
+
     sqlx::query("DELETE FROM chapters WHERE item_id = $1")
         .bind(item_id)
         .execute(&mut **tx)
@@ -274,6 +282,82 @@ async fn store_one(
         .execute(&mut **tx)
         .await?;
     Ok(outcome)
+}
+
+/// Items of folders below `item_id`'s whose tracks all just moved to it: the per-disc albums of
+/// an album now read as one. What users kept on them moves along — progress and bookmarks
+/// shifted by the length of the discs before, favorites, playlist entries, listening history,
+/// an artist's chosen cover — and then they go. Track favorites need nothing: the tracks moved
+/// with their ids.
+async fn absorb_emptied_subfolders(
+    tx: &mut Transaction<'_, Postgres>,
+    item_id: i32,
+    entry: &ScannedItem,
+) -> Result<(), sqlx::Error> {
+    let prefix = format!("{}/", entry.source_path);
+    let emptied: Vec<(i32, String)> = sqlx::query_as(
+        "SELECT id, source_path FROM items AS old
+         WHERE old.kind = $1 AND old.id <> $2
+           AND substr(old.source_path, 1, length($3)) = $3
+           AND NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.item_id = old.id)",
+    )
+    .bind(entry.kind.as_str())
+    .bind(item_id)
+    .bind(&prefix)
+    .fetch_all(&mut **tx)
+    .await?;
+    for (old_id, old_path) in emptied {
+        // Where the old album starts inside the new one: everything before its first track.
+        let offset: f64 = sqlx::query_scalar(
+            "SELECT coalesce(sum(duration), 0) FROM tracks
+             WHERE item_id = $1 AND position < (
+                 SELECT coalesce(min(position), 0) FROM tracks
+                 WHERE item_id = $1 AND substr(path, 1, length($2)) = $2)",
+        )
+        .bind(item_id)
+        .bind(format!("{old_path}/"))
+        .fetch_one(&mut **tx)
+        .await?;
+        // Shifted by the discs before it.
+        for statement in [
+            "INSERT INTO progress (user_id, item_id, position, finished, updated_at)
+             SELECT user_id, $2, position + $3, false, updated_at FROM progress
+             WHERE item_id = $1
+             ON CONFLICT (user_id, item_id) DO UPDATE
+                 SET position = excluded.position, finished = false,
+                     updated_at = excluded.updated_at
+                 WHERE excluded.updated_at > progress.updated_at",
+            "INSERT INTO bookmarks (user_id, item_id, position, title)
+             SELECT user_id, $2, position + $3, title FROM bookmarks WHERE item_id = $1
+             ON CONFLICT DO NOTHING",
+        ] {
+            sqlx::query(statement)
+                .bind(old_id)
+                .bind(item_id)
+                .bind(offset)
+                .execute(&mut **tx)
+                .await?;
+        }
+        for statement in [
+            "INSERT INTO favorites (user_id, item_id)
+             SELECT user_id, $2 FROM favorites WHERE item_id = $1
+             ON CONFLICT (user_id, item_id) WHERE item_id IS NOT NULL DO NOTHING",
+            "UPDATE playlist_entries SET item_id = $2 WHERE item_id = $1",
+            "UPDATE listen_events SET item_id = $2 WHERE item_id = $1",
+            "UPDATE artist_covers SET item_id = $2 WHERE item_id = $1",
+        ] {
+            sqlx::query(statement)
+                .bind(old_id)
+                .bind(item_id)
+                .execute(&mut **tx)
+                .await?;
+        }
+        sqlx::query("DELETE FROM items WHERE id = $1")
+            .bind(old_id)
+            .execute(&mut **tx)
+            .await?;
+    }
+    Ok(())
 }
 
 /// How many items are stored at once. Each holds a pool connection for its transaction; the

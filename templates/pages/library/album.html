@@ -28,6 +28,7 @@
 			<span></span><span>Titel</span><span>Interpret</span><span></span><span>Dauer</span>
 		</div>
 		{% for track in tracks %}
+		{% if let Some(label) = track.disc_label %}<div role="row" class="disc-row"><span role="cell" class="eyebrow">{{ label }}</span></div>{% endif %}
 		<div role="row" class="row clickable" aria-current="false" data-track-row data-track-id="{{ track.id }}">
 			<button type="button" class="activator bare" aria-label="{{ track.title }} abspielen" data-action="play-track" data-track-id="{{ track.id }}"></button>
 			<span class="index mono"><span class="num">{{ track.number }}</span>{% call ui::icon("play") %}{% endcall %}</span>

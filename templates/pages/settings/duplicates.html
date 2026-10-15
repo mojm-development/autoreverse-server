@@ -5,7 +5,10 @@
 {% block content %}
 <div class="settings-duplicates">
 	<h1>Doppelte Alben</h1>
-	<p class="lede">Alben mit gleichem Interpreten und Titel in mehreren Ordnern. Behalte eine Kopie, die anderen werden in der Bibliothek ausgeblendet. Die Dateien bleiben unverändert.</p>
+	<p class="lede">Alben mit gleichem Interpreten und Titel in mehreren Ordnern. Behalte eine Kopie, die anderen werden in der Bibliothek ausgeblendet – ihre Dateien bleiben dabei unverändert. Ausgeblendete Kopien kannst du unten endgültig von der Festplatte löschen.</p>
+
+	{% if let Some(notice) = notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+	{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 
 	{% if open.is_empty() %}
 	<p class="empty">Keine doppelten Alben offen.</p>
@@ -43,7 +46,13 @@
 	{% endif %}
 
 	{% if !hidden.is_empty() %}
-	<h2>Ausgeblendet <span class="count mono">{{ hidden.len() }}</span></h2>
+	<div class="hidden-head">
+		<h2>Ausgeblendet <span class="count mono">{{ hidden.len() }}</span></h2>
+		<form method="POST" action="/settings/duplicates" data-confirm="Alle {{ hidden.len() }} ausgeblendeten Kopien endgültig von der Festplatte löschen? Das lässt sich nicht rückgängig machen.">
+			<input type="hidden" name="action" value="delete-hidden" />
+			<button type="submit" class="danger">Alle ausgeblendeten löschen</button>
+		</form>
+	</div>
 	<ul class="copies hidden-list">
 		{% for entry in hidden %}
 		<li class="copy">
@@ -57,6 +66,11 @@
 				<input type="hidden" name="action" value="unhide" />
 				<input type="hidden" name="id" value="{{ entry.copy.id }}" />
 				<button type="submit" class="outline">Wieder einblenden</button>
+			</form>
+			<form method="POST" action="/settings/duplicates" data-confirm="„{{ entry.copy.title }}“ aus {{ entry.copy.folder }} endgültig von der Festplatte löschen?">
+				<input type="hidden" name="action" value="delete" />
+				<input type="hidden" name="id" value="{{ entry.copy.id }}" />
+				<button type="submit" class="danger">Löschen</button>
 			</form>
 		</li>
 		{% endfor %}

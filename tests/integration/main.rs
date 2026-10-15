@@ -9,6 +9,7 @@ mod artist_covers;
 mod auth_api;
 mod bootstrap;
 mod collections_api;
+mod discs;
 mod duplicates;
 mod items_api;
 mod library_paths;

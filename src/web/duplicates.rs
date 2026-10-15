@@ -2,10 +2,11 @@
 //! folder. A Verwalter picks the copy to keep; the others are hidden, their files untouched.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use askama::Template;
 use axum::body::Bytes;
-use axum::extract::State;
+use axum::extract::{RawQuery, State};
 use axum::http::Uri;
 use axum::response::{Html, Redirect};
 use axum::{Router, routing::get};
@@ -15,7 +16,10 @@ use super::layout::Shell;
 use super::settings::{Section, settings_shell, web_user};
 use crate::auth::WebAdmin;
 use crate::error::{WebError, WebResult};
-use crate::library::duplicates::{Copy, Group, groups, keep, keep_all_recommended, unhide};
+use crate::library::duplicates::{
+    Copy, DeleteRefused, Group, delete_all_hidden, delete_hidden_copy, groups, keep,
+    keep_all_recommended, unhide,
+};
 use crate::library::paths::get_library_paths;
 use crate::state::AppState;
 
@@ -61,6 +65,16 @@ struct DuplicatesPage {
     sections: Vec<&'static Section>,
     open: Vec<GroupView>,
     hidden: Vec<HiddenView>,
+    /// After deleting: "3 Kopien gelöscht."
+    notice: Option<String>,
+    error: Option<&'static str>,
+}
+
+/// What the last deletion left in the address: `geloescht=<n>`, `fehler=<code>`.
+#[derive(serde::Deserialize, Default)]
+struct Outcome {
+    geloescht: Option<usize>,
+    fehler: Option<String>,
 }
 
 fn view(copy: &Copy, music_root: Option<&str>, recommended: bool) -> CopyView {
@@ -126,7 +140,15 @@ fn hidden_views(groups: &[Group], music_root: Option<&str>) -> Vec<HiddenView> {
         .collect()
 }
 
-async fn page(State(state): State<AppState>, admin: WebAdmin, uri: Uri) -> WebResult<Html<String>> {
+async fn page(
+    State(state): State<AppState>,
+    admin: WebAdmin,
+    uri: Uri,
+    RawQuery(query): RawQuery,
+) -> WebResult<Html<String>> {
+    // A hand-edited address shows no message rather than an error.
+    let outcome: Outcome =
+        serde_urlencoded::from_str(query.as_deref().unwrap_or("")).unwrap_or_default();
     let (shell, sections) = settings_shell(&state, &web_user(&admin), &uri).await?;
     let music_root = get_library_paths(&state.db).await?.music_dir;
     let groups = groups(&state.db).await?;
@@ -135,12 +157,18 @@ async fn page(State(state): State<AppState>, admin: WebAdmin, uri: Uri) -> WebRe
         sections,
         open: open_views(&groups, music_root.as_deref()),
         hidden: hidden_views(&groups, music_root.as_deref()),
+        notice: outcome.geloescht.map(|n| match n {
+            1 => "1 Kopie gelöscht.".to_owned(),
+            n => format!("{n} Kopien gelöscht."),
+        }),
+        error: outcome.fehler.as_deref().and_then(DeleteRefused::message),
     };
     Ok(Html(page.render()?))
 }
 
-/// `action=keep|unhide|keep-all`, `id`, and `next` (the anchor to land on). Answers with a
-/// redirect back to the page, so a reload does not send the form again.
+/// `action=keep|unhide|keep-all|delete|delete-hidden`, `id`, and `next` (the anchor to land
+/// on). Answers with a redirect back to the page, so a reload does not send the form again; a
+/// deletion reports its outcome in the address.
 async fn action(
     State(state): State<AppState>,
     _admin: WebAdmin,
@@ -149,6 +177,22 @@ async fn action(
     let form: HashMap<String, String> = serde_urlencoded::from_bytes(&body).unwrap_or_default();
     let id = || form.get("id").and_then(|v| v.parse::<i32>().ok());
     let not_found = || WebError::not_found("Album nicht gefunden");
+    let music_root = || async {
+        Ok::<_, WebError>(
+            get_library_paths(&state.db)
+                .await?
+                .music_dir
+                .map(PathBuf::from),
+        )
+    };
+    let deleted = |count: usize, refused: Option<DeleteRefused>| {
+        let mut to = format!("{PAGE}?geloescht={count}");
+        if let Some(reason) = refused {
+            to.push_str("&fehler=");
+            to.push_str(reason.code());
+        }
+        Ok(Redirect::to(&to))
+    };
     match form.get("action").map(String::as_str) {
         Some("keep") => {
             keep(&state.db, id().ok_or_else(not_found)?)
@@ -160,6 +204,20 @@ async fn action(
         }
         Some("keep-all") => {
             keep_all_recommended(&state.db).await?;
+        }
+        Some("delete") => {
+            let root = music_root().await?;
+            let outcome =
+                delete_hidden_copy(&state.db, id().ok_or_else(not_found)?, root.as_deref()).await?;
+            return match outcome {
+                Ok(()) => deleted(1, None),
+                Err(reason) => deleted(0, Some(reason)),
+            };
+        }
+        Some("delete-hidden") => {
+            let root = music_root().await?;
+            let (count, refused) = delete_all_hidden(&state.db, root.as_deref()).await?;
+            return deleted(count, refused);
         }
         _ => return Err(WebError::not_found("Unbekannte Aktion")),
     }
