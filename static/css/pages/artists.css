@@ -45,13 +45,13 @@
 	min-width: 0;
 	text-align: center;
 }
-/* People are round here: a circle tells an artist apart from an album at a glance. */
+/* Square with the album tiles' corners, so the grid reads like the album grid. */
 .artists-page .portrait {
 	display: grid;
 	place-items: center;
 	width: 100%;
 	aspect-ratio: 1 / 1;
-	border-radius: 50%;
+	border-radius: var(--radius-md);
 	overflow: hidden;
 	background: var(--tile);
 	background-image: repeating-linear-gradient(135deg, var(--stripe) 0 1px, transparent 1px 7px);
