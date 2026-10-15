@@ -592,7 +592,9 @@
 	color: var(--faint);
 	font-size: 11.5px;
 }
-.podcast-search [hidden] {
+.podcast-search [hidden],
+/* Legacy rendered the list only once there were hits; an empty one would add a flex gap. */
+.podcast-search .results:empty {
 	display: none;
 }
 .podcast-search .results {

@@ -103,7 +103,9 @@ async fn the_users_page_lists_accounts_with_role_and_actions(db: PgPool) {
     assert!(html.contains(r#"aria-label="Neues Passwort für Mara""#));
     assert!(html.contains("hx-confirm=\"„Mara“ löschen?"));
     // Mara never logged in; oliver was seen by this very request.
-    assert!(html.contains(r#"<td class="mono">—</td>"#));
+    // Plain text like legacy's toLocaleDateString cell, not monospace (design parity).
+    assert!(html.contains("<td>—</td>"));
+    assert!(!html.contains(r#"<td class="mono">"#));
 }
 
 #[sqlx::test]

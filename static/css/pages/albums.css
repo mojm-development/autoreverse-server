@@ -8,7 +8,8 @@
 	gap: 10px;
 	margin-bottom: 14px;
 }
-.albums-page .count {
+/* header only: the selection bar (bulk_editor.html) has its own .count */
+.albums-page header .count {
 	color: var(--faint);
 	font-size: 13px;
 }

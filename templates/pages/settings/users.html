@@ -38,7 +38,7 @@
 			<tr>
 				<td>{{ u.name }}{% if u.is_self %} <span class="you mono">du</span>{% endif %}</td>
 				<td>{% if u.is_admin %}Verwalter{% else %}Nutzer{% endif %}</td>
-				<td class="mono">{{ u.last_seen }}</td>
+				<td>{{ u.last_seen }}</td>
 				<td class="actions">
 					<form method="POST" action="?/toggleAdmin">
 						<input type="hidden" name="userId" value="{{ u.id }}" />
