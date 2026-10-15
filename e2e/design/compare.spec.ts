@@ -143,9 +143,14 @@ const SHOTS: Shot[] = [
 	{ name: 'not-found', path: '/library/books/999999' }
 ];
 
-const only = process.env.SHOTS?.split(',').filter(Boolean);
-const vpOnly = process.env.VIEWPORTS?.split(',').filter(Boolean);
-const themeOnly = process.env.THEMES?.split(',').filter(Boolean);
+// compare.sh always passes all three, empty when unset: an empty list means "no filter".
+function listEnv(name: string): string[] | undefined {
+	const list = process.env[name]?.split(',').filter(Boolean);
+	return list?.length ? list : undefined;
+}
+const only = listEnv('SHOTS');
+const vpOnly = listEnv('VIEWPORTS');
+const themeOnly = listEnv('THEMES');
 
 async function login(browser: Browser, server: Server): Promise<string> {
 	const file = `playwright/.auth/${server}.json`;
