@@ -107,7 +107,7 @@ test('the lock screen shows track, artist and album for music', () => {
 		title: 'Zwei',
 		artist: 'Kraftwerk',
 		album: 'Autobahn',
-		artwork: [{ src: '/items/1/cover' }]
+		artwork: [{ src: '/items/1/cover?size=512' }]
 	});
 });
 

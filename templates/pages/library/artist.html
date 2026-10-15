@@ -42,7 +42,7 @@
 				<input type="hidden" name="item_id" value="{{ album.id }}" />
 				<button type="submit" class="album bare" aria-pressed="{{ album.active }}">
 					<span class="cover">
-						{% if album.has_cover %}<img src="/items/{{ album.id }}/cover" alt="" loading="lazy" />{% endif %}
+						{% if album.has_cover %}<img src="/items/{{ album.id }}/cover?size=384" alt="" loading="lazy" />{% endif %}
 					</span>
 					<span class="title">{{ album.title }}</span>
 					<span class="year mono">{{ album.year }}{% if album.active %} · gewählt{% else if album.saved %} · gespeichert{% endif %}</span>

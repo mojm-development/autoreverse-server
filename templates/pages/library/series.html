@@ -27,7 +27,7 @@
 			<li data-series-entry data-search="{{ shelf.search }}">
 				<a class="tile" href="{{ shelf.href }}">
 					<span class="stack">
-						{% for cover in shelf.covers %}<span class="spine" style="background-image: url(/items/{{ cover }}/cover); --i: {{ loop.index0 }}"></span>{% endfor %}
+						{% for cover in shelf.covers %}<span class="spine" style="background-image: url(/items/{{ cover }}/cover?size=128); --i: {{ loop.index0 }}"></span>{% endfor %}
 						{% if shelf.covers.is_empty() %}<span class="spine empty-spine" style="--i: 0"></span>{% endif %}
 					</span>
 					<span class="body">

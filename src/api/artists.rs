@@ -11,8 +11,8 @@ use axum::{Json, Router, routing::get};
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use super::images::{cover_roots, serve_image};
-use super::validate::ApiJson;
+use super::images::{cover_roots, serve_image, thumb_size};
+use super::validate::{ApiJson, ApiQuery, QueryMap};
 use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
 use crate::library::artist_covers::{
@@ -104,7 +104,9 @@ async fn image(
     State(state): State<AppState>,
     _user: ApiUser,
     Path(artist): Path<String>,
+    ApiQuery(query): ApiQuery<QueryMap>,
 ) -> ApiResult<Response> {
+    let size = thumb_size(&query)?;
     let chosen = chosen_cover(&state.db, &artist).await?;
     if let Some(path) = chosen.as_ref().and_then(|c| c.image_path.clone()) {
         return serve_image(
@@ -112,6 +114,8 @@ async fn image(
             std::slice::from_ref(&state.config.artists_dir),
             NO_IMAGE,
             IMAGE_CACHE,
+            size,
+            &state.config.thumbs_dir,
         )
         .await;
     }
@@ -124,7 +128,15 @@ async fn image(
         .ok_or_else(|| ApiError::not_found(NO_IMAGE))?;
     // The same roots `/items/{id}/cover` allows: an album cover is no less a stored path.
     let roots = cover_roots(&state.db, &state.config).await?;
-    serve_image(&PathBuf::from(cover_path), &roots, NO_IMAGE, IMAGE_CACHE).await
+    serve_image(
+        &PathBuf::from(cover_path),
+        &roots,
+        NO_IMAGE,
+        IMAGE_CACHE,
+        size,
+        &state.config.thumbs_dir,
+    )
+    .await
 }
 
 /// The request body an upload may have.

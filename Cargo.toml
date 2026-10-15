@@ -14,6 +14,7 @@ dotenvy = "0.15.7"
 feed-rs = "3.0.0"
 gethostname = "1.1.0"
 getrandom = "0.4"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 lofty = "0.25.4"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "charset", "http2", "gzip", "query"] }

@@ -80,7 +80,7 @@ async fn the_albums_page_lists_present_albums_with_counts(db: PgPool) {
     assert!(html.contains("<title>Alben · Autoreverse</title>"));
     assert!(html.contains("Autobahn") && html.contains("Nordlicht"));
     assert!(!html.contains("Verschwunden") && !html.contains("Kein Album"));
-    assert!(html.contains(&format!(r#"<img src="/items/{autobahn}/cover""#)));
+    assert!(html.contains(&format!(r#"<img src="/items/{autobahn}/cover?size=384""#)));
     assert!(html.contains(&format!(r#"href="/library/albums/{autobahn}""#)));
     // Heading count and the sidebar's music counts.
     assert!(html.contains(r#"<span class="count mono">2</span>"#));
@@ -246,7 +246,7 @@ async fn the_artists_page_shows_pictures_initials_and_counts(db: PgPool) {
     assert!(html.contains(r#"Interpreten <span class="count mono">3</span>"#));
     assert!(html.contains("2 Alben") && html.contains("1 Album"));
     // The fallback album's cover, initials without a picture, the upload under the artist's URL.
-    assert!(html.contains(&format!(r#"<img src="/items/{autobahn}/cover""#)));
+    assert!(html.contains(&format!(r#"<img src="/items/{autobahn}/cover?size=384""#)));
     assert!(html.contains(r#"<span class="initials">AV</span>"#));
     assert!(html.contains(r#"<img src="/artists/Die%20%C3%84rzte/image?v="#));
     assert!(html.contains(r#"href="/library/albums?artist=Ansa%20Volt""#));

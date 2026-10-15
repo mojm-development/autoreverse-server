@@ -7,7 +7,7 @@
 <div class="content album-page" style="--a: var(--music)" data-live-item data-item-id="{{ album.id }}" data-kind="album">
 	<div class="hero">
 		<div class="cover">
-			{% if album.cover_path.is_some() %}<img src="/items/{{ album.id }}/cover" alt="" />{% endif %}
+			{% if album.cover_path.is_some() %}<img src="/items/{{ album.id }}/cover?size=768" alt="" />{% endif %}
 		</div>
 		<div class="meta">
 			<span class="eyebrow">{{ eyebrow }}</span>

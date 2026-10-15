@@ -25,7 +25,7 @@ export function sessionMetadata(current, item) {
 		title,
 		artist: item?.artist || item?.author || '',
 		album,
-		artwork: current.hasCover ? [{ src: `/items/${current.itemId}/cover` }] : []
+		artwork: current.hasCover ? [{ src: `/items/${current.itemId}/cover?size=512` }] : []
 	};
 }
 

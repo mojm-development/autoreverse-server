@@ -17,6 +17,8 @@ pub struct Config {
     pub cover_dir: PathBuf,
     pub podcasts_dir: PathBuf,
     pub artists_dir: PathBuf,
+    /// Scaled-down covers and artist images, rendered on first request; safe to delete.
+    pub thumbs_dir: PathBuf,
     /// 0 turns the background refresh off.
     pub podcast_refresh_hours: f64,
     /// The iTunes Search API; `AUTOREVERSE_PODCAST_DIRECTORY_URL` points it elsewhere (the e2e
@@ -72,6 +74,7 @@ impl Config {
             cover_dir: data_dir.join("covers"),
             podcasts_dir: data_dir.join("podcasts"),
             artists_dir: data_dir.join("artists"),
+            thumbs_dir: data_dir.join("thumbs"),
             data_dir,
             podcast_refresh_hours: refresh_hours(lookup("AUTOREVERSE_PODCAST_REFRESH_HOURS")),
             podcast_directory_url: non_empty("AUTOREVERSE_PODCAST_DIRECTORY_URL")

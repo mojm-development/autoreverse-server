@@ -26,7 +26,7 @@
 			<a href="{{ entry.href }}" class="continue-card">
 				<div class="art">
 					{% if entry.has_cover %}
-					<img src="/items/{{ entry.id }}/cover" alt="" width="74" height="74" />
+					<img src="/items/{{ entry.id }}/cover?size=256" alt="" width="74" height="74" />
 					{% else %}
 					<div class="placeholder" style="--accent: var(--{{ entry.accent }})"></div>
 					{% endif %}
@@ -54,7 +54,7 @@
 			<figure class="cover-tile">
 				<div class="art">
 					{% if tile.has_cover %}
-					<img src="/items/{{ tile.id }}/cover" alt="" width="100" height="100" />
+					<img src="/items/{{ tile.id }}/cover?size=384" alt="" width="100" height="100" />
 					{% else %}
 					<div class="placeholder" style="--accent: var(--{{ tile.accent }})"></div>
 					{% endif %}

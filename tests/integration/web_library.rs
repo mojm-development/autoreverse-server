@@ -262,7 +262,7 @@ async fn the_series_page_groups_shelves_by_author(db: PgPool) {
     assert!(html.contains("Andreas Eschbach") && html.contains("Ohne Autor"));
     assert!(html.contains("2 Bände · 1 beendet"));
     assert!(html.contains("1 Band"));
-    assert!(html.contains(&format!("url(/items/{first}/cover)")));
+    assert!(html.contains(&format!("url(/items/{first}/cover?size=128)")));
     assert!(
         html.contains(r#"href="/library/books?series=Perry+Rhodan&#38;author=Andreas+Eschbach""#)
     );

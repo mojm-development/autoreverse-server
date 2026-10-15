@@ -76,10 +76,10 @@ async fn list(State(state): State<AppState>, user: WebUser, uri: Uri) -> WebResu
         .map(|artist| {
             let pick = chosen.get(&artist.name);
             let cover_url = if pick.is_some_and(|p| p.image_path.is_some()) {
-                Some(image_url(&artist.name))
+                Some(format!("{}&size=384", image_url(&artist.name)))
             } else {
                 effective_album(pick, &fallback, &artist.name)
-                    .map(|id| format!("/items/{id}/cover"))
+                    .map(|id| format!("/items/{id}/cover?size=384"))
             };
             let encoded = encode_component(&artist.name);
             ArtistTile {
