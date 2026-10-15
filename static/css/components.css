@@ -39,6 +39,11 @@ img.mark {
 	padding-bottom: var(--player-bar-height);
 }
 @media (max-width: 700px) {
+	/* The sidebar turns into a fixed bar below, so main is the only grid item left — in legacy it
+	   then landed in the 216px sidebar column and every page was squeezed into it. */
+	.shell {
+		grid-template-columns: minmax(0, 1fr);
+	}
 	.shell > main {
 		padding-bottom: calc(var(--player-bar-height) + var(--mobile-nav-height));
 	}

@@ -115,6 +115,18 @@
 	.mini-player .mini-viz {
 		display: none;
 	}
+	/* At 390px the info column would be ~60px wide and the time ran into the speed pill; without
+	   the cover and with tighter transport it gets ~120px. */
+	.mini-player .cover {
+		display: none;
+	}
+	.mini-player .transport {
+		gap: 8px;
+	}
+	.mini-player .time {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 }
 
 /* Scrubber.svelte — `role="slider"` keeps it apart from the book page's static progress bar. */

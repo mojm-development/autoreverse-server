@@ -170,6 +170,7 @@
 }
 .scan-card .report {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 14px;
 	color: var(--faint);
 	font-size: 11px;
@@ -211,7 +212,10 @@
 
 @media (max-width: 700px) {
 	.settings {
-		grid-template-columns: 1fr;
+		grid-template-columns: minmax(0, 1fr);
+		/* The shell stretches .settings to the viewport; without this the free height is shared
+		   between the subnav row and the content row. */
+		align-content: start;
 	}
 	.settings .subnav {
 		flex-direction: row;
@@ -468,7 +472,7 @@
 }
 .settings-about dl {
 	display: grid;
-	grid-template-columns: max-content 1fr;
+	grid-template-columns: max-content minmax(0, 1fr);
 	gap: 6px 18px;
 	margin: 0 0 16px;
 	font-size: 12.5px;
@@ -478,4 +482,5 @@
 }
 .settings-about dd {
 	margin: 0;
+	overflow-wrap: anywhere;
 }

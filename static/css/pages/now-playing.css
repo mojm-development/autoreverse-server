@@ -354,6 +354,15 @@
 	.np .left {
 		padding: 20px 16px;
 	}
+	/* The column grows with its content here, so the hero must not take a 0 basis: it collapsed
+	   and cover, title and byline spilled upwards over the status row. */
+	.np .hero {
+		flex: none;
+	}
+	.np .cover-row {
+		flex: none;
+		height: 40vw;
+	}
 	.np h1 {
 		font-size: 30px;
 	}

@@ -60,6 +60,11 @@
 	align-items: center;
 	gap: 10px;
 	flex-wrap: wrap;
+	min-width: 0;
+}
+/* The file input's intrinsic width (~320px) pushed narrow screens sideways. */
+.artist-page .custom input[type='file'] {
+	max-width: 100%;
 }
 .artist-page .error {
 	color: var(--music);
