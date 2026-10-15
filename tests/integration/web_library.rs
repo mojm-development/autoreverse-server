@@ -277,13 +277,15 @@ async fn the_settings_overview_lists_what_the_user_may_open(db: PgPool) {
 
     let (_, html) = page(&app, "/settings", &admin).await;
     let overview = &html[html.find(r#"data-testid="settings-overview""#).unwrap()..];
-    assert_eq!(overview.matches(r#"class="card""#).count(), 7);
+    assert_eq!(overview.matches(r#"class="card""#).count(), 8);
+    assert!(overview.contains("Doppelte Alben"));
     assert!(html.contains("<h1>Einstellungen</h1>"));
 
     let (_, html) = page(&app, "/settings", &user).await;
     let overview = &html[html.find(r#"data-testid="settings-overview""#).unwrap()..];
     assert!(overview.contains("Wiedergabe"));
     assert!(!overview.contains("Bibliotheken"));
+    assert!(!overview.contains("Doppelte Alben"));
 }
 
 #[sqlx::test]

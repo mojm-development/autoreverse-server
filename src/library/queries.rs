@@ -160,7 +160,8 @@ fn push_item_conditions(
     artist: Option<&str>,
     missing: Option<bool>,
 ) {
-    query.push(" WHERE items.parent_id IS NULL");
+    // A copy hidden under Einstellungen → Doppelte Alben is in no list.
+    query.push(" WHERE items.parent_id IS NULL AND items.duplicate_of IS NULL");
     if let Some(kind) = kind {
         query.push(" AND items.kind = ").push_bind(kind.to_owned());
     }
@@ -347,6 +348,7 @@ pub async fn artists(db: &PgPool) -> Result<Vec<Artist>, sqlx::Error> {
     sqlx::query_as(
         "SELECT artist AS name, count(*)::int AS album_count FROM items
          WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
+           AND duplicate_of IS NULL
          GROUP BY artist ORDER BY lower(artist), artist",
     )
     .fetch_all(db)
@@ -358,6 +360,7 @@ pub async fn albums_of_artist(db: &PgPool, artist: &str) -> Result<Vec<Item>, sq
     let sql = format!(
         "SELECT * FROM items
          WHERE kind = 'album' AND artist = $1 AND missing_since IS NULL
+           AND duplicate_of IS NULL
          ORDER BY year DESC NULLS LAST, {}",
         *NATURAL_TITLE
     );
@@ -497,9 +500,9 @@ pub async fn library_counts(db: &PgPool) -> Result<LibraryCounts, sqlx::Error> {
              count(*) FILTER (WHERE kind = 'album'),
              count(*) FILTER (WHERE kind = 'podcast'),
              (SELECT count(*) FROM tracks JOIN items AS owner ON owner.id = tracks.item_id
-              WHERE owner.missing_since IS NULL)
+              WHERE owner.missing_since IS NULL AND owner.duplicate_of IS NULL)
          FROM items
-         WHERE parent_id IS NULL AND missing_since IS NULL",
+         WHERE parent_id IS NULL AND missing_since IS NULL AND duplicate_of IS NULL",
     )
     .fetch_one(db)
     .await?;
@@ -515,7 +518,8 @@ pub async fn library_counts(db: &PgPool) -> Result<LibraryCounts, sqlx::Error> {
 pub async fn artist_count(db: &PgPool) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar(
         "SELECT count(DISTINCT artist) FROM items
-         WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL",
+         WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
+           AND duplicate_of IS NULL",
     )
     .fetch_one(db)
     .await
@@ -541,6 +545,7 @@ pub async fn unheard_episode_count(db: &PgPool, user_id: i32) -> Result<i64, sql
 pub async fn recently_added(db: &PgPool, limit: i64) -> Result<Vec<Item>, sqlx::Error> {
     sqlx::query_as(
         "SELECT * FROM items WHERE parent_id IS NULL AND missing_since IS NULL
+           AND duplicate_of IS NULL
          ORDER BY added_at DESC, id DESC LIMIT $1",
     )
     .bind(limit)
@@ -558,7 +563,7 @@ pub async fn search_items(
 ) -> Result<Vec<Item>, sqlx::Error> {
     let sql = format!(
         "SELECT * FROM items
-         WHERE kind = ANY($1) AND missing_since IS NULL
+         WHERE kind = ANY($1) AND missing_since IS NULL AND duplicate_of IS NULL
            AND (title ILIKE $2 ESCAPE '\\' OR author ILIKE $2 ESCAPE '\\'
                 OR artist ILIKE $2 ESCAPE '\\')
          ORDER BY {} LIMIT $3",
@@ -591,6 +596,7 @@ pub async fn search_tracks(db: &PgPool, q: &str, limit: i64) -> Result<Vec<Track
                 item.title AS item_title, item.kind AS item_kind
          FROM tracks AS track JOIN items AS item ON item.id = track.item_id
          WHERE track.title ILIKE $1 ESCAPE '\\' AND item.missing_since IS NULL
+           AND item.duplicate_of IS NULL
          ORDER BY lower(track.title) LIMIT $2",
     )
     .bind(like_pattern(q))
@@ -613,6 +619,7 @@ pub async fn search_artists(db: &PgPool, q: &str, limit: i64) -> Result<Vec<Name
         "SELECT name, role, count(*)::int AS work_count FROM (
              SELECT artist AS name, 'artist' AS role FROM items
              WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
+           AND duplicate_of IS NULL
                AND artist ILIKE $1 ESCAPE '\\'
              UNION ALL
              SELECT author AS name, 'author' AS role FROM items
@@ -629,9 +636,11 @@ pub async fn search_artists(db: &PgPool, q: &str, limit: i64) -> Result<Vec<Name
 
 /// Every present item, episodes included (the search page's "in N Items").
 pub async fn total_items(db: &PgPool) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar("SELECT count(*) FROM items WHERE missing_since IS NULL")
-        .fetch_one(db)
-        .await
+    sqlx::query_scalar(
+        "SELECT count(*) FROM items WHERE missing_since IS NULL AND duplicate_of IS NULL",
+    )
+    .fetch_one(db)
+    .await
 }
 
 /// A subscription with how many episodes it has and how many of those are news to the user.

@@ -3,6 +3,7 @@
 pub mod artist_covers;
 pub mod bookmarks;
 pub mod bulk_metadata;
+pub mod duplicates;
 pub mod favorites;
 pub mod like;
 pub mod metadata;

@@ -57,6 +57,12 @@ pub const SECTIONS: &[Section] = &[
         admin: true,
     },
     Section {
+        href: "/settings/duplicates",
+        label: "Doppelte Alben",
+        description: "Mehrfach vorhandene Alben finden und überzählige Kopien ausblenden.",
+        admin: true,
+    },
+    Section {
         href: "/settings/users",
         label: "Nutzer",
         description: "Konten anlegen und Verwalterrechte vergeben.",
