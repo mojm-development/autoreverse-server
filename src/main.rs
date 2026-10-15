@@ -67,6 +67,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         config.admin_password.as_deref(),
     )
     .await?;
+    let moved = autoreverse_server::library::duplicates::transfer_all(&pool).await?;
+    if moved != Default::default() {
+        tracing::info!(
+            "Von ausgeblendeten Kopien übertragen: {} Fortschritte, {} Favoriten",
+            moved.progress,
+            moved.favorites
+        );
+    }
 
     let addr = SocketAddr::new(config.host, config.port);
     let state = AppState::new(pool, config);
