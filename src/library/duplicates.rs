@@ -3,7 +3,7 @@
 //! and a hidden copy can be shown again.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 
 /// What makes two albums the same: artist and title, case and runs of whitespace ignored.
 /// Editions stay apart on purpose — "Achtung Baby (Deluxe Edition)" is not "Achtung Baby".
@@ -81,8 +81,107 @@ pub async fn groups(db: &PgPool) -> Result<Vec<Group>, sqlx::Error> {
     Ok(groups)
 }
 
-/// Keeps album `id` and hides every other copy of it. `None` if `id` is no album, else how
-/// many copies are hidden now.
+/// What [`transfer_to_kept`] moved.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Transferred {
+    pub progress: u64,
+    pub favorites: u64,
+}
+
+/// Moves progress and favorites from every hidden copy to the album kept instead, so hiding a
+/// copy loses nobody's place or heart. Idempotent: what was moved is gone from the copy.
+///
+/// - Progress: the newer one wins where a user has some on both.
+/// - Favorite albums: moved; one already on the kept album stays as it is.
+/// - Favorite tracks: moved to the kept album's track with the same title, or the same position
+///   where either title is missing. A track without a match keeps its favorite on the copy,
+///   which stays playable by id.
+pub async fn transfer_to_kept(db: &mut PgConnection) -> Result<Transferred, sqlx::Error> {
+    // DISTINCT ON: two hidden copies of one album must not both update the same row.
+    sqlx::query(
+        "INSERT INTO progress (user_id, item_id, position, finished, updated_at)
+         SELECT DISTINCT ON (progress.user_id, copy.duplicate_of)
+                progress.user_id, copy.duplicate_of, progress.position, progress.finished,
+                progress.updated_at
+         FROM progress JOIN items AS copy ON copy.id = progress.item_id
+         WHERE copy.duplicate_of IS NOT NULL
+         ORDER BY progress.user_id, copy.duplicate_of, progress.updated_at DESC
+         ON CONFLICT (user_id, item_id) DO UPDATE
+             SET position = excluded.position, finished = excluded.finished,
+                 updated_at = excluded.updated_at
+             WHERE excluded.updated_at > progress.updated_at",
+    )
+    .execute(&mut *db)
+    .await?;
+    let moved_progress = sqlx::query(
+        "DELETE FROM progress USING items AS copy
+         WHERE copy.id = progress.item_id AND copy.duplicate_of IS NOT NULL",
+    )
+    .execute(&mut *db)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO favorites (user_id, item_id)
+         SELECT DISTINCT favorites.user_id, copy.duplicate_of
+         FROM favorites JOIN items AS copy ON copy.id = favorites.item_id
+         WHERE copy.duplicate_of IS NOT NULL
+         ON CONFLICT (user_id, item_id) WHERE item_id IS NOT NULL DO NOTHING",
+    )
+    .execute(&mut *db)
+    .await?;
+    let albums = sqlx::query(
+        "DELETE FROM favorites USING items AS copy
+         WHERE copy.id = favorites.item_id AND copy.duplicate_of IS NOT NULL",
+    )
+    .execute(&mut *db)
+    .await?;
+
+    let tracks = sqlx::query(
+        "WITH moves AS (
+             SELECT favorites.user_id, track.id AS old_id, target.id AS new_id
+             FROM favorites
+             JOIN tracks AS track ON track.id = favorites.track_id
+             JOIN items AS copy ON copy.id = track.item_id
+             CROSS JOIN LATERAL (
+                 SELECT kept.id FROM tracks AS kept
+                 WHERE kept.item_id = copy.duplicate_of
+                   AND (lower(btrim(kept.title)) = lower(btrim(track.title))
+                        OR ((kept.title IS NULL OR track.title IS NULL)
+                            AND kept.position = track.position))
+                 ORDER BY (lower(btrim(kept.title)) = lower(btrim(track.title))) IS TRUE DESC,
+                          kept.position = track.position DESC
+                 LIMIT 1
+             ) AS target
+             WHERE copy.duplicate_of IS NOT NULL
+         ),
+         added AS (
+             INSERT INTO favorites (user_id, track_id)
+             SELECT DISTINCT user_id, new_id FROM moves
+             ON CONFLICT (user_id, track_id) WHERE track_id IS NOT NULL DO NOTHING
+         )
+         DELETE FROM favorites USING moves
+         WHERE favorites.user_id = moves.user_id AND favorites.track_id = moves.old_id",
+    )
+    .execute(&mut *db)
+    .await?;
+
+    Ok(Transferred {
+        progress: moved_progress.rows_affected(),
+        favorites: albums.rows_affected() + tracks.rows_affected(),
+    })
+}
+
+/// [`transfer_to_kept`] in its own transaction, for copies hidden before the transfer existed.
+/// Run at every start; with nothing left on hidden copies it changes nothing.
+pub async fn transfer_all(db: &PgPool) -> Result<Transferred, sqlx::Error> {
+    let mut tx = db.begin().await?;
+    let moved = transfer_to_kept(&mut tx).await?;
+    tx.commit().await?;
+    Ok(moved)
+}
+
+/// Keeps album `id` and hides every other copy of it, moving their progress and favorites over
+/// ([`transfer_to_kept`]). `None` if `id` is no album, else how many copies are hidden now.
 pub async fn keep(db: &PgPool, id: i32) -> Result<Option<u64>, sqlx::Error> {
     let mut tx = db.begin().await?;
     let found =
@@ -102,6 +201,7 @@ pub async fn keep(db: &PgPool, id: i32) -> Result<Option<u64>, sqlx::Error> {
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    transfer_to_kept(&mut tx).await?;
     tx.commit().await?;
     Ok(Some(hidden.rows_affected()))
 }
