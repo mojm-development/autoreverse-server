@@ -60,7 +60,7 @@ pub async fn fallback_covers(db: &PgPool) -> Result<HashMap<String, i32>, sqlx::
         "SELECT DISTINCT ON (artist) artist, id
          FROM items
          WHERE kind = 'album' AND artist IS NOT NULL AND cover_path IS NOT NULL
-           AND missing_since IS NULL
+           AND missing_since IS NULL AND duplicate_of IS NULL
          ORDER BY artist, md5(artist || ':' || id::text)",
     )
     .fetch_all(db)

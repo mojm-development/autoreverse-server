@@ -3,6 +3,7 @@
 pub mod albums;
 pub mod artists;
 pub mod books;
+pub mod duplicates;
 pub mod errors;
 pub mod favorites;
 pub mod format;
@@ -36,5 +37,6 @@ pub fn router() -> Router<AppState> {
         .merge(search::router())
         .merge(player::router())
         .merge(settings::router())
+        .merge(duplicates::router())
         .merge(users::router())
 }
