@@ -2,6 +2,7 @@
 //! description-durations-played.test.ts, cover.test.ts).
 
 use autoreverse_server::library::paths::set_library_paths;
+use autoreverse_server::library::thumbs::{AHEAD_SIZES, render_ahead};
 use axum::http::{StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -310,6 +311,32 @@ async fn serves_a_scaled_down_jpeg_for_a_size_and_keeps_it(db: PgPool) {
         .get(&format!("/items/{id}/cover?size=abc"), Some(&token))
         .await;
     assert_eq!(invalid.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[sqlx::test]
+async fn renders_thumbnails_ahead_once(db: PgPool) {
+    let library = TempLibrary::new();
+    let (app, _) = cover_app(db, &library).await;
+    let path = library.music().join("A/cover.png");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    image::RgbImage::new(1000, 1000).save(&path).unwrap();
+    seed(
+        app.db(),
+        Seed {
+            cover_path: path.to_str(),
+            ..Seed::new("album", "X")
+        },
+    )
+    .await;
+    let thumbs = library.data().join("thumbs");
+
+    let rendered = render_ahead(app.db(), &thumbs).await.unwrap();
+    assert_eq!(rendered, 1);
+    assert_eq!(
+        std::fs::read_dir(&thumbs).unwrap().count(),
+        AHEAD_SIZES.len()
+    );
+    assert_eq!(render_ahead(app.db(), &thumbs).await.unwrap(), 0);
 }
 
 #[sqlx::test]

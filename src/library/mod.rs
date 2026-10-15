@@ -11,3 +11,4 @@ pub mod playback;
 pub mod playlists;
 pub mod queries;
 pub mod sorting;
+pub mod thumbs;
