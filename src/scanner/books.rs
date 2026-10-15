@@ -4,7 +4,10 @@
 use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::UNIX_EPOCH;
+
+use rayon::prelude::*;
 
 use super::chapters::{ScannedChapter, read_chapters};
 use super::series::{SeriesSource, resolve_series};
@@ -199,6 +202,7 @@ pub fn scan_folder(
     dir: &Path,
     kind: ItemKind,
     known: &KnownFiles,
+    known_per_folder: &HashMap<&str, usize>,
 ) -> io::Result<Option<ScannedItem>> {
     let files = audio_files_in(dir);
     if files.is_empty() {
@@ -209,14 +213,7 @@ pub fn scan_folder(
         stats.insert(file.clone(), file_stats(file)?);
     }
     let dir_str = dir.to_string_lossy().into_owned();
-    let dir_prefix = format!("{dir_str}/");
-    let known_in_folder = known
-        .keys()
-        .filter(|k| {
-            k.strip_prefix(&dir_prefix)
-                .is_some_and(|rest| !rest.contains('/'))
-        })
-        .count();
+    let known_in_folder = known_per_folder.get(dir_str.as_str()).copied().unwrap_or(0);
     let unchanged = known_in_folder == files.len()
         && files
             .iter()
@@ -367,32 +364,55 @@ pub fn scan_folder(
     }))
 }
 
-/// Scans every folder under `root`. A folder that fails is recorded in `failures` and left out.
-/// `on_progress(processed, total)` after each folder; `cancelled()` is asked before each and
-/// stops the walk — the caller must then not treat the result as complete.
+/// How many known files sit directly in each folder, by the folder's path. Counted once per
+/// scan: asking all known files for every folder grew with folders × files.
+fn known_per_folder(known: &KnownFiles) -> HashMap<&str, usize> {
+    let mut counts = HashMap::new();
+    for path in known.keys() {
+        if let Some((folder, _)) = path.rsplit_once('/') {
+            *counts.entry(folder).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+/// Scans every folder under `root`, several at once (rayon, one thread per core): reading tags
+/// and ffprobe are per folder and independent. The result keeps the walk's order. A folder that
+/// fails is recorded in `failures` and left out. `on_progress(processed, total)` after each
+/// folder; `cancelled()` is asked before each and skips the rest — the caller must then not
+/// treat the result as complete.
 pub fn scan_tree(
     root: &Path,
     kind: ItemKind,
     known: &KnownFiles,
     failures: &mut Vec<ScanFailure>,
-    mut on_progress: impl FnMut(usize, usize),
-    cancelled: impl Fn() -> bool,
+    on_progress: impl Fn(usize, usize) + Sync,
+    cancelled: impl Fn() -> bool + Sync,
 ) -> Vec<ScannedItem> {
     let dirs = all_directories(root);
+    let known_per_folder = known_per_folder(known);
+    let processed = AtomicUsize::new(0);
+    let outcomes: Vec<Option<io::Result<Option<ScannedItem>>>> = dirs
+        .par_iter()
+        .map(|dir| {
+            if cancelled() {
+                return None;
+            }
+            let outcome = scan_folder(root, dir, kind, known, &known_per_folder);
+            on_progress(processed.fetch_add(1, Ordering::Relaxed) + 1, dirs.len());
+            Some(outcome)
+        })
+        .collect();
     let mut results = Vec::new();
-    for (i, dir) in dirs.iter().enumerate() {
-        if cancelled() {
-            break;
-        }
-        match scan_folder(root, dir, kind, known) {
-            Ok(Some(item)) => results.push(item),
-            Ok(None) => {}
-            Err(e) => failures.push(ScanFailure {
+    for (dir, outcome) in dirs.iter().zip(outcomes) {
+        match outcome {
+            None | Some(Ok(None)) => {}
+            Some(Ok(Some(item))) => results.push(item),
+            Some(Err(e)) => failures.push(ScanFailure {
                 path: dir.to_string_lossy().into_owned(),
                 message: reason(&e),
             }),
         }
-        on_progress(i + 1, dirs.len());
     }
     results
 }

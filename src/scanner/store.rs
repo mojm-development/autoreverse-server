@@ -4,6 +4,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use futures_util::{StreamExt, stream};
 use sqlx::{PgPool, Postgres, Transaction};
 
 use super::books::{KnownFiles, ScanFailure, ScannedItem};
@@ -275,9 +276,15 @@ async fn store_one(
     Ok(outcome)
 }
 
-/// Stores every scanned item. A failing one is rolled back, recorded in `failures` and counted
-/// as skipped; the rest carry on. `on_progress(processed, total, report)` after each item;
-/// `cancelled()` is asked before each and stops the loop.
+/// How many items are stored at once. Each holds a pool connection for its transaction; the
+/// pool has 10, and the web UI needs some while a scan runs.
+const STORE_CONCURRENCY: usize = 6;
+
+/// Stores every scanned item, [`STORE_CONCURRENCY`] transactions at a time. Items never share
+/// rows — one per `source_path`, tracks by their own path — so they cannot collide. A failing
+/// one is rolled back, recorded in `failures` and counted as skipped; the rest carry on.
+/// Results are taken in input order. `on_progress(processed, total, report)` after each item;
+/// `cancelled()` is asked before each starts and stops the loop.
 pub async fn store_items(
     db: &PgPool,
     scanned: &[ScannedItem],
@@ -286,18 +293,28 @@ pub async fn store_items(
     mut on_progress: impl FnMut(usize, usize, StoreReport),
     cancelled: impl Fn() -> bool,
 ) -> StoreReport {
+    let cancelled = &cancelled;
+    // Over indices, not `&ScannedItem`: a closure taking a reference makes the future too
+    // generic for `tokio::spawn(run_scan(…))` to prove it `Send`.
+    let mut results = stream::iter(0..scanned.len())
+        .map(|i| async move {
+            let entry = &scanned[i];
+            if cancelled() {
+                return None;
+            }
+            let result = async {
+                let mut tx = db.begin().await?;
+                let outcome = store_one(&mut tx, entry, covers_dir).await?;
+                tx.commit().await?;
+                Ok::<_, sqlx::Error>(outcome)
+            }
+            .await;
+            Some((entry, result))
+        })
+        .buffered(STORE_CONCURRENCY);
     let mut report = StoreReport::default();
-    for (i, entry) in scanned.iter().enumerate() {
-        if cancelled() {
-            break;
-        }
-        let result = async {
-            let mut tx = db.begin().await?;
-            let outcome = store_one(&mut tx, entry, covers_dir).await?;
-            tx.commit().await?;
-            Ok::<_, sqlx::Error>(outcome)
-        }
-        .await;
+    let mut processed = 0;
+    while let Some(Some((entry, result))) = results.next().await {
         match result {
             Ok(Outcome::New) => report.new += 1,
             Ok(Outcome::Updated) => report.updated += 1,
@@ -310,7 +327,8 @@ pub async fn store_items(
                 report.skipped += 1;
             }
         }
-        on_progress(i + 1, scanned.len(), report);
+        processed += 1;
+        on_progress(processed, scanned.len(), report);
     }
     report
 }
