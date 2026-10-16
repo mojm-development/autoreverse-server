@@ -366,3 +366,79 @@ async fn the_page_deletes_on_request_and_reports_it(db: PgPool) {
     .await;
     assert!(html.contains("Ist der Musik-Ordner schreibgeschützt eingebunden?"));
 }
+
+#[sqlx::test]
+async fn a_recording_stored_twice_shrinks_to_one_track_keeping_its_favorite(db: PgPool) {
+    let app = TestApp::new(db.clone());
+    let anna = app.user("anna", true).await;
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("Kelly Clarkson/All I Ever Wanted");
+    for file in ["01 Cry.mp3", "01 Cry (1).mp3"] {
+        make_audio(
+            &dir.join(file),
+            &[
+                ("title", "Cry"),
+                ("track", "1"),
+                ("album", "All I Ever Wanted"),
+            ],
+        );
+    }
+    make_audio(
+        &dir.join("02 Save You.mp3"),
+        &[
+            ("title", "Save You"),
+            ("track", "2"),
+            ("album", "All I Ever Wanted"),
+        ],
+    );
+    // What an earlier scan stored: every file a track.
+    let source = dir.to_str().unwrap();
+    let old = album(
+        source,
+        ["01 Cry (1).mp3", "01 Cry.mp3", "02 Save You.mp3"]
+            .iter()
+            .enumerate()
+            .map(|(i, f)| track(dir.join(f).to_str().unwrap(), i as i32 + 1, 1))
+            .collect(),
+    );
+    store(
+        &db,
+        &[ScannedItem {
+            title: "All I Ever Wanted".into(),
+            ..old
+        }],
+    )
+    .await;
+    let twin: i32 = sqlx::query_scalar("SELECT id FROM tracks WHERE path LIKE '%01 Cry.mp3'")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE tracks SET title = 'Cry' WHERE path LIKE '%Cry%'")
+        .execute(&db)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO favorites (user_id, track_id) VALUES ($1, $2)")
+        .bind(anna)
+        .bind(twin)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    let scanned = scan_music(root.path());
+    assert_eq!(scanned[0].tracks.len(), 2);
+    store(&db, &scanned).await;
+
+    let tracks: Vec<(i32, String)> =
+        sqlx::query_as("SELECT id, title FROM tracks ORDER BY position")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    let titles: Vec<&str> = tracks.iter().map(|(_, t)| t.as_str()).collect();
+    assert_eq!(titles, ["Cry", "Save You"]);
+    let favorite: i32 = sqlx::query_scalar("SELECT track_id FROM favorites WHERE user_id = $1")
+        .bind(anna)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(favorite, tracks[0].0);
+}

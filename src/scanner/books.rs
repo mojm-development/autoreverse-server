@@ -188,6 +188,46 @@ pub fn order_tracks(raw: &[RawTrack], file_order: &[String]) -> Vec<ScannedTrack
         .collect()
 }
 
+/// Whether two files are the same recording twice: the same title (case and spacing aside),
+/// within 1.5 s of each other, and the same track and disc number wherever both carry one. The
+/// numbers keep a disc's "Track 01" apart from the next disc's, and an album's songs apart from a
+/// bonus disc's remasters.
+fn same_recording(a: &RawTrack, b: &RawTrack) -> bool {
+    let title = |t: &RawTrack| {
+        t.tags
+            .title
+            .clone()
+            .unwrap_or_else(|| stem(&t.path))
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase()
+    };
+    let agree = |x: Option<u32>, y: Option<u32>| x.zip(y).is_none_or(|(x, y)| x == y);
+    title(a) == title(b)
+        && (a.tags.duration - b.tags.duration).abs() <= 1.5
+        && agree(a.tags.track, b.tags.track)
+        && agree(a.tags.disc, b.tags.disc)
+}
+
+/// One file per recording: of files that are the same recording ([`same_recording`]) — a song
+/// in two formats, or loose files beside a disc folder holding them again — only the largest
+/// stays, the first of equal ones. The others stay on disk but out of the item.
+fn without_duplicate_files(raw: Vec<RawTrack>) -> Vec<RawTrack> {
+    let beaten = |i: usize| {
+        raw.iter().enumerate().any(|(j, other)| {
+            j != i
+                && same_recording(&raw[i], other)
+                && (other.size > raw[i].size || (other.size == raw[i].size && j < i))
+        })
+    };
+    let keep: Vec<bool> = (0..raw.len()).map(|i| !beaten(i)).collect();
+    raw.into_iter()
+        .zip(keep)
+        .filter_map(|(t, keep)| keep.then_some(t))
+        .collect()
+}
+
 fn file_stats(path: &str) -> io::Result<(f64, i64)> {
     let metadata = std::fs::metadata(path)?;
     let mtime = metadata
@@ -329,6 +369,7 @@ fn scan_unit(
             }
         })
         .collect();
+    let raw = without_duplicate_files(raw);
     let tracks = order_tracks(&raw, &files);
     let first = &raw[0].tags;
     let title_from_tag = first.album.is_some();
@@ -543,6 +584,51 @@ mod tests {
 
     fn paths(tracks: &[ScannedTrack]) -> Vec<&str> {
         tracks.iter().map(|t| t.path.as_str()).collect()
+    }
+
+    fn file(path: &str, title: &str, duration: f64, size: i64) -> RawTrack {
+        RawTrack {
+            path: path.into(),
+            tags: TrackTags {
+                title: Some(title.into()),
+                track: Some(1),
+                duration,
+                readable: true,
+                ..TrackTags::UNREADABLE
+            },
+            mtime: 1.0,
+            size,
+        }
+    }
+
+    #[test]
+    fn keeps_the_largest_of_a_recording_in_two_files() {
+        let kept = without_duplicate_files(vec![
+            file("/m/01 Cry.mp3", "Cry", 240.0, 8_000),
+            file("/m/01 Cry.m4a", " cry ", 240.9, 9_000),
+            file("/m/02 Save You.mp3", "Save You", 200.0, 7_000),
+        ]);
+        let paths: Vec<&str> = kept.iter().map(|t| t.path.as_str()).collect();
+        assert_eq!(paths, ["/m/01 Cry.m4a", "/m/02 Save You.mp3"]);
+    }
+
+    #[test]
+    fn same_titles_differing_in_length_number_or_disc_all_stay() {
+        let mut other_disc = file("/m/CD2/01.mp3", "Track 01", 300.0, 1);
+        other_disc.tags.disc = Some(2);
+        let mut first_disc = file("/m/CD1/01.mp3", "Track 01", 300.0, 1);
+        first_disc.tags.disc = Some(1);
+        let mut other_number = file("/m/03.mp3", "Intro", 60.0, 1);
+        other_number.tags.track = Some(3);
+        let kept = without_duplicate_files(vec![
+            first_disc,
+            other_disc,
+            file("/m/01.mp3", "Intro", 60.0, 1),
+            other_number,
+            file("/m/live.mp3", "Cry", 240.0, 1),
+            file("/m/edit.mp3", "Cry", 200.0, 1),
+        ]);
+        assert_eq!(kept.len(), 6);
     }
 
     #[test]

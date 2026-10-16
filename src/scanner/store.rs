@@ -211,6 +211,31 @@ async fn store_one(
     };
 
     let current_paths: Vec<String> = entry.tracks.iter().map(|t| t.path.clone()).collect();
+    // A track about to go may be the twin of one that stays (a duplicate file the scanner now
+    // leaves out): its favorites and playlist entries move to the twin with the same title.
+    for statement in [
+        "UPDATE favorites SET track_id = twin.id
+         FROM tracks AS gone, tracks AS twin
+         WHERE favorites.track_id = gone.id
+           AND gone.item_id = $1 AND NOT (gone.path = ANY($2))
+           AND twin.item_id = $1 AND twin.path = ANY($2)
+           AND lower(btrim(twin.title)) = lower(btrim(gone.title))
+           AND NOT EXISTS (SELECT 1 FROM favorites AS taken
+                           WHERE taken.user_id = favorites.user_id
+                             AND taken.track_id = twin.id)",
+        "UPDATE playlist_entries SET track_id = twin.id
+         FROM tracks AS gone, tracks AS twin
+         WHERE playlist_entries.track_id = gone.id
+           AND gone.item_id = $1 AND NOT (gone.path = ANY($2))
+           AND twin.item_id = $1 AND twin.path = ANY($2)
+           AND lower(btrim(twin.title)) = lower(btrim(gone.title))",
+    ] {
+        sqlx::query(statement)
+            .bind(item_id)
+            .bind(&current_paths)
+            .execute(&mut **tx)
+            .await?;
+    }
     sqlx::query("DELETE FROM tracks WHERE item_id = $1 AND NOT (path = ANY($2))")
         .bind(item_id)
         .bind(&current_paths)
