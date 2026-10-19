@@ -171,7 +171,7 @@ async fn set_hash_in(
     }
     sqlx::query("DELETE FROM auth_tokens WHERE user_id = $1 AND value IS DISTINCT FROM $2")
         .bind(user_id)
-        .bind(keep)
+        .bind(keep.map(super::tokens::token_digest))
         .execute(&mut **tx)
         .await?;
     Ok(())

@@ -26,6 +26,8 @@ pub enum FeedError {
 }
 
 const FEED_TIMEOUT: Duration = Duration::from_secs(20);
+/// Far above any real feed (long-running shows with full show notes reach a few MB).
+const MAX_FEED_BYTES: usize = 64 * 1024 * 1024;
 const MAX_COVER_BYTES: usize = 5_000_000;
 
 /// A transport failure in a few German words, without the URL reqwest would add.
@@ -61,12 +63,15 @@ pub async fn fetch_feed_text(http: &reqwest::Client, feed_url: &str) -> Result<S
             response.status().as_u16()
         )));
     }
-    response.text().await.map_err(|e| {
-        FeedError::Fetch(format!(
-            "Feed nicht erreichbar: {}",
-            describe_transport_error(&e)
-        ))
-    })
+    super::text_capped(response, MAX_FEED_BYTES)
+        .await
+        .map_err(|e| {
+            FeedError::Fetch(format!(
+                "Feed nicht erreichbar: {}",
+                describe_transport_error(&e)
+            ))
+        })?
+        .ok_or_else(|| FeedError::Fetch("Feed ist zu groß".into()))
 }
 
 pub async fn preview_feed(http: &reqwest::Client, feed_url: &str) -> Result<ParsedFeed, FeedError> {

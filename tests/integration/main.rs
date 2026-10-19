@@ -23,6 +23,7 @@ mod queries;
 mod scan_api;
 mod scan_store;
 mod scanner_folders;
+mod security;
 mod server_info;
 mod startup;
 mod tokens;

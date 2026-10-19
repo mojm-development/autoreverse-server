@@ -956,7 +956,9 @@ async fn post_podcasts_answers_502_and_422_for_broken_feeds(db: PgPool) {
 }
 
 #[sqlx::test]
-async fn a_non_admin_may_subscribe(db: PgPool) {
+async fn a_non_admin_may_not_subscribe(db: PgPool) {
+    // Legacy let any user subscribe through the API while its web UI asked for an admin; both
+    // now ask for one (see tests/integration/security.rs).
     let web = FakeWeb::start().await;
     web.set("/feed.xml", 200, FEED);
     let data = tempfile::tempdir().unwrap();
@@ -971,7 +973,8 @@ async fn a_non_admin_may_subscribe(db: PgPool) {
             Some(&token),
         )
         .await;
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(web.hits("/feed.xml"), 0);
 }
 
 #[sqlx::test]

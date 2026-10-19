@@ -13,7 +13,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::validate::{ApiJson, ApiQuery, QueryMap, int_param};
-use crate::auth::ApiUser;
+use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
 use crate::podcasts::directory::{DEFAULT_COUNTRY, DEFAULT_LIMIT, search_directory};
 use crate::podcasts::download::{DownloadError, download_episode};
@@ -61,11 +61,13 @@ impl From<DownloadError> for ApiError {
     }
 }
 
-/// `feed_url` out of the body: a non-empty string, else 422.
+/// `feed_url` out of the body: an `http(s)` URL, else 422.
 fn feed_url(body: &Value) -> ApiResult<String> {
     body.get("feed_url")
         .and_then(Value::as_str)
-        .filter(|u| !u.is_empty())
+        .filter(|u| {
+            reqwest::Url::parse(u).is_ok_and(|url| matches!(url.scheme(), "http" | "https"))
+        })
         .map(str::to_owned)
         .ok_or_else(|| ApiError::unprocessable(FEED_URL_INVALID))
 }
@@ -102,7 +104,7 @@ struct PodcastOut {
 
 async fn create(
     State(state): State<AppState>,
-    _user: ApiUser,
+    _admin: ApiAdmin,
     ApiJson(body): ApiJson<Value>,
 ) -> ApiResult<Json<PodcastOut>> {
     let url = feed_url(&body)?;
@@ -126,7 +128,7 @@ struct UnsubscribeOut {
 
 async fn remove(
     State(state): State<AppState>,
-    _user: ApiUser,
+    _admin: ApiAdmin,
     Path(raw_id): Path<String>,
 ) -> ApiResult<Json<UnsubscribeOut>> {
     let id = path_id(&raw_id, UNKNOWN_PODCAST)?;
@@ -151,7 +153,7 @@ struct RefreshOut {
 
 async fn refresh_one(
     State(state): State<AppState>,
-    _user: ApiUser,
+    _admin: ApiAdmin,
     Path(raw_id): Path<String>,
 ) -> ApiResult<Json<RefreshOut>> {
     let id = path_id(&raw_id, UNKNOWN_PODCAST)?;
@@ -199,7 +201,7 @@ struct PreviewOut {
 /// The feed as it would be subscribed, without subscribing.
 async fn preview(
     State(state): State<AppState>,
-    _user: ApiUser,
+    _admin: ApiAdmin,
     ApiJson(body): ApiJson<Value>,
 ) -> ApiResult<Json<PreviewOut>> {
     let url = feed_url(&body)?;

@@ -112,7 +112,11 @@ per-process login throttle (both in `AppState`). At start `ensure_first_admin` c
 from `AUTOREVERSE_ADMIN_USER`/`_PASSWORD`, only while the `users` table is empty;
 `autoreverse-server set-password` is the rescue path. A form POST whose `Origin` is not the
 server's own (`ORIGIN`, else `http://<Host>`) is refused, as SvelteKit did — behind a TLS proxy
-`ORIGIN` must be set.
+`ORIGIN` must be set. Beyond legacy, any POST/PUT/PATCH/DELETE without a bearer token that the
+browser marks `Sec-Fetch-Site: cross-site|same-site` is refused too. `auth_tokens.value` holds the
+SHA-256 of a token, never the token; a token idle for `tokens::IDLE_DAYS` expires. Every response
+gets `nosniff`, `X-Frame-Options: DENY` and a CSP without inline scripts (`app::security_headers`)
+— page JS goes into `static/js/`, never into a `<script>` block or an `on…=` attribute.
 
 ### Scanning
 

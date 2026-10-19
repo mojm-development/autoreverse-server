@@ -34,6 +34,7 @@ pub fn app(state: AppState) -> Router {
         ))
         .layer(middleware::from_fn(trim_trailing_slash))
         .layer(CatchPanicLayer::custom(panic_response))
+        .layer(middleware::from_fn(security_headers))
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -80,8 +81,16 @@ async fn trim_trailing_slash(request: Request, next: Next) -> Response {
 
 /// SvelteKit's CSRF check, which legacy got for free: a form-encoded POST/PUT/PATCH/DELETE whose
 /// `Origin` is not this server's own is refused. The server's origin is `ORIGIN` if set, else
-/// `http://<Host>`. JSON requests are not affected — a browser cannot send them cross-site without
-/// a CORS preflight, which this server never grants.
+/// `http://<Host>`.
+///
+/// Beyond legacy, any other state-changing request that the browser marks as coming from another
+/// site (`Sec-Fetch-Site: cross-site` or `same-site`) is refused too, unless it carries a bearer
+/// token. Without that, a page elsewhere could send a body-less `fetch(…, {method: 'POST',
+/// credentials: 'include'})` — a "simple" request that needs no CORS preflight — and the session
+/// cookie would ride along from a sibling subdomain (`SameSite=Lax` treats it as same-site). The
+/// native clients send a bearer token and no `Sec-Fetch-Site`, so they are not affected; going by
+/// that header rather than `Origin` keeps a proxy without `ORIGIN` working for the web UI's own
+/// `fetch()` calls.
 async fn reject_cross_site_forms(
     State(state): State<AppState>,
     request: Request,
@@ -91,9 +100,11 @@ async fn reject_cross_site_forms(
         *request.method(),
         Method::POST | Method::PUT | Method::PATCH | Method::DELETE
     );
-    if unsafe_method && is_form(request.headers()) {
+    if unsafe_method {
         let headers = request.headers();
-        if let Some(origin) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) {
+        if is_form(headers)
+            && let Some(origin) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok())
+        {
             let expected = state.config.origin.clone().or_else(|| {
                 let host = headers.get(header::HOST).and_then(|v| v.to_str().ok())?;
                 Some(format!("http://{host}"))
@@ -106,8 +117,58 @@ async fn reject_cross_site_forms(
                     .into_response();
             }
         }
+        if from_another_site(headers) && !has_bearer(headers) {
+            return detail_response(
+                StatusCode::FORBIDDEN,
+                "Anfragen von fremden Seiten sind nicht erlaubt",
+            );
+        }
     }
     next.run(request).await
+}
+
+fn from_another_site(headers: &HeaderMap) -> bool {
+    headers
+        .get("sec-fetch-site")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|site| {
+            site.eq_ignore_ascii_case("cross-site") || site.eq_ignore_ascii_case("same-site")
+        })
+}
+
+fn has_bearer(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(' ').next())
+        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("bearer"))
+}
+
+/// Everything the web UI loads comes from this server, except artwork from the podcast directory
+/// and feeds (`https:` images). Inline `style` attributes carry cover URLs and layout variables,
+/// so styles stay `'unsafe-inline'`; scripts do not — the UI has no inline script or handler.
+const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self'; \
+    style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; \
+    connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; \
+    frame-ancestors 'none'";
+
+/// Browser hardening on every response: no framing (clickjacking on the settings pages), no
+/// content sniffing (a stored cover or episode served as something else), no full URLs in the
+/// `Referer` to podcast hosts, and the CSP above. Headers a handler already set are kept.
+async fn security_headers(request: Request, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    for (name, value) in [
+        (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        (header::X_FRAME_OPTIONS, "DENY"),
+        (header::REFERRER_POLICY, "same-origin"),
+        (header::CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY),
+    ] {
+        if !headers.contains_key(&name) {
+            headers.insert(name, header::HeaderValue::from_static(value));
+        }
+    }
+    response
 }
 
 fn is_form(headers: &HeaderMap) -> bool {
