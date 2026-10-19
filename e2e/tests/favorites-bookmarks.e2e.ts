@@ -19,8 +19,13 @@ test('the album heart toggles and the album shows up under Favoriten', async ({ 
 
 	// A reload shows the stored state, and taking it back empties the list again.
 	await page.goto(`/library/albums/${albumId}`);
+	// The heart flips before the server answers; leaving the page earlier would cancel the DELETE.
+	const removed = page.waitForResponse(
+		(res) => res.url().includes('/favorites/items/') && res.request().method() === 'DELETE'
+	);
 	await page.getByRole('button', { name: 'Aus Favoriten entfernen' }).click();
 	await expect(page.getByRole('button', { name: 'Zu Favoriten hinzufügen' })).toBeVisible();
+	expect((await removed).ok()).toBe(true);
 	await page.goto('/library/favorites');
 	await expect(page.getByText('E2E-Fixture-Album-Favorite')).toHaveCount(0);
 });
