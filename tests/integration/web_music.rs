@@ -315,3 +315,36 @@ async fn the_artist_page_is_for_admins_and_marks_the_current_choice(db: PgPool) 
     let (_, html) = page(&app, "/library/artists/Niemand", &admin).await;
     assert!(html.contains("Für diesen Interpreten ist kein Album in der Bibliothek."));
 }
+
+#[sqlx::test]
+async fn the_album_page_names_each_tracks_artist_and_links_the_genre(db: PgPool) {
+    let app = TestApp::new(db);
+    let user = cookie(&app, "oliver", false).await;
+    let id = seed(app.db(), album("Bravo Hits", "Verschiedene Interpreten")).await;
+    let own = seed_track(app.db(), id, 1, "/m/1.mp3", 200.0).await;
+    seed_track(app.db(), id, 2, "/m/2.mp3", 200.0).await;
+    sqlx::query("UPDATE tracks SET artist = 'Nena' WHERE id = $1")
+        .bind(own)
+        .execute(app.db())
+        .await
+        .unwrap();
+    sqlx::query("UPDATE items SET genre = 'Pop & Rock' WHERE id = $1")
+        .bind(id)
+        .execute(app.db())
+        .await
+        .unwrap();
+    let (_, html) = page(&app, &format!("/library/albums/{id}"), &user).await;
+    assert!(html.contains(r#"<span class="cell">Nena</span>"#));
+    // A track without its own artist falls back to the album's.
+    assert!(html.contains(r#"<span class="cell">Verschiedene Interpreten</span>"#));
+    assert!(
+        html.contains(r#"<a href="/library/albums?genre=Pop%20%26%20Rock">Pop &#38; Rock</a>"#)
+    );
+
+    let (status, html) = page(&app, "/library/albums?genre=pop%20%26%20rock", &user).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Bravo Hits"));
+    assert!(html.contains("Genre: pop &#38; rock"));
+    let (_, html) = page(&app, "/library/albums?genre=Jazz", &user).await;
+    assert!(!html.contains("Bravo Hits"));
+}

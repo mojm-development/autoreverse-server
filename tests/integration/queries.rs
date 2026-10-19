@@ -120,7 +120,7 @@ async fn missing_filters_on_missing_since(db: PgPool) {
     };
     assert_eq!(titles(&db, &missing(true)).await, ["Weg"]);
     assert_eq!(titles(&db, &missing(false)).await, ["Da"]);
-    assert_eq!(count_items(&db, "album", None).await.unwrap(), 1);
+    assert_eq!(count_items(&db, "album", None, None).await.unwrap(), 1);
     assert_eq!(library_counts(&db).await.unwrap().album_count, 1);
     assert_eq!(count_missing(&db, Some("album")).await.unwrap(), 1);
     assert_eq!(count_missing(&db, Some("book")).await.unwrap(), 0);
@@ -138,7 +138,7 @@ async fn delete_missing_removes_only_missing_rows(db: PgPool) {
     .await;
     seed(&db, Seed::new("album", "Da")).await;
     assert_eq!(delete_missing(&db).await.unwrap(), 1);
-    assert_eq!(count_items(&db, "album", None).await.unwrap(), 1);
+    assert_eq!(count_items(&db, "album", None, None).await.unwrap(), 1);
 }
 
 #[sqlx::test]

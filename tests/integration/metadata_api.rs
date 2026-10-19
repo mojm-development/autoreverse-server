@@ -53,11 +53,15 @@ fn scanned(title: &str, author: &str, mtime: f64) -> ScannedItem {
         description: None,
         series: None,
         year: None,
+        genre: None,
+        title_sort: None,
+        artist_sort: None,
         series_index: None,
         tracks: vec![ScannedTrack {
             path: "/library/books/Autor/Buch/01.mp3".into(),
             position: 1,
             title: Some("Track aus der Datei".into()),
+            artist: None,
             disc: None,
             duration: 10.0,
             mtime,
@@ -949,4 +953,62 @@ async fn delete_missing_removes_the_missing_and_waits_for_a_running_scan(db: PgP
         body_json(response).await["detail"],
         "Es läuft gerade ein Scan"
     );
+}
+
+fn three_track_album(mtime: f64) -> ScannedItem {
+    let track = |n: i32| ScannedTrack {
+        path: format!("/library/music/Band/Album/0{n}.mp3"),
+        position: n,
+        title: Some(format!("Song {n}")),
+        artist: None,
+        disc: Some(1),
+        duration: 10.0,
+        mtime,
+        size: mtime as i64,
+    };
+    ScannedItem {
+        source_path: "/library/music/Band/Album".into(),
+        kind: ItemKind::Album,
+        author: None,
+        artist: Some("Band".into()),
+        tracks: vec![track(1), track(2), track(3)],
+        chapters: Vec::new(),
+        ..scanned("Album", "x", mtime)
+    }
+}
+
+async fn order(db: &PgPool) -> Vec<(String, i32)> {
+    sqlx::query_as("SELECT title, position FROM tracks ORDER BY position")
+        .fetch_all(db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test]
+async fn a_disc_set_by_hand_moves_the_track_there_also_after_the_next_scan(db: PgPool) {
+    let app = TestApp::new(db);
+    let (_, token) = admin(&app).await;
+    store(app.db(), three_track_album(100.0)).await;
+    let first: i32 = sqlx::query_scalar("SELECT id FROM tracks WHERE position = 1")
+        .fetch_one(app.db())
+        .await
+        .unwrap();
+    let response = app
+        .call(
+            Method::PATCH,
+            &format!("/tracks/{first}"),
+            Some(json!({ "set": { "disc": 2 } })),
+            Some(&token),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let expected = [
+        ("Song 2".to_owned(), 1),
+        ("Song 3".to_owned(), 2),
+        ("Song 1".to_owned(), 3),
+    ];
+    assert_eq!(order(app.db()).await, expected);
+
+    store(app.db(), three_track_album(999.0)).await;
+    assert_eq!(order(app.db()).await, expected);
 }

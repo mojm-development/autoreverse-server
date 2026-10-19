@@ -145,7 +145,10 @@ async fn store_one(
         return Ok(Outcome::Unchanged);
     }
 
-    let sort_title = entry.title.to_lowercase();
+    let sort_title = match &entry.title_sort {
+        Some(tagged) => tagged.to_lowercase(),
+        None => crate::library::sorting::sort_key(&entry.title),
+    };
     let (item_id, outcome, current_cover) = match existing {
         Some(existing) => {
             // Every scanned field, each kept as stored when locked.
@@ -160,7 +163,9 @@ async fn store_one(
                      description = CASE WHEN $12 THEN $13 ELSE description END,
                      series = CASE WHEN $14 THEN $15 ELSE series END,
                      series_index = CASE WHEN $16 THEN $17 ELSE series_index END,
-                     year = CASE WHEN $18 THEN $19 ELSE year END
+                     year = CASE WHEN $18 THEN $19 ELSE year END,
+                     genre = CASE WHEN $20 THEN $21 ELSE genre END,
+                     artist_sort = CASE WHEN $8 THEN $22 ELSE artist_sort END
                  WHERE id = $1",
             )
             .bind(existing.id)
@@ -182,6 +187,9 @@ async fn store_one(
             .bind(entry.series_index)
             .bind(unless_locked(locked, "year"))
             .bind(entry.year)
+            .bind(unless_locked(locked, "genre"))
+            .bind(&entry.genre)
+            .bind(&entry.artist_sort)
             .execute(&mut **tx)
             .await?;
             (existing.id, Outcome::Updated, existing.cover_path)
@@ -189,8 +197,8 @@ async fn store_one(
         None => {
             let id: i32 = sqlx::query_scalar(
                 "INSERT INTO items (kind, source_path, title, sort_title, author, artist,
-                     album_artist, description, series, series_index, year)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                     album_artist, description, series, series_index, year, genre, artist_sort)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                  RETURNING id",
             )
             .bind(entry.kind.as_str())
@@ -204,6 +212,8 @@ async fn store_one(
             .bind(&entry.series)
             .bind(entry.series_index)
             .bind(entry.year)
+            .bind(&entry.genre)
+            .bind(&entry.artist_sort)
             .fetch_one(&mut **tx)
             .await?;
             (id, Outcome::New, None)
@@ -251,10 +261,12 @@ async fn store_one(
     // them in PATCH /tracks but rewrote them here anyway).
     for t in &entry.tracks {
         sqlx::query(
-            "INSERT INTO tracks (item_id, position, path, duration, title, disc, mtime, size)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "INSERT INTO tracks (item_id, position, path, duration, title, disc, mtime, size,
+                 artist)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (path) DO UPDATE SET item_id = excluded.item_id,
                  position = excluded.position, duration = excluded.duration,
+                 artist = excluded.artist,
                  title = CASE WHEN 'title' = ANY(tracks.locked_fields)
                      THEN tracks.title ELSE excluded.title END,
                  disc = CASE WHEN 'disc' = ANY(tracks.locked_fields)
@@ -269,8 +281,20 @@ async fn store_one(
         .bind(t.disc)
         .bind(t.mtime)
         .bind(t.size)
+        .bind(&t.artist)
         .execute(&mut **tx)
         .await?;
+    }
+
+    // A disc locked by hand keeps its value above, but the positions came from the tags.
+    let hand_set_disc: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM tracks WHERE item_id = $1 AND 'disc' = ANY(locked_fields))",
+    )
+    .bind(item_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if hand_set_disc {
+        crate::library::metadata::order_by_disc(tx, item_id).await?;
     }
 
     absorb_emptied_subfolders(tx, item_id, entry).await?;

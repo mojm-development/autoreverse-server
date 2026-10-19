@@ -266,3 +266,61 @@ fn reads_the_chapter_marks_of_a_single_file_book() {
     assert_eq!(item.chapters.len(), 2);
     assert_eq!(item.chapters[0].title, "Prolog");
 }
+
+#[test]
+fn a_sampler_keeps_each_tracks_artist_and_goes_under_various_artists() {
+    let root = tempfile::tempdir().unwrap();
+    let album = root.path().join("Bravo Hits 1");
+    for (file, artist, title, genre) in [
+        ("01.mp3", "Nena", "Leuchtturm", "Pop"),
+        ("02.mp3", "Falco", "Rock Me", "Pop"),
+        ("03.mp3", "Kraftwerk", "Computerliebe", "Electronic"),
+    ] {
+        make_audio(
+            &album.join(file),
+            &[
+                ("title", title),
+                ("artist", artist),
+                ("album", "Bravo Hits 1"),
+                ("genre", genre),
+                ("track", &file[1..2]),
+            ],
+        );
+    }
+    let scanned = scan_tree(
+        root.path(),
+        ItemKind::Album,
+        &KnownFiles::new(),
+        &mut Vec::new(),
+        |_, _| {},
+        || false,
+    );
+    let item = &scanned[0];
+    assert_eq!(item.artist.as_deref(), Some("Verschiedene Interpreten"));
+    assert_eq!(item.genre.as_deref(), Some("Pop"));
+    let artists: Vec<_> = item
+        .tracks
+        .iter()
+        .map(|t| t.artist.as_deref().unwrap())
+        .collect();
+    assert_eq!(artists, ["Nena", "Falco", "Kraftwerk"]);
+}
+
+#[test]
+fn reads_the_sort_tags_of_album_and_artist() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("Beatles/Abbey Road/01.mp3");
+    make_audio(
+        &file,
+        &[
+            ("title", "Come Together"),
+            ("artist", "The Beatles"),
+            ("album", "Abbey Road"),
+            ("album-sort", "Road, Abbey"),
+            ("artist-sort", "Beatles, The"),
+        ],
+    );
+    let tags = read_tags(&file);
+    assert_eq!(tags.album_sort.as_deref(), Some("Road, Abbey"));
+    assert_eq!(tags.artist_sort.as_deref(), Some("Beatles, The"));
+}

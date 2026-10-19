@@ -117,12 +117,13 @@ impl From<&Item> for ItemSummary {
     }
 }
 
-/// A single item: the summary plus its description.
+/// A single item: the summary plus its description and genre (`genre` is new in Rust).
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ItemDetail {
     #[serde(flatten)]
     pub summary: ItemSummary,
     pub description: Option<String>,
+    pub genre: Option<String>,
 }
 
 impl From<&Item> for ItemDetail {
@@ -130,6 +131,7 @@ impl From<&Item> for ItemDetail {
         ItemDetail {
             summary: row.into(),
             description: row.description.clone(),
+            genre: row.genre.clone(),
         }
     }
 }
@@ -141,6 +143,10 @@ pub struct TrackOut {
     pub title: Option<String>,
     #[serde(serialize_with = "js_number")]
     pub duration: f64,
+    /// New in Rust, so a client can head discs and name a sampler's artists without asking
+    /// `/tracks/{id}` for every track.
+    pub artist: Option<String>,
+    pub disc: Option<i32>,
 }
 
 impl From<&Track> for TrackOut {
@@ -150,18 +156,18 @@ impl From<&Track> for TrackOut {
             position: row.position,
             title: row.title.clone(),
             duration: row.duration,
+            artist: row.artist.clone(),
+            disc: row.disc,
         }
     }
 }
 
-/// A single track (`GET /tracks/{id}`): the list shape plus what a client needs to place it —
-/// its item and disc.
+/// A single track (`GET /tracks/{id}`): the list shape (which carries the disc) plus its item.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TrackDetail {
     #[serde(flatten)]
     pub track: TrackOut,
     pub item_id: i32,
-    pub disc: Option<i32>,
 }
 
 impl From<&Track> for TrackDetail {
@@ -169,7 +175,6 @@ impl From<&Track> for TrackDetail {
         TrackDetail {
             track: row.into(),
             item_id: row.item_id,
-            disc: row.disc,
         }
     }
 }
@@ -199,6 +204,8 @@ impl From<&Chapter> for ChapterOut {
 pub struct TrackSummary {
     pub id: i32,
     pub title: Option<String>,
+    /// The track's own artist (new in Rust).
+    pub artist: Option<String>,
     #[serde(serialize_with = "js_number")]
     pub duration: f64,
     pub item_id: i32,
@@ -211,6 +218,7 @@ impl TrackSummary {
         TrackSummary {
             id: track.id,
             title: track.title.clone(),
+            artist: track.artist.clone(),
             duration: track.duration,
             item_id: item.id,
             item_title: item.title.clone(),
@@ -224,6 +232,7 @@ impl From<&TrackHit> for TrackSummary {
         TrackSummary {
             id: hit.id,
             title: hit.title.clone(),
+            artist: hit.artist.clone(),
             duration: hit.duration,
             item_id: hit.item_id,
             item_title: hit.item_title.clone(),

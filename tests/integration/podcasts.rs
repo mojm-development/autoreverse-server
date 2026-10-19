@@ -47,6 +47,15 @@ async fn episodes_of(db: &PgPool, podcast: i32) -> Vec<(i32, String, Option<Stri
 }
 
 async fn episode(db: &PgPool, podcast: i32, title: &str, guid: &str, media: Option<&str>) -> i32 {
+    // The fake web server listens on 127.0.0.1. A feed on the internet may not name files there
+    // (podcasts::net), so a seeded podcast without a feed counts as one on this machine.
+    sqlx::query(
+        "UPDATE items SET feed_url = coalesce(feed_url, 'http://127.0.0.1/feed') WHERE id = $1",
+    )
+    .bind(podcast)
+    .execute(db)
+    .await
+    .unwrap();
     sqlx::query_scalar(
         "INSERT INTO items (kind, parent_id, title, sort_title, guid, feed_url)
          VALUES ('episode', $1, $2, lower($2), $3, $4) RETURNING id",
@@ -655,7 +664,7 @@ fn temp_file(dir: &tempfile::TempDir, name: &str) -> std::path::PathBuf {
 #[sqlx::test]
 async fn retention_deletes_downloads_past_the_newest_n(db: PgPool) {
     let files = tempfile::tempdir().unwrap();
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     let old = temp_file(&files, "old.mp3");
     let new = temp_file(&files, "new.mp3");
     dated_episode(&db, podcast, 1, Some(&old)).await;
@@ -673,7 +682,7 @@ async fn retention_deletes_downloads_past_the_newest_n(db: PgPool) {
 #[sqlx::test]
 async fn retention_keeps_everything_when_the_number_is_high_enough(db: PgPool) {
     let files = tempfile::tempdir().unwrap();
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     dated_episode(&db, podcast, 1, Some(&temp_file(&files, "a.mp3"))).await;
     dated_episode(&db, podcast, 2, Some(&temp_file(&files, "b.mp3"))).await;
     let result = apply_retention(&db, &http_client(), podcast, 10, Path::new("/tmp"))
@@ -686,7 +695,7 @@ async fn retention_keeps_everything_when_the_number_is_high_enough(db: PgPool) {
 #[sqlx::test]
 async fn retention_zero_keeps_nothing_downloaded(db: PgPool) {
     let files = tempfile::tempdir().unwrap();
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     dated_episode(&db, podcast, 1, Some(&temp_file(&files, "a.mp3"))).await;
     let result = apply_retention(&db, &http_client(), podcast, 0, Path::new("/tmp"))
         .await
@@ -697,7 +706,7 @@ async fn retention_zero_keeps_nothing_downloaded(db: PgPool) {
 
 #[sqlx::test]
 async fn retention_counts_a_failed_download_instead_of_aborting(db: PgPool) {
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     dated_episode(&db, podcast, 1, None).await;
     dated_episode(&db, podcast, 2, None).await;
     let result = apply_retention(&db, &http_client(), podcast, 2, Path::new("/tmp"))
@@ -711,7 +720,7 @@ async fn retention_downloads_the_newest_missing_episodes(db: PgPool) {
     let web = FakeWeb::start().await;
     web.set("/2.mp3", 200, vec![1u8, 2, 3]);
     let dir = tempfile::tempdir().unwrap();
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     dated_episode(&db, podcast, 1, None).await;
     let newest = dated_episode(&db, podcast, 2, None).await;
     sqlx::query("UPDATE items SET feed_url = $2 WHERE id = $1")
@@ -736,7 +745,7 @@ async fn retention_downloads_the_newest_missing_episodes(db: PgPool) {
 
 #[sqlx::test]
 async fn the_default_applies_unless_a_podcast_overrides_it(db: PgPool) {
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     assert_eq!(get_keep_default(&db).await.unwrap(), 0);
     set_keep_default(&db, 5.0).await.unwrap();
     assert_eq!(get_keep_default(&db).await.unwrap(), 5);
@@ -775,7 +784,7 @@ async fn an_out_of_range_default_is_clamped(db: PgPool) {
 #[sqlx::test]
 async fn retain_for_podcast_uses_the_override_and_ignores_other_kinds(db: PgPool) {
     let files = tempfile::tempdir().unwrap();
-    let podcast = show(&db, "Show", "https://x/feed").await;
+    let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
     set_keep_default(&db, 10.0).await.unwrap();
     set_keep_for_podcast(&db, podcast, Some(1.0)).await.unwrap();
     dated_episode(&db, podcast, 1, Some(&temp_file(&files, "a.mp3"))).await;
@@ -956,7 +965,9 @@ async fn post_podcasts_answers_502_and_422_for_broken_feeds(db: PgPool) {
 }
 
 #[sqlx::test]
-async fn a_non_admin_may_subscribe(db: PgPool) {
+async fn a_non_admin_may_not_subscribe(db: PgPool) {
+    // Legacy let any user subscribe through the API while its web UI asked for an admin; both
+    // now ask for one (see tests/integration/security.rs).
     let web = FakeWeb::start().await;
     web.set("/feed.xml", 200, FEED);
     let data = tempfile::tempdir().unwrap();
@@ -971,7 +982,8 @@ async fn a_non_admin_may_subscribe(db: PgPool) {
             Some(&token),
         )
         .await;
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    assert_eq!(web.hits("/feed.xml"), 0);
 }
 
 #[sqlx::test]
@@ -1334,4 +1346,19 @@ async fn search_validates_its_parameters_and_reports_a_broken_directory(db: PgPo
         body_json(response).await["detail"],
         "Unerwartete Antwort des Podcast-Verzeichnisses"
     );
+}
+
+#[sqlx::test]
+async fn a_feed_on_the_internet_may_not_name_a_file_in_the_local_network(db: PgPool) {
+    let web = FakeWeb::start().await;
+    web.set("/ep.mp3", 200, vec![0u8, 1, 2, 3]);
+    let dir = tempfile::tempdir().unwrap();
+    let podcast = show(&db, "Fremd", "https://93.184.216.34/feed.xml").await;
+    let id = episode(&db, podcast, "E", "g-fence", Some(&web.url("/ep.mp3"))).await;
+    let result = download_episode(&db, &http_client(), id, dir.path()).await;
+    assert!(
+        matches!(&result, Err(DownloadError::Fetch(m)) if m.contains("lokalen Netz")),
+        "{result:?}"
+    );
+    assert_eq!(web.hits("/ep.mp3"), 0);
 }

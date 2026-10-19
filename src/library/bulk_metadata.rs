@@ -130,6 +130,11 @@ async fn resolve_targets(db: &PgPool, request: &Map<String, Value>) -> ApiResult
             query.push_bind(value.to_owned());
         }
     }
+    if let Some(genre) = text("genre") {
+        query.push(" AND lower(genre) = lower(");
+        query.push_bind(genre.to_owned());
+        query.push(")");
+    }
     if let Some(q) = text("q") {
         let pattern = like_pattern(q);
         query.push(" AND (title ILIKE ");

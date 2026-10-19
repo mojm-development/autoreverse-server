@@ -64,8 +64,14 @@ von denen du Backups hast.
 **Benutzer**
 
 - Passwort-Hashing mit Argon2id
-- Bearer-Token für API-Clients, Session-Cookies für die Weboberfläche, ein gemeinsamer Resolver
-- Drosselung bei Fehlanmeldungen (`429` mit `Retry-After`)
+- Bearer-Token für API-Clients, Session-Cookies für die Weboberfläche, ein gemeinsamer Resolver;
+  in der Datenbank liegt nur ein SHA-256 der Tokens, nach 180 Tagen ohne Nutzung verfallen sie
+- Schutz gegen Anfragen fremder Seiten (`Origin`, `Sec-Fetch-Site`), Clickjacking-Schutz und eine
+  Content-Security-Policy ohne Inline-Skripte
+- Drosselung bei Fehlanmeldungen (`429` mit `Retry-After`), pro Name und pro öffentlicher
+  Client-Adresse
+- Dateien, Artwork und Kapitel, die ein Feed aus dem Internet nennt, lädt der Server nie aus dem
+  lokalen Netz
 - Trennung Verwalter/Benutzer: Benutzeranlage und Bibliothekskonfiguration nur für Verwalter
 - Wiedergabeeinstellungen pro Benutzer
 
@@ -206,6 +212,11 @@ auftritt. Ein `ORIGIN` mit `https://` setzt außerdem das `Secure`-Flag am Sitzu
 `X-Forwarded-*`-Header wertet der Server nicht aus; `ORIGIN` ist der einzige Weg, ihm seine
 öffentliche URL mitzuteilen.
 
+Unabhängig von `ORIGIN` lehnt der Server jede ändernde Anfrage ohne Bearer-Token ab, die der Browser
+als von einer fremden Seite stammend kennzeichnet (`Sec-Fetch-Site`). Jede Antwort trägt
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` und eine
+Content-Security-Policy; der Proxy muss sie nicht ergänzen. HSTS ist Sache des Proxys.
+
 ### Heruntergeladene Podcast-Episoden von außen erreichen
 
 Über die Oberfläche heruntergeladene Episoden landen in `$AUTOREVERSE_DATA/podcasts` und damit
@@ -314,7 +325,7 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `GET`                  | `/me/stats`                                       | Hörzeit je Tag — `?days=` (Vorgabe 30)                                      |
 | `POST`                 | `/me/password`                                    | Eigenes Passwort ändern                                                     |
 | `GET` `PUT`            | `/me/playback`                                    | Wiedergabeeinstellungen                                                     |
-| `GET`                  | `/items`                                          | Titel auflisten — `?kind=book\|album\|podcast\|episode`, `?q=`, `?missing=` |
+| `GET`                  | `/items`                                          | Titel auflisten — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=` |
 | `GET` `PATCH`          | `/items/{id}`                                     | Einzelner Titel; Metadaten bearbeiten (Verwalter)                           |
 | `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Metadaten in Masse bearbeiten und zurücknehmen (Verwalter)                  |
 | `POST`                 | `/items/series`                                   | Reihen und Bandnummern erkennen oder zuweisen, vorab als Probelauf (Verwalter) |
@@ -322,10 +333,11 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `GET`                  | `/items/{id}/cover`                               | Coverbild                                                                   |
 | `DELETE`               | `/items/missing`                                  | Fehlende Titel entfernen (Verwalter)                                        |
 | `GET`                  | `/artists`                                        | Interpreten                                                                 |
+| `GET`                  | `/genres`                                         | Genres der Alben mit Albenzahl                                              |
 | `GET`                  | `/library/more`                                   | Nächste Seite des Bibliotheksrasters (für die Weboberfläche)                |
 | `GET` `POST`           | `/artists/{name}/image`                           | Eigenes Interpretenbild; Upload nur für Verwalter, multipart `image`        |
 | `PUT` `DELETE`         | `/artists/{name}/cover`                           | Album als Interpretenbild wählen oder auf Zufall zurücksetzen (Verwalter)   |
-| `GET`                  | `/search`                                         | Suche über die ganze Bibliothek                                             |
+| `GET`                  | `/search`                                         | Suche über die ganze Bibliothek, auch Titel nach Interpret und Interpreten  |
 | `GET` `PATCH`          | `/tracks/{id}`                                    | Einzelner Track; Metadaten bearbeiten (Verwalter)                           |
 | `GET` `HEAD`           | `/tracks/{id}/stream`                             | Audiostream mit Range-Unterstützung                                         |
 | `POST`                 | `/play/{itemId}`                                  | Wiedergabesitzung öffnen                                                    |
@@ -338,9 +350,9 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `GET` `PATCH` `DELETE` | `/playlists/{id}`                                 | Lesen / umbenennen / löschen                                                |
 | `POST` `PUT` `DELETE`  | `/playlists/{id}/entries[/{entryId}]`             | Einträge einer Wiedergabeliste                                              |
 | `GET`                  | `/podcasts/search`                                | Verzeichnissuche nach Namen                                                 |
-| `POST`                 | `/podcasts/preview`                               | Feed ansehen, ohne zu abonnieren                                            |
-| `POST`                 | `/podcasts`                                       | Feed abonnieren                                                             |
-| `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Aktualisieren / Abo beenden                                                 |
+| `POST`                 | `/podcasts/preview`                               | Feed ansehen, ohne zu abonnieren (Verwalter)                                |
+| `POST`                 | `/podcasts`                                       | Feed abonnieren (Verwalter)                                                 |
+| `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Aktualisieren / Abo beenden (Verwalter)                                     |
 | `POST`                 | `/episodes/{id}/download`                         | Episode auf den Server laden                                                |
 | `POST` `GET`           | `/scan`, `/scan/status`, `/scan/cancel`           | Scan steuern (Verwalter)                                                    |
 | `GET` `POST`           | `/users`                                          | Benutzer auflisten / anlegen (Verwalter)                                    |

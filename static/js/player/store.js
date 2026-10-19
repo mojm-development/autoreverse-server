@@ -98,13 +98,28 @@ export function createPlayerStore(options = {}) {
 		heartbeat.unref?.();
 	}
 
+	/**
+	 * The position as the server counts it: along the item's own track order. A shuffled play
+	 * walks a reordered list, so its `position` would point somewhere else in the album.
+	 */
+	function savedPosition(state) {
+		const track = state.tracks[state.trackIndex];
+		if (track?.albumStart === undefined) return state.position;
+		return track.albumStart + (state.position - trackStart(state.tracks, state.trackIndex));
+	}
+
+	/** Music plays at its own speed; the speed setting is for spoken word. */
+	function speedFor(kind) {
+		return kind === 'album' ? 1 : preferences.playbackSpeed;
+	}
+
 	async function flushProgress(finished) {
 		if (!current) return;
 		try {
 			await request(`/progress/${current.itemId}`, {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ position: current.position, finished })
+				body: JSON.stringify({ position: savedPosition(current), finished })
 			});
 		} catch {
 			// Offline for a moment: the next heartbeat tries again.
@@ -276,7 +291,12 @@ export function createPlayerStore(options = {}) {
 		const body = await res.json();
 		const tracks = body.tracks;
 		if (!tracks?.length) return false;
-		if (shuffle) shuffleInPlace(tracks, random);
+		if (shuffle) {
+			tracks.forEach((track, index) => {
+				track.albumStart = trackStart(tracks, index);
+			});
+			shuffleInPlace(tracks, random);
+		}
 
 		let trackIndex;
 		let offset;
@@ -303,7 +323,7 @@ export function createPlayerStore(options = {}) {
 			trackIndex,
 			position,
 			playing: true,
-			speed: preferences.playbackSpeed
+			speed: speedFor(body.kind ?? 'album')
 		};
 		startHeartbeat();
 		loadTrack(trackIndex, offset);
@@ -391,18 +411,22 @@ export function createPlayerStore(options = {}) {
 		if (current) seek(current.position + seconds);
 	}
 
+	function applySpeed() {
+		if (!current) return;
+		current.speed = speedFor(current.kind);
+		if (audioEl) audioEl.playbackRate = current.speed;
+	}
+
 	function setSpeed(value) {
 		const clamped = Math.min(4, Math.max(0.5, value));
 		preferences = { ...preferences, playbackSpeed: clamped };
-		if (current) current.speed = clamped;
-		if (audioEl) audioEl.playbackRate = clamped;
+		applySpeed();
 		notify();
 	}
 
 	function applyPreferences(next) {
 		preferences = { ...preferences, ...next };
-		if (current) current.speed = preferences.playbackSpeed;
-		if (audioEl) audioEl.playbackRate = preferences.playbackSpeed;
+		applySpeed();
 		notify();
 	}
 

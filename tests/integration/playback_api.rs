@@ -229,7 +229,8 @@ async fn play_opens_a_session_and_returns_tracks_and_chapters(db: PgPool) {
             "kind": "book",
             "has_cover": false,
             "start_position": 0,
-            "tracks": [{"id": track, "position": 1, "title": null, "duration": 120}],
+            "tracks": [{"id": track, "position": 1, "title": null, "duration": 120,
+                "artist": null, "disc": null}],
             "chapters": [{"title": "Eins", "start": 0, "end": 60.5}]
         })
         .to_string()
@@ -257,6 +258,20 @@ async fn play_starts_at_the_saved_position(db: PgPool) {
     )
     .await;
     assert_eq!(body["start_position"], 42.5);
+}
+
+#[sqlx::test]
+async fn a_finished_item_plays_from_the_start(db: PgPool) {
+    let (app, token, user) = signed_in(db).await;
+    let album = seed(app.db(), Seed::new("album", "X")).await;
+    seed_track(app.db(), album, 1, "/a", 120.0).await;
+    seed_progress(app.db(), user, album, 120.0, true).await;
+    let body = body_json(
+        app.post_json(&format!("/play/{album}"), json!({}), Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(body["start_position"], 0);
 }
 
 #[sqlx::test]
@@ -375,7 +390,7 @@ async fn closing_books_the_distance_travelled_not_the_wall_clock(db: PgPool) {
 async fn closing_counts_from_the_start_position_and_never_books_a_rewind(db: PgPool) {
     let (app, token, user) = signed_in(db).await;
     let book = seed(app.db(), Seed::new("book", "X")).await;
-    seed_progress(app.db(), user, book, 100.0, true).await;
+    seed_progress(app.db(), user, book, 100.0, false).await;
 
     let session = open(&app, &token, book).await;
     app.post_json(
@@ -393,6 +408,18 @@ async fn closing_counts_from_the_start_position_and_never_books_a_rewind(db: PgP
     .await;
     assert_eq!(listened(&app, user).await, [60.0]);
     // Closing keeps the finished flag as it was.
+    sqlx::query("UPDATE progress SET finished = true WHERE user_id = $1")
+        .bind(user)
+        .execute(app.db())
+        .await
+        .unwrap();
+    let session = open(&app, &token, book).await;
+    app.post_json(
+        &format!("/sessions/{session}/close"),
+        json!({"position": 30}),
+        Some(&token),
+    )
+    .await;
     let finished: bool =
         sqlx::query_scalar("SELECT finished FROM progress WHERE user_id = $1 AND item_id = $2")
             .bind(user)

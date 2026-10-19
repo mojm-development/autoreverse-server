@@ -25,6 +25,7 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/artists", get(list))
+        .route("/genres", get(genres))
         .route(
             "/artists/{name}/cover",
             get(cover).put(choose_album).delete(reset_cover),
@@ -48,6 +49,25 @@ struct ArtistOut {
 #[derive(Serialize)]
 struct ArtistsOut {
     artists: Vec<ArtistOut>,
+}
+
+#[derive(Serialize)]
+struct GenresOut {
+    genres: Vec<ArtistOut>,
+}
+
+/// `GET /genres` (new in Rust): every album genre with its album count, for `/items?genre=`.
+async fn genres(State(state): State<AppState>, _user: ApiUser) -> ApiResult<Json<GenresOut>> {
+    let rows = queries::genres(&state.db).await?;
+    Ok(Json(GenresOut {
+        genres: rows
+            .into_iter()
+            .map(|g| ArtistOut {
+                name: g.name,
+                album_count: g.album_count,
+            })
+            .collect(),
+    }))
 }
 
 async fn list(State(state): State<AppState>, _user: ApiUser) -> ApiResult<Json<ArtistsOut>> {

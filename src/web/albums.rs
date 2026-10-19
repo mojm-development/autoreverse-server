@@ -71,6 +71,7 @@ fn album_rows(rows: &[Item], durations: &HashMap<i32, f64>, first: i64) -> Vec<A
 struct ListParams {
     q: String,
     artist: Option<String>,
+    genre: Option<String>,
     missing: bool,
     sort: SortKey,
     view: &'static str,
@@ -82,6 +83,7 @@ impl ListParams {
         ListParams {
             q: get("q").unwrap_or_default(),
             artist: get("artist"),
+            genre: get("genre"),
             missing: get("missing").as_deref() == Some("true"),
             sort: get("sort")
                 .and_then(|s| SortKey::parse(&s))
@@ -102,6 +104,9 @@ impl ListParams {
         }
         if let Some(artist) = &self.artist {
             params.push(("artist", artist.clone()));
+        }
+        if let Some(genre) = &self.genre {
+            params.push(("genre", genre.clone()));
         }
         if self.missing {
             params.push(("missing", "true".into()));
@@ -152,10 +157,11 @@ impl ListParams {
     }
 
     fn heading(&self) -> String {
-        match (&self.artist, self.missing) {
-            (Some(artist), _) => format!("Alben von {artist}"),
-            (None, true) => "Fehlende Alben".into(),
-            (None, false) => "Alben".into(),
+        match (&self.artist, &self.genre, self.missing) {
+            (Some(artist), _, _) => format!("Alben von {artist}"),
+            (None, _, true) => "Fehlende Alben".into(),
+            (None, Some(genre), false) => format!("Alben · {genre}"),
+            (None, None, false) => "Alben".into(),
         }
     }
 }
@@ -171,6 +177,7 @@ async fn page_of(
         &ItemsFilter {
             kind: Some("album".into()),
             q: (!params.q.is_empty()).then(|| params.q.clone()),
+            genre: params.genre.clone(),
             missing: Some(params.missing),
             sort: Some(params.sort),
             limit: PAGE_SIZE,
@@ -189,6 +196,7 @@ struct AlbumsPage {
     view: &'static str,
     q: String,
     artist: Option<String>,
+    genre: Option<String>,
     missing: bool,
     sort: &'static str,
     total: i64,
@@ -198,6 +206,7 @@ struct AlbumsPage {
     list_href: String,
     clear_q_href: String,
     clear_artist_href: String,
+    clear_genre_href: String,
     clear_missing_href: String,
     more_href: Option<String>,
     empty: String,
@@ -225,7 +234,7 @@ async fn list(
                 if params.missing {
                     count_missing(&state.db, Some("album")).await
                 } else {
-                    count_items(&state.db, "album", q).await
+                    count_items(&state.db, "album", q, params.genre.as_deref()).await
                 }
             })?
         }
@@ -253,6 +262,7 @@ async fn list(
             Some(BulkEditor::album_filter(
                 &params.q,
                 params.artist.as_deref(),
+                params.genre.as_deref(),
                 params.missing,
             )),
         )
@@ -276,10 +286,12 @@ async fn list(
         list_href: params.href(&[("view", "list")]),
         clear_q_href: params.href(&[("q", "")]),
         clear_artist_href: params.href(&[("artist", "")]),
+        clear_genre_href: params.href(&[("genre", "")]),
         clear_missing_href: params.href(&[("missing", "")]),
         empty,
         q: params.q.clone(),
         artist: params.artist.clone(),
+        genre: params.genre.clone(),
         missing: params.missing,
     };
     Ok(Html(page.render()?))
@@ -331,6 +343,8 @@ pub struct TrackRow {
     /// "CD 2" above the first track of each disc, when the album has more than one.
     pub disc_label: Option<String>,
     pub title: String,
+    /// The track's own artist, else the album's ("—" when neither is known).
+    pub artist: String,
     pub duration: String,
     pub favorite: bool,
 }
@@ -341,8 +355,9 @@ struct AlbumPage {
     shell: Shell,
     album: Item,
     eyebrow: String,
+    /// The album's genre and the list of albums with it.
+    genre: Option<(String, String)>,
     subline: String,
-    artist: String,
     tracks: Vec<TrackRow>,
     favorite: bool,
     playlists: Vec<PlaylistChoice>,
@@ -362,7 +377,11 @@ async fn is_admin(state: &AppState, user_id: i32) -> Result<bool, sqlx::Error> {
 
 /// The rows of the track table. On an album with more than one disc each disc gets a heading
 /// and its own numbering; tracks without a disc count as the first.
-fn track_table(tracks: &[queries::Track], favorites: &HashSet<i32>) -> Vec<TrackRow> {
+fn track_table(
+    tracks: &[queries::Track],
+    album_artist: Option<&str>,
+    favorites: &HashSet<i32>,
+) -> Vec<TrackRow> {
     let disc = |t: &queries::Track| t.disc.unwrap_or(1);
     let several = tracks.iter().any(|t| disc(t) != disc(&tracks[0]));
     let mut number = 0;
@@ -384,6 +403,12 @@ fn track_table(tracks: &[queries::Track], favorites: &HashSet<i32>) -> Vec<Track
                     .title
                     .clone()
                     .unwrap_or_else(|| format!("Titel {}", i + 1)),
+                artist: t
+                    .artist
+                    .as_deref()
+                    .or(album_artist)
+                    .unwrap_or("—")
+                    .to_owned(),
                 duration: format_hours(t.duration),
                 favorite: favorites.contains(&t.id),
             }
@@ -429,8 +454,11 @@ async fn detail(
         shell,
         eyebrow,
         subline,
-        artist: album.artist.clone().unwrap_or_else(|| "—".into()),
-        tracks: track_table(&track_rows, &favorite_tracks),
+        genre: album.genre.clone().map(|genre| {
+            let href = format!("/library/albums?genre={}", encode_component(&genre));
+            (genre, href)
+        }),
+        tracks: track_table(&track_rows, album.artist.as_deref(), &favorite_tracks),
         favorite,
         playlists,
         album,

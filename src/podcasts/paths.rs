@@ -35,14 +35,23 @@ pub fn is_inside(path: &Path, root: &Path) -> bool {
     resolve(path).starts_with(resolve(root))
 }
 
-/// The file extension of a media URL's path (`.mp3` if it has none), like Node's `extname`.
+/// The file extension of a media URL's path, like Node's `extname` — `.mp3` if it has none, or
+/// one that is no plain short extension (`.mp3%20` or `.php;x`): it becomes part of a file name
+/// on disk.
 pub fn suffix_for(media_url: &str) -> String {
     let path = reqwest::Url::parse(media_url)
         .map(|u| u.path().to_owned())
         .unwrap_or_default();
     let base = path.rsplit('/').next().unwrap_or("");
     match base.rfind('.') {
-        Some(dot) if dot > 0 => base[dot..].to_owned(),
+        Some(dot)
+            if dot > 0
+                && base.len() - dot <= 6
+                && base[dot + 1..].bytes().all(|b| b.is_ascii_alphanumeric())
+                && base.len() - dot > 1 =>
+        {
+            base[dot..].to_owned()
+        }
         _ => ".mp3".to_owned(),
     }
 }
@@ -141,6 +150,9 @@ mod tests {
         assert_eq!(suffix_for("https://x/episode"), ".mp3");
         assert_eq!(suffix_for("https://x/.hidden"), ".mp3");
         assert_eq!(suffix_for("kaputt"), ".mp3");
+        assert_eq!(suffix_for("https://x/ep.mp3%2F..%2Fx"), ".mp3");
+        assert_eq!(suffix_for("https://x/ep.verylongext"), ".mp3");
+        assert_eq!(suffix_for("https://x/ep."), ".mp3");
     }
 
     #[test]

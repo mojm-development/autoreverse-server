@@ -48,6 +48,12 @@ impl LoginThrottle {
         }
     }
 
+    /// A throttle that locks out after `limit` attempts in the window instead of [`LIMIT`].
+    pub fn with_limit(mut self, limit: usize) -> Self {
+        self.limit = limit;
+        self
+    }
+
     pub fn with_max_keys(mut self, max_keys: usize) -> Self {
         self.max_keys = max_keys;
         self

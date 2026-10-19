@@ -466,6 +466,7 @@ async fn entries_name_exactly_one_known_item_or_track(db: PgPool) {
         json!({
             "id": track,
             "title": "Antenne",
+            "artist": null,
             "duration": 120.5,
             "item_id": album,
             "item_title": "Radio-Aktivität",

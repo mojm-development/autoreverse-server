@@ -63,8 +63,13 @@ data you have backups of.
 **Users**
 
 - Argon2id password hashing
-- Bearer tokens for API clients, session cookies for the web UI, one resolver behind both
-- Login throttling (`429` with `Retry-After`)
+- Bearer tokens for API clients, session cookies for the web UI, one resolver behind both; the
+  database holds only a SHA-256 of each token, and a token unused for 180 days expires
+- Login throttling (`429` with `Retry-After`), per name and per public client address
+- Protection against cross-site requests (`Origin`, `Sec-Fetch-Site`), clickjacking protection and
+  a Content-Security-Policy without inline scripts
+- Files, artwork and chapters named by a feed on the internet are never fetched from the local
+  network
 - Admin/non-admin split: user creation and library configuration are admin-only
 - Per-user playback preferences
 
@@ -207,6 +212,11 @@ authenticates fine, which is why the failure shows up at the login screen specif
 `X-Forwarded-*` headers are not evaluated; `ORIGIN` is the only way to tell the server its public
 URL.
 
+Independently of `ORIGIN`, any state-changing request without a bearer token that the browser marks
+as coming from another site (`Sec-Fetch-Site`) is refused. Every response carries
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and a
+Content-Security-Policy; a proxy does not need to add them. HSTS is the proxy's business.
+
 ### Getting at downloaded podcast episodes
 
 Episodes downloaded through the UI are written to `$AUTOREVERSE_DATA/podcasts`, which lives inside
@@ -308,7 +318,7 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET`                  | `/me/stats`                                       | Listening time per day — `?days=` (default 30)                         |
 | `POST`                 | `/me/password`                                    | Change own password                                                    |
 | `GET` `PUT`            | `/me/playback`                                    | Playback preferences                                                   |
-| `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?missing=` |
+| `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=` |
 | `GET` `PATCH`          | `/items/{id}`                                     | One item; edit its metadata (admin)                                    |
 | `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Bulk metadata edit and its undo (admin)                                |
 | `POST`                 | `/items/series`                                   | Detect or assign series and volume numbers, dry run by default (admin) |
@@ -316,10 +326,11 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET`                  | `/items/{id}/cover`                               | Cover image                                                            |
 | `DELETE`               | `/items/missing`                                  | Purge items whose files are gone (admin)                               |
 | `GET`                  | `/artists`                                        | Distinct artists                                                       |
+| `GET`                  | `/genres`                                         | Album genres with their album counts                                   |
 | `GET`                  | `/library/more`                                   | Next page of the web library grid (used by the web UI)                 |
 | `GET` `POST`           | `/artists/{name}/image`                           | Custom artist image; upload is admin, multipart `image`                |
 | `PUT` `DELETE`         | `/artists/{name}/cover`                           | Pick an album as the artist image, or reset to random (admin)          |
-| `GET`                  | `/search`                                         | Cross-library search                                                   |
+| `GET`                  | `/search`                                         | Cross-library search, including tracks by their artist and artists     |
 | `GET` `PATCH`          | `/tracks/{id}`                                    | One track; edit its metadata (admin)                                   |
 | `GET` `HEAD`           | `/tracks/{id}/stream`                             | Range-capable audio stream                                             |
 | `POST`                 | `/play/{itemId}`                                  | Open a playback session                                                |
@@ -332,9 +343,9 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET` `PATCH` `DELETE` | `/playlists/{id}`                                 | Read / rename / delete                                                 |
 | `POST` `PUT` `DELETE`  | `/playlists/{id}/entries[/{entryId}]`             | Playlist entries                                                       |
 | `GET`                  | `/podcasts/search`                                | Directory search by name                                               |
-| `POST`                 | `/podcasts/preview`                               | Read a feed without subscribing                                        |
-| `POST`                 | `/podcasts`                                       | Subscribe to a feed                                                    |
-| `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Refresh / unsubscribe                                                  |
+| `POST`                 | `/podcasts/preview`                               | Read a feed without subscribing (admin)                                |
+| `POST`                 | `/podcasts`                                       | Subscribe to a feed (admin)                                            |
+| `POST` `DELETE`        | `/podcasts/{id}/refresh`, `/podcasts/{id}`        | Refresh / unsubscribe (admin)                                          |
 | `POST`                 | `/episodes/{id}/download`                         | Download an episode to the server                                      |
 | `POST` `GET`           | `/scan`, `/scan/status`, `/scan/cancel`           | Library scan control (admin)                                           |
 | `GET` `POST`           | `/users`                                          | List / create users (admin)                                            |

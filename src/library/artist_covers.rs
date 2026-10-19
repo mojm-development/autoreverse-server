@@ -180,6 +180,45 @@ pub async fn clear_cover(db: &PgPool, artist: &str) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
+/// One spelling per album artist, case aside: "AC/DC" and "Ac/Dc" from two albums' tags would
+/// otherwise be two artists with two tiles, two pictures and two filters. Every album takes the
+/// spelling a Verwalter locked by hand, else the one most albums use (alphabetically first on a
+/// tie). A hand-locked artist is never rewritten. A picture chosen under another spelling moves
+/// along unless the kept spelling already has one. Runs after every scan.
+pub async fn unify_artist_spellings(db: &PgPool) -> Result<(), sqlx::Error> {
+    let mut tx = db.begin().await?;
+    sqlx::query(
+        "CREATE TEMP TABLE canonical_artist ON COMMIT DROP AS
+         SELECT DISTINCT ON (lower(artist)) lower(artist) AS key, artist
+         FROM items
+         WHERE kind = 'album' AND artist IS NOT NULL
+         GROUP BY lower(artist), artist
+         ORDER BY lower(artist), bool_or('artist' = ANY(locked_fields)) DESC, count(*) DESC,
+                  artist",
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE items SET artist = c.artist
+         FROM canonical_artist c
+         WHERE items.kind = 'album' AND lower(items.artist) = c.key
+           AND items.artist <> c.artist AND NOT ('artist' = ANY(items.locked_fields))",
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE artist_covers SET artist = c.artist, updated_at = now()
+         FROM canonical_artist c
+         WHERE lower(artist_covers.artist) = c.key AND artist_covers.artist <> c.artist
+           AND NOT EXISTS (SELECT 1 FROM artist_covers kept WHERE kept.artist = c.artist)
+           AND artist_covers.artist = (SELECT min(other.artist) FROM artist_covers other
+                                       WHERE lower(other.artist) = c.key)",
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

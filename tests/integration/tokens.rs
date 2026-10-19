@@ -1,7 +1,7 @@
 //! Token store (legacy tests/unit/tokens.test.ts).
 
 use autoreverse_server::auth::tokens::{
-    issue_token, revoke_other_tokens, revoke_token, user_for_token,
+    IDLE_DAYS, issue_token, revoke_other_tokens, revoke_token, token_digest, user_for_token,
 };
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -49,7 +49,7 @@ async fn revoke_other_tokens_keeps_the_current_one(db: PgPool) {
 }
 
 async fn last_seen(db: &PgPool, token: &str) -> Option<DateTime<Utc>> {
-    sqlx::query_scalar("SELECT last_seen_at FROM auth_tokens WHERE value = $1")
+    sqlx::query_scalar("SELECT last_seen_at FROM auth_tokens WHERE value = encode(sha256(convert_to($1, 'UTF8')), 'hex')")
         .bind(token)
         .fetch_one(db)
         .await
@@ -68,7 +68,7 @@ async fn refreshes_last_seen_only_when_null_or_stale(db: PgPool) {
 
     // Fresh: left alone.
     let fixed = "2099-01-01T00:00:00Z".parse::<DateTime<Utc>>().unwrap();
-    sqlx::query("UPDATE auth_tokens SET last_seen_at = $1 WHERE value = $2")
+    sqlx::query("UPDATE auth_tokens SET last_seen_at = $1 WHERE value = encode(sha256(convert_to($2, 'UTF8')), 'hex')")
         .bind(fixed)
         .bind(&token)
         .execute(app.db())
@@ -79,7 +79,7 @@ async fn refreshes_last_seen_only_when_null_or_stale(db: PgPool) {
 
     // Older than an hour: refreshed.
     sqlx::query(
-        "UPDATE auth_tokens SET last_seen_at = now() - interval '2 hours' WHERE value = $1",
+        "UPDATE auth_tokens SET last_seen_at = now() - interval '2 hours' WHERE value = encode(sha256(convert_to($1, 'UTF8')), 'hex')",
     )
     .bind(&token)
     .execute(app.db())
@@ -101,4 +101,44 @@ async fn deleting_a_user_deletes_their_tokens(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(user_for_token(app.db(), &token).await.unwrap(), None);
+}
+
+#[sqlx::test]
+async fn stores_only_a_hash_of_the_token(db: PgPool) {
+    let app = TestApp::new(db);
+    let id = app.user("oliver", false).await;
+    let token = issue_token(app.db(), id).await.unwrap();
+    let stored: String = sqlx::query_scalar("SELECT value FROM auth_tokens WHERE user_id = $1")
+        .bind(id)
+        .fetch_one(app.db())
+        .await
+        .unwrap();
+    assert_ne!(stored, token);
+    assert_eq!(stored, token_digest(&token));
+}
+
+#[sqlx::test]
+async fn a_long_idle_token_expires_and_is_deleted(db: PgPool) {
+    let app = TestApp::new(db);
+    let id = app.user("oliver", false).await;
+    let token = issue_token(app.db(), id).await.unwrap();
+    let idle = issue_token(app.db(), id).await.unwrap();
+    sqlx::query(
+        "UPDATE auth_tokens SET created_at = now() - make_interval(days => $2 + 1),
+                                last_seen_at = now() - make_interval(days => $2 + 1)
+         WHERE value = $1",
+    )
+    .bind(token_digest(&idle))
+    .bind(IDLE_DAYS)
+    .execute(app.db())
+    .await
+    .unwrap();
+    assert_eq!(user_for_token(app.db(), &idle).await.unwrap(), None);
+    assert_eq!(user_for_token(app.db(), &token).await.unwrap(), Some(id));
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_tokens WHERE user_id = $1")
+        .bind(id)
+        .fetch_one(app.db())
+        .await
+        .unwrap();
+    assert_eq!(left, 1);
 }

@@ -154,7 +154,7 @@ async fn the_list_has_items_and_tracks_in_title_order_without_missing_ones(db: P
     assert_eq!(
         body["tracks"],
         json!([{
-            "id": track, "title": "Autobahn", "duration": 120, "item_id": ten,
+            "id": track, "title": "Autobahn", "artist": null, "duration": 120, "item_id": ten,
             "item_title": "Teil 10", "item_kind": "album"
         }])
     );
@@ -453,7 +453,7 @@ async fn search_matches_author_and_artist_finds_tracks_and_hides_missing_items(d
     assert_eq!(
         body["tracks"],
         json!([{
-            "id": track, "title": "Eschbach-Suite", "duration": 61.5, "item_id": album,
+            "id": track, "title": "Eschbach-Suite", "artist": null, "duration": 61.5, "item_id": album,
             "item_title": "Live", "item_kind": "album"
         }])
     );

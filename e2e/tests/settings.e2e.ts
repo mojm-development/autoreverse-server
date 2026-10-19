@@ -48,7 +48,7 @@ test('/settings itself renders an overview linking into every section', async ({
 	await expect(page.getByRole('heading', { name: 'Einstellungen' })).toBeVisible();
 	// Scoped to the card grid — the surrounding subnav carries the same labels.
 	const overview = page.getByTestId('settings-overview');
-	await expect(overview.getByRole('link')).toHaveCount(7);
+	await expect(overview.getByRole('link')).toHaveCount(8);
 	await overview.getByRole('link', { name: 'Bibliotheken' }).click();
 	await expect(page).toHaveURL('/settings/libraries');
 });

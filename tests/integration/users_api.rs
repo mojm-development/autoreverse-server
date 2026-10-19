@@ -27,7 +27,7 @@ async fn token_count(app: &TestApp, user: i32) -> i64 {
 }
 
 async fn token_exists(app: &TestApp, token: &str) -> bool {
-    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM auth_tokens WHERE value = $1)")
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM auth_tokens WHERE value = encode(sha256(convert_to($1, 'UTF8')), 'hex'))")
         .bind(token)
         .fetch_one(app.db())
         .await

@@ -108,11 +108,18 @@ One resolver for both worlds: a `Bearer` header first, else the `autoreverse_ses
 Guards are extractors in `auth/session.rs`: `ApiUser` / `ApiAdmin` answer 401/403 with
 `{detail}`, `WebUser` / `WebAdmin` redirect (to `/login`, or `/library` for a non-admin).
 `Session` is the optional variant. Passwords are argon2id with a concurrency semaphore and a
-per-process login throttle (both in `AppState`). At start `ensure_first_admin` creates the admin
+per-process login throttle by name, plus one by client address that counts only public peers
+(behind a proxy all arrive from its private address; `X-Forwarded-For` is not trusted).
+Outgoing requests for URLs a feed names go through `podcasts::net`'s fenced client, which
+reaches no private, loopback or link-local address unless the feed itself lives in the LAN. At start `ensure_first_admin` creates the admin
 from `AUTOREVERSE_ADMIN_USER`/`_PASSWORD`, only while the `users` table is empty;
 `autoreverse-server set-password` is the rescue path. A form POST whose `Origin` is not the
 server's own (`ORIGIN`, else `http://<Host>`) is refused, as SvelteKit did — behind a TLS proxy
-`ORIGIN` must be set.
+`ORIGIN` must be set. Beyond legacy, any POST/PUT/PATCH/DELETE without a bearer token that the
+browser marks `Sec-Fetch-Site: cross-site|same-site` is refused too. `auth_tokens.value` holds the
+SHA-256 of a token, never the token; a token idle for `tokens::IDLE_DAYS` expires. Every response
+gets `nosniff`, `X-Frame-Options: DENY` and a CSP without inline scripts (`app::security_headers`)
+— page JS goes into `static/js/`, never into a `<script>` block or an `on…=` attribute.
 
 ### Scanning
 

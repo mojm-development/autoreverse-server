@@ -286,7 +286,7 @@ async fn vanished_albums_are_hidden_from_every_album_listing(db: PgPool) {
         ..Default::default()
     };
     assert_eq!(items(&db, &present).await.unwrap().len(), 1);
-    assert_eq!(count_items(&db, "album", None).await.unwrap(), 1);
+    assert_eq!(count_items(&db, "album", None, None).await.unwrap(), 1);
     assert_eq!(library_counts(&db).await.unwrap().album_count, 1);
     assert_eq!(
         artists(&db).await.unwrap(),
@@ -509,7 +509,7 @@ async fn a_track_has_its_shape_and_an_unknown_one_is_404(db: PgPool) {
     let body = body_json(app.get(&format!("/tracks/{track}"), Some(&token)).await).await;
     assert_eq!(
         body,
-        json!({"id": track, "position": 1, "title": null, "duration": 1350.5,
+        json!({"id": track, "position": 1, "title": null, "duration": 1350.5, "artist": null,
                "item_id": id, "disc": null})
     );
     for uri in ["/tracks/999999", "/tracks/abc"] {
@@ -726,5 +726,231 @@ async fn the_image_route_says_404_without_any_picture(db: PgPool) {
         assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
         let body: Value = body_json(response).await;
         assert_eq!(body, json!({"detail": "Kein Bild"}), "{uri}");
+    }
+}
+
+// --- genres, track artists, search by artist ---------------------------------------------------
+
+async fn set_genre(db: &PgPool, id: i32, genre: &str) {
+    sqlx::query("UPDATE items SET genre = $2 WHERE id = $1")
+        .bind(id)
+        .bind(genre)
+        .execute(db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test]
+async fn albums_filter_by_genre_and_genres_are_listed_case_insensitively(db: PgPool) {
+    let (app, token) = signed_in(db).await;
+    let rock = seed(app.db(), album("Back in Black", "AC/DC")).await;
+    let rock2 = seed(app.db(), album("Highway", "AC/DC")).await;
+    let rock3 = seed(app.db(), album("Let There Be Rock", "AC/DC")).await;
+    let jazz = seed(app.db(), album("Kind of Blue", "Miles Davis")).await;
+    // Listed in the spelling most albums use.
+    set_genre(app.db(), rock, "Rock").await;
+    set_genre(app.db(), rock2, "rock").await;
+    set_genre(app.db(), rock3, "Rock").await;
+    set_genre(app.db(), jazz, "Jazz").await;
+
+    let body = body_json(app.get("/genres", Some(&token)).await).await;
+    assert_eq!(
+        body,
+        json!({"genres": [
+            {"name": "Jazz", "album_count": 1},
+            {"name": "Rock", "album_count": 3}
+        ]})
+    );
+    let body = body_json(app.get("/items?kind=album&genre=ROCK", Some(&token)).await).await;
+    let titles: Vec<&str> = body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles, ["Back in Black", "Highway", "Let There Be Rock"]);
+    let body = body_json(app.get(&format!("/items/{jazz}"), Some(&token)).await).await;
+    assert_eq!(body["genre"], "Jazz");
+}
+
+#[sqlx::test]
+async fn tracks_carry_their_artist_and_disc_and_search_finds_them_by_artist(db: PgPool) {
+    let (app, token) = signed_in(db).await;
+    let sampler = seed(app.db(), album("Bravo Hits", "Verschiedene Interpreten")).await;
+    let track = seed_track(app.db(), sampler, 1, "/m/1.mp3", 200.0).await;
+    sqlx::query("UPDATE tracks SET artist = 'Nena', title = 'Leuchtturm', disc = 2 WHERE id = $1")
+        .bind(track)
+        .execute(app.db())
+        .await
+        .unwrap();
+
+    let body = body_json(app.get(&format!("/items/{sampler}"), Some(&token)).await).await;
+    assert_eq!(body["tracks"][0]["artist"], "Nena");
+    assert_eq!(body["tracks"][0]["disc"], 2);
+
+    let body = body_json(app.get("/search?q=nena", Some(&token)).await).await;
+    assert_eq!(body["tracks"][0]["title"], "Leuchtturm");
+    assert_eq!(body["tracks"][0]["artist"], "Nena");
+    let body = body_json(app.get("/search?q=interpreten", Some(&token)).await).await;
+    assert_eq!(
+        body["artists"],
+        json!([{"name": "Verschiedene Interpreten", "role": "artist", "work_count": 1}])
+    );
+}
+
+#[sqlx::test]
+async fn a_verwalter_sets_the_genre_and_it_is_locked(db: PgPool) {
+    let app = TestApp::new(db);
+    let admin = app.user("admin", true).await;
+    let token = app.token(admin).await;
+    let id = seed(app.db(), album("Kind of Blue", "Miles Davis")).await;
+    let response = app
+        .call(
+            axum::http::Method::PATCH,
+            &format!("/items/{id}"),
+            Some(json!({ "set": { "genre": "Modal Jazz" } })),
+            Some(&token),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let (genre, locked): (Option<String>, Vec<String>) =
+        sqlx::query_as("SELECT genre, locked_fields FROM items WHERE id = $1")
+            .bind(id)
+            .fetch_one(app.db())
+            .await
+            .unwrap();
+    assert_eq!(genre.as_deref(), Some("Modal Jazz"));
+    assert!(locked.contains(&"genre".to_owned()));
+}
+
+#[sqlx::test]
+async fn artist_spellings_are_unified_to_the_most_common_or_the_locked_one(db: PgPool) {
+    use autoreverse_server::library::artist_covers::unify_artist_spellings;
+    let a = seed(&db, album("Back in Black", "AC/DC")).await;
+    let b = seed(&db, album("Highway", "AC/DC")).await;
+    let c = seed(&db, album("Powerage", "Ac/Dc")).await;
+    sqlx::query("INSERT INTO artist_covers (artist, item_id) VALUES ('Ac/Dc', $1)")
+        .bind(c)
+        .execute(&db)
+        .await
+        .unwrap();
+    let k1 = seed(&db, album("Autobahn", "kraftwerk")).await;
+    let k2 = seed(&db, album("Radio", "kraftwerk")).await;
+    let k3 = seed(&db, album("Mix", "Kraftwerk")).await;
+    sqlx::query("UPDATE items SET locked_fields = ARRAY['artist'] WHERE id = $1")
+        .bind(k3)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    unify_artist_spellings(&db).await.unwrap();
+
+    let artist = |id: i32| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, String>("SELECT artist FROM items WHERE id = $1")
+                .bind(id)
+                .fetch_one(&db)
+                .await
+                .unwrap()
+        }
+    };
+    for id in [a, b, c] {
+        assert_eq!(artist(id).await, "AC/DC");
+    }
+    // A Verwalter's spelling wins over the majority.
+    for id in [k1, k2, k3] {
+        assert_eq!(artist(id).await, "Kraftwerk");
+    }
+    let covers: Vec<String> = sqlx::query_scalar("SELECT artist FROM artist_covers")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(covers, ["AC/DC"]);
+    assert_eq!(
+        artists(&db).await.unwrap(),
+        [
+            Artist {
+                name: "AC/DC".into(),
+                album_count: 3
+            },
+            Artist {
+                name: "Kraftwerk".into(),
+                album_count: 3
+            }
+        ]
+    );
+}
+
+#[sqlx::test]
+async fn artists_sort_by_their_sort_name_or_without_a_leading_article(db: PgPool) {
+    seed(&db, album("Gold", "Abba")).await;
+    seed(&db, album("Parachutes", "Coldplay")).await;
+    seed(&db, album("Is This It", "The Strokes")).await;
+    let beatles = seed(&db, album("Abbey Road", "The Beatles")).await;
+    sqlx::query("UPDATE items SET artist_sort = 'Beatles, The' WHERE id = $1")
+        .bind(beatles)
+        .execute(&db)
+        .await
+        .unwrap();
+    let names: Vec<String> = artists(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| a.name)
+        .collect();
+    assert_eq!(names, ["Abba", "The Beatles", "Coldplay", "The Strokes"]);
+}
+
+#[sqlx::test]
+async fn a_stored_album_sorts_without_its_article_unless_the_tags_say_otherwise(db: PgPool) {
+    use autoreverse_server::scanner::store::store_items;
+    let mut wall = scan_music_item("The Wall");
+    let mut road = scan_music_item("Abbey Road");
+    road.source_path = "/m/Beatles/Abbey Road".into();
+    road.title_sort = Some("Road, Abbey".into());
+    wall.source_path = "/m/Pink Floyd/The Wall".into();
+    let mut failures = Vec::new();
+    store_items(
+        &db,
+        &[wall, road],
+        Path::new("/nonexistent"),
+        &mut failures,
+        |_, _, _| {},
+        || false,
+    )
+    .await;
+    let keys: Vec<(String, String)> =
+        sqlx::query_as("SELECT title, sort_title FROM items ORDER BY title")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(
+        keys,
+        [
+            ("Abbey Road".into(), "road, abbey".into()),
+            ("The Wall".into(), "wall".into())
+        ]
+    );
+}
+
+fn scan_music_item(title: &str) -> ScannedItem {
+    ScannedItem {
+        source_path: String::new(),
+        kind: ItemKind::Album,
+        title: title.into(),
+        author: None,
+        artist: Some("X".into()),
+        album_artist: None,
+        description: None,
+        series: None,
+        year: None,
+        genre: None,
+        title_sort: None,
+        artist_sort: None,
+        series_index: None,
+        tracks: Vec::new(),
+        chapters: Vec::new(),
+        unchanged: false,
     }
 }

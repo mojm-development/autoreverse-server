@@ -10,7 +10,7 @@
 			{% if album.cover_path.is_some() %}<img src="/items/{{ album.id }}/cover?size=768" alt="" />{% endif %}
 		</div>
 		<div class="meta">
-			<span class="eyebrow">{{ eyebrow }}</span>
+			<span class="eyebrow">{{ eyebrow }}{% if let Some((genre, href)) = genre %} · <a href="{{ href }}">{{ genre }}</a>{% endif %}</span>
 			<h1>{{ album.title }}</h1>
 			<p class="subline">{{ subline }}</p>
 			<div class="actions">
@@ -33,7 +33,7 @@
 			<button type="button" class="activator bare" aria-label="{{ track.title }} abspielen" data-action="play-track" data-track-id="{{ track.id }}"></button>
 			<span class="index mono"><span class="num">{{ track.number }}</span>{% call ui::icon("play") %}{% endcall %}</span>
 			<span class="title">{{ track.title }}</span>
-			<span class="cell">{{ artist }}</span>
+			<span class="cell">{{ track.artist }}</span>
 			<span class="cell fav above">{% call ui::favorite("tracks", track.id, track.favorite, "Titel favorisieren", "Titel aus Favoriten entfernen", "small") %}{% endcall %}<button type="button" class="icon-btn small" data-playlist-pick data-pick-track="{{ track.id }}" aria-label="{{ track.title }} zur Playlist hinzufügen" title="Zur Playlist hinzufügen">{% call ui::icon("playlist-add") %}{% endcall %}</button></span>
 			<span class="cell mono">{{ track.duration }}</span>
 		</div>
