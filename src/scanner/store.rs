@@ -280,6 +280,17 @@ async fn store_one(
         .await?;
     }
 
+    // A disc locked by hand keeps its value above, but the positions came from the tags.
+    let hand_set_disc: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM tracks WHERE item_id = $1 AND 'disc' = ANY(locked_fields))",
+    )
+    .bind(item_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if hand_set_disc {
+        crate::library::metadata::order_by_disc(tx, item_id).await?;
+    }
+
     absorb_emptied_subfolders(tx, item_id, entry).await?;
 
     sqlx::query("DELETE FROM chapters WHERE item_id = $1")

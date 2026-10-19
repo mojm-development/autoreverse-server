@@ -524,6 +524,37 @@ pub async fn write_patch(
         .build()
         .execute(&mut **tx)
         .await?;
+    if target == Target::Track && patch.iter().any(|(field, _)| field.column == "disc") {
+        let item_id: i32 = sqlx::query_scalar("SELECT item_id FROM tracks WHERE id = $1")
+            .bind(id)
+            .fetch_one(&mut **tx)
+            .await?;
+        order_by_disc(tx, item_id).await?;
+    }
+    Ok(())
+}
+
+/// Numbers an item's tracks 1..n by disc (none counts as the first), keeping their order within
+/// a disc. A disc changed by hand has to move its track there: the album page heads every disc
+/// change, so a track left in place would split its disc in two ("CD 1, CD 2, CD 1").
+pub async fn order_by_disc(
+    tx: &mut Transaction<'_, Postgres>,
+    item_id: i32,
+) -> Result<(), sqlx::Error> {
+    // Negative first: UNIQUE(item_id, position) must hold after each statement.
+    sqlx::query(
+        "UPDATE tracks SET position = -ranked.n
+         FROM (SELECT id, row_number() OVER (ORDER BY coalesce(disc, 1), position, id) AS n
+               FROM tracks WHERE item_id = $1) AS ranked
+         WHERE tracks.id = ranked.id",
+    )
+    .bind(item_id)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query("UPDATE tracks SET position = -position WHERE item_id = $1")
+        .bind(item_id)
+        .execute(&mut **tx)
+        .await?;
     Ok(())
 }
 
