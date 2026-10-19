@@ -45,7 +45,10 @@ pub fn describe_transport_error(e: &reqwest::Error) -> String {
     }
 }
 
-pub async fn fetch_feed_text(http: &reqwest::Client, feed_url: &str) -> Result<String, FeedError> {
+pub async fn fetch_feed_text(
+    http: &super::HttpClients,
+    feed_url: &str,
+) -> Result<String, FeedError> {
     let response = http
         .get(feed_url)
         .timeout(FEED_TIMEOUT)
@@ -74,7 +77,10 @@ pub async fn fetch_feed_text(http: &reqwest::Client, feed_url: &str) -> Result<S
         .ok_or_else(|| FeedError::Fetch("Feed ist zu groß".into()))
 }
 
-pub async fn preview_feed(http: &reqwest::Client, feed_url: &str) -> Result<ParsedFeed, FeedError> {
+pub async fn preview_feed(
+    http: &super::HttpClients,
+    feed_url: &str,
+) -> Result<ParsedFeed, FeedError> {
     let raw = fetch_feed_text(http, feed_url).await?;
     parse_feed(&raw).map_err(|e| FeedError::Invalid(e.0))
 }
@@ -165,7 +171,7 @@ async fn sync_episodes(
 /// The feed's artwork into the cover directory. Any failure just means no cover.
 async fn store_feed_cover(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::net::FeedHttp<'_>,
     podcast_id: i32,
     image_url: &str,
     covers_dir: &Path,
@@ -174,7 +180,12 @@ async fn store_feed_cover(
     if !matches!(url.scheme(), "http" | "https") {
         return None;
     }
-    let mut response = http.get(url).timeout(FEED_TIMEOUT).send().await.ok()?;
+    let mut response = http
+        .get(url.as_str())?
+        .timeout(FEED_TIMEOUT)
+        .send()
+        .await
+        .ok()?;
     if !response.status().is_success() {
         return None;
     }
@@ -205,7 +216,7 @@ async fn store_feed_cover(
 
 async fn finish_sync(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     podcast: (i32, String, Option<String>, Option<String>),
     parsed: &ParsedFeed,
     covers_dir: Option<&Path>,
@@ -218,7 +229,8 @@ async fn finish_sync(
         .execute(db)
         .await?;
     if let (Some(dir), None, Some(image)) = (covers_dir, &cover_path, &parsed.image_url) {
-        cover_path = store_feed_cover(db, http, id, image, dir).await;
+        let fenced = http.for_feed(feed_url.as_deref()).await;
+        cover_path = store_feed_cover(db, &fenced, id, image, dir).await;
     }
     Ok(Synced {
         id,
@@ -233,7 +245,7 @@ async fn finish_sync(
 /// Subscribes to `feed_url`; subscribing to the same URL again reuses the podcast.
 pub async fn subscribe(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     feed_url: &str,
     covers_dir: Option<&Path>,
 ) -> Result<Synced, FeedError> {
@@ -270,7 +282,7 @@ pub async fn subscribe(
 /// Fetches the podcast's feed again and syncs its episodes.
 pub async fn refresh(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     podcast_id: i32,
     covers_dir: Option<&Path>,
 ) -> Result<Synced, FeedError> {

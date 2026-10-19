@@ -21,7 +21,7 @@ pub struct AppState {
     /// The one scan status of this process (legacy `scanState`).
     pub scan: ScanStatus,
     /// Outgoing HTTP (feeds, episodes, the podcast directory).
-    pub http: reqwest::Client,
+    pub http: crate::podcasts::HttpClients,
 }
 
 impl AppState {

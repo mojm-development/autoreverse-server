@@ -42,7 +42,7 @@ pub struct Downloaded {
 /// A missing or broken chapter source never costs the listener the episode.
 async fn store_chapters(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::net::FeedHttp<'_>,
     episode_id: i32,
     path: &Path,
     chapters_url: Option<&str>,
@@ -163,7 +163,7 @@ async fn existing_download(
 /// uncontended call always fetches (that is how a listener re-downloads on purpose).
 pub async fn download_episode(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     episode_id: i32,
     podcasts_dir: &Path,
 ) -> Result<Downloaded, DownloadError> {
@@ -183,12 +183,19 @@ pub async fn download_episode(
 
 async fn download_locked(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     episode_id: i32,
     podcasts_dir: &Path,
 ) -> Result<Downloaded, DownloadError> {
-    let episode: (String, Option<String>, Option<String>, Option<String>) = sqlx::query_as(
-        "SELECT episode.title, episode.feed_url, episode.chapters_url, podcast.title
+    let episode: (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+    ) = sqlx::query_as(
+        "SELECT episode.title, episode.feed_url, episode.chapters_url, podcast.title,
+                podcast.feed_url
          FROM items AS episode LEFT JOIN items AS podcast ON podcast.id = episode.parent_id
          WHERE episode.id = $1 AND episode.kind = 'episode'",
     )
@@ -196,7 +203,8 @@ async fn download_locked(
     .fetch_optional(db)
     .await?
     .ok_or(DownloadError::NotFound)?;
-    let (title, media_url, chapters_url, podcast_title) = episode;
+    let (title, media_url, chapters_url, podcast_title, podcast_feed) = episode;
+    let http = http.for_feed(podcast_feed.as_deref()).await;
     let media_url = media_url.ok_or_else(|| {
         DownloadError::NotDownloadable("Keine Audiodatei in diesem Feed-Eintrag".into())
     })?;
@@ -211,7 +219,10 @@ async fn download_locked(
     )
     .await?;
 
-    let response = http.get(&media_url).send().await.map_err(|e| {
+    let request = http.get(&media_url).ok_or_else(|| {
+        DownloadError::Fetch("Folge nicht erreichbar: Adresse im lokalen Netz".into())
+    })?;
+    let response = request.send().await.map_err(|e| {
         DownloadError::Fetch(format!(
             "Folge nicht erreichbar: {}",
             describe_transport_error(&e)
@@ -231,7 +242,7 @@ async fn download_locked(
         .unwrap_or(0.0);
     store_chapters(
         db,
-        http,
+        &http,
         episode_id,
         &destination,
         chapters_url.as_deref(),

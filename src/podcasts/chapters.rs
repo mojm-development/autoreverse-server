@@ -123,8 +123,11 @@ pub fn parse_chapters_json(text: &str) -> Vec<ChapterMark> {
 const MAX_CHAPTERS_BYTES: usize = 2 * 1024 * 1024;
 
 /// Chapters are a bonus; a feed that cannot serve them must not fail a download.
-pub async fn fetch_chapters_json(http: &reqwest::Client, url: &str) -> Vec<ChapterMark> {
-    let response = http.get(url).timeout(Duration::from_secs(10)).send().await;
+pub async fn fetch_chapters_json(http: &super::net::FeedHttp<'_>, url: &str) -> Vec<ChapterMark> {
+    let Some(request) = http.get(url) else {
+        return Vec::new();
+    };
+    let response = request.timeout(Duration::from_secs(10)).send().await;
     match response {
         Ok(r) if r.status().is_success() => match super::text_capped(r, MAX_CHAPTERS_BYTES).await {
             Ok(Some(text)) => parse_chapters_json(&text),

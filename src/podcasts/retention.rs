@@ -90,7 +90,7 @@ async fn remove_download(
 /// counted, not fatal.
 pub async fn apply_retention(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     podcast_id: i32,
     keep: i32,
     podcasts_dir: &Path,
@@ -128,7 +128,7 @@ pub async fn apply_retention(
 /// Retention with the podcast's own number or the default; nothing for anything but a podcast.
 pub async fn retain_for_podcast(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     podcast_id: i32,
     podcasts_dir: &Path,
 ) -> Result<RetentionResult, sqlx::Error> {
@@ -159,7 +159,7 @@ pub struct RefreshRunResult {
 /// indistinguishable from a run that never happened.
 pub async fn refresh_all_and_retain(
     db: &PgPool,
-    http: &reqwest::Client,
+    http: &super::HttpClients,
     covers_dir: &Path,
     podcasts_dir: &Path,
 ) -> Result<RefreshRunResult, sqlx::Error> {
