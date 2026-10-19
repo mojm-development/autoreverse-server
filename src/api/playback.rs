@@ -61,8 +61,11 @@ async fn play(
     if row.kind == "episode" && tracks.is_empty() {
         return Err(ApiError::conflict("Folge ist noch nicht heruntergeladen"));
     }
+    // A finished item starts over: its saved position is the very end, where the player would
+    // stop again at once (legacy handed that position out unchanged).
     let start_position = queries::progress(&state.db, user.id, row.id)
         .await?
+        .filter(|p| !p.finished)
         .map_or(0.0, |p| p.position);
     let session_id = open_session(&state.db, user.id, row.id, start_position).await?;
     let (chapters, cover) = tokio::try_join!(

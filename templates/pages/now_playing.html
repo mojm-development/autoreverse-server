@@ -67,9 +67,11 @@
 				</div>
 
 				<div class="options">
+					{% if !by_track %}
 					<select class="pill speed" aria-label="Geschwindigkeit" data-np-speed>
 						{% for speed in speeds %}<option value="{{ speed.value }}"{% if speed.selected %} selected{% endif %}>{{ speed.label }}</option>{% endfor %}
 					</select>
+					{% endif %}
 					<select class="pill sleep" aria-label="Sleep-Timer" data-np-sleep>
 						<option value="0">Sleep-Timer</option>
 						<option value="15">15 Min</option>

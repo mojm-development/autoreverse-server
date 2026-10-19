@@ -241,7 +241,7 @@ test('reloadCurrentTrack() re-reads the track at the same index', async () => {
 });
 
 test('preferences come from the caller and reach a running player', async () => {
-	const { player } = store(session(), { playbackSpeed: 1.5, skipBack: 20 });
+	const { player } = store(session({ kind: 'book' }), { playbackSpeed: 1.5, skipBack: 20 });
 	assert.equal(player.preferences.playbackSpeed, 1.5);
 	assert.equal(player.preferences.skipForward, 15);
 	await player.play(42);
@@ -437,4 +437,34 @@ test('onEnded can take over when a track runs out (playlist queue)', async () =>
 	el.onended();
 	assert.deepEqual(ended.at(-1), { itemId: 42, trackId: 2, last: true });
 	assert.equal(player.current.playing, false);
+});
+
+test('music plays at normal speed whatever the audiobook speed is', async () => {
+	const { player } = store(session(), { playbackSpeed: 1.5 });
+	await player.play(42);
+	const el = fakeAudio();
+	player.attachAudioElement(el);
+	assert.equal(player.current.speed, 1);
+	assert.equal(el.playbackRate, 1);
+	player.applyPreferences({ playbackSpeed: 2 });
+	assert.equal(el.playbackRate, 1);
+	assert.equal(player.preferences.playbackSpeed, 2);
+});
+
+test('a shuffled play saves the position along the album order', async () => {
+	const { fetch, player } = store();
+	await player.play(42, undefined, { shuffle: true, random: () => 0 });
+	const el = fakeAudio();
+	player.attachAudioElement(el);
+	// Shuffled order is 22, 33, 11: the last one is the album's first track.
+	player.playTrackById(42, 11);
+	await flush();
+	el.currentTime = 5;
+	el.ontimeupdate();
+	assert.equal(player.current.position, 205);
+	el.onpause();
+	el.onended();
+	await flush();
+	const progress = fetch.calls.find(([url]) => url === '/progress/42');
+	assert.match(progress[1].body, /"position":5,/);
 });
