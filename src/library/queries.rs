@@ -23,6 +23,9 @@ pub struct Item {
     pub artist: Option<String>,
     pub album_artist: Option<String>,
     pub year: Option<i32>,
+    /// `None` where a query does not select it.
+    #[sqlx(default)]
+    pub genre: Option<String>,
     pub author: Option<String>,
     pub narrator: Option<String>,
     pub description: Option<String>,
@@ -49,6 +52,9 @@ pub struct Track {
     pub path: String,
     pub duration: f64,
     pub title: Option<String>,
+    /// The track's own artist from its tags (a sampler's songs).
+    #[sqlx(default)]
+    pub artist: Option<String>,
     pub disc: Option<i32>,
     pub mtime: Option<f64>,
     pub size: Option<i64>,
@@ -143,6 +149,8 @@ pub struct ItemsFilter {
     pub q: Option<String>,
     /// Exact album artist (`/items?artist=`).
     pub artist: Option<String>,
+    /// Genre, case-insensitively (`/items?genre=`).
+    pub genre: Option<String>,
     pub missing: Option<bool>,
     pub sort: Option<SortKey>,
     pub limit: i64,
@@ -152,12 +160,14 @@ pub struct ItemsFilter {
     pub played_by: Option<i32>,
 }
 
-/// Top-level items only (no episodes), with the kind / search / artist / missing filters.
+/// Top-level items only (no episodes), with the kind / search / artist / genre / missing
+/// filters.
 fn push_item_conditions(
     query: &mut QueryBuilder<Postgres>,
     kind: Option<&str>,
     q: Option<&str>,
     artist: Option<&str>,
+    genre: Option<&str>,
     missing: Option<bool>,
 ) {
     // A copy hidden under Einstellungen → Doppelte Alben is in no list.
@@ -169,6 +179,12 @@ fn push_item_conditions(
         query
             .push(" AND items.artist = ")
             .push_bind(artist.to_owned());
+    }
+    if let Some(genre) = genre {
+        query
+            .push(" AND lower(items.genre) = lower(")
+            .push_bind(genre.to_owned())
+            .push(")");
     }
     if let Some(q) = q.filter(|q| !q.is_empty()) {
         let pattern = like_pattern(q);
@@ -204,6 +220,7 @@ pub async fn items(db: &PgPool, filter: &ItemsFilter) -> Result<Vec<Item>, sqlx:
         filter.kind.as_deref(),
         filter.q.as_deref(),
         filter.artist.as_deref(),
+        filter.genre.as_deref(),
         filter.missing,
     );
     let mut sort = filter.sort.unwrap_or(SortKey::Title);
@@ -216,10 +233,15 @@ pub async fn items(db: &PgPool, filter: &ItemsFilter) -> Result<Vec<Item>, sqlx:
     query.build_query_as().fetch_all(db).await
 }
 
-/// Present top-level items of `kind` matching `q`.
-pub async fn count_items(db: &PgPool, kind: &str, q: Option<&str>) -> Result<i64, sqlx::Error> {
+/// Present top-level items of `kind` matching `q` (and `genre`, if given).
+pub async fn count_items(
+    db: &PgPool,
+    kind: &str,
+    q: Option<&str>,
+    genre: Option<&str>,
+) -> Result<i64, sqlx::Error> {
     let mut query = QueryBuilder::new("SELECT count(*) FROM items");
-    push_item_conditions(&mut query, Some(kind), q, None, Some(false));
+    push_item_conditions(&mut query, Some(kind), q, None, genre, Some(false));
     query.build_query_scalar().fetch_one(db).await
 }
 
@@ -334,6 +356,26 @@ pub async fn item_durations_with_feed_fallback(
         durations.entry(id).or_insert(duration);
     }
     Ok(durations)
+}
+
+/// A genre and how many present albums carry it.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct Genre {
+    pub name: String,
+    pub album_count: i32,
+}
+
+/// Every genre of a present album, case-insensitively, in the spelling most albums use.
+pub async fn genres(db: &PgPool) -> Result<Vec<Genre>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT mode() WITHIN GROUP (ORDER BY genre) AS name, count(*)::int AS album_count
+         FROM items
+         WHERE kind = 'album' AND genre IS NOT NULL AND missing_since IS NULL
+           AND duplicate_of IS NULL
+         GROUP BY lower(genre) ORDER BY lower(genre)",
+    )
+    .fetch_all(db)
+    .await
 }
 
 /// An album artist and how many present albums they have.
@@ -583,19 +625,21 @@ pub async fn search_items(
 pub struct TrackHit {
     pub id: i32,
     pub title: Option<String>,
+    pub artist: Option<String>,
     pub duration: f64,
     pub item_id: i32,
     pub item_title: String,
     pub item_kind: String,
 }
 
-/// Tracks of present items whose title contains `q`.
+/// Tracks of present items whose title or own artist contains `q`.
 pub async fn search_tracks(db: &PgPool, q: &str, limit: i64) -> Result<Vec<TrackHit>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT track.id, track.title, track.duration, track.item_id,
+        "SELECT track.id, track.title, track.artist, track.duration, track.item_id,
                 item.title AS item_title, item.kind AS item_kind
          FROM tracks AS track JOIN items AS item ON item.id = track.item_id
-         WHERE track.title ILIKE $1 ESCAPE '\\' AND item.missing_since IS NULL
+         WHERE (track.title ILIKE $1 ESCAPE '\\' OR track.artist ILIKE $1 ESCAPE '\\')
+           AND item.missing_since IS NULL
            AND item.duplicate_of IS NULL
          ORDER BY lower(track.title) LIMIT $2",
     )

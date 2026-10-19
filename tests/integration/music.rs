@@ -286,7 +286,7 @@ async fn vanished_albums_are_hidden_from_every_album_listing(db: PgPool) {
         ..Default::default()
     };
     assert_eq!(items(&db, &present).await.unwrap().len(), 1);
-    assert_eq!(count_items(&db, "album", None).await.unwrap(), 1);
+    assert_eq!(count_items(&db, "album", None, None).await.unwrap(), 1);
     assert_eq!(library_counts(&db).await.unwrap().album_count, 1);
     assert_eq!(
         artists(&db).await.unwrap(),
@@ -509,7 +509,7 @@ async fn a_track_has_its_shape_and_an_unknown_one_is_404(db: PgPool) {
     let body = body_json(app.get(&format!("/tracks/{track}"), Some(&token)).await).await;
     assert_eq!(
         body,
-        json!({"id": track, "position": 1, "title": null, "duration": 1350.5,
+        json!({"id": track, "position": 1, "title": null, "duration": 1350.5, "artist": null,
                "item_id": id, "disc": null})
     );
     for uri in ["/tracks/999999", "/tracks/abc"] {
@@ -727,4 +727,98 @@ async fn the_image_route_says_404_without_any_picture(db: PgPool) {
         let body: Value = body_json(response).await;
         assert_eq!(body, json!({"detail": "Kein Bild"}), "{uri}");
     }
+}
+
+// --- genres, track artists, search by artist ---------------------------------------------------
+
+async fn set_genre(db: &PgPool, id: i32, genre: &str) {
+    sqlx::query("UPDATE items SET genre = $2 WHERE id = $1")
+        .bind(id)
+        .bind(genre)
+        .execute(db)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test]
+async fn albums_filter_by_genre_and_genres_are_listed_case_insensitively(db: PgPool) {
+    let (app, token) = signed_in(db).await;
+    let rock = seed(app.db(), album("Back in Black", "AC/DC")).await;
+    let rock2 = seed(app.db(), album("Highway", "AC/DC")).await;
+    let rock3 = seed(app.db(), album("Let There Be Rock", "AC/DC")).await;
+    let jazz = seed(app.db(), album("Kind of Blue", "Miles Davis")).await;
+    // Listed in the spelling most albums use.
+    set_genre(app.db(), rock, "Rock").await;
+    set_genre(app.db(), rock2, "rock").await;
+    set_genre(app.db(), rock3, "Rock").await;
+    set_genre(app.db(), jazz, "Jazz").await;
+
+    let body = body_json(app.get("/genres", Some(&token)).await).await;
+    assert_eq!(
+        body,
+        json!({"genres": [
+            {"name": "Jazz", "album_count": 1},
+            {"name": "Rock", "album_count": 3}
+        ]})
+    );
+    let body = body_json(app.get("/items?kind=album&genre=ROCK", Some(&token)).await).await;
+    let titles: Vec<&str> = body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles, ["Back in Black", "Highway", "Let There Be Rock"]);
+    let body = body_json(app.get(&format!("/items/{jazz}"), Some(&token)).await).await;
+    assert_eq!(body["genre"], "Jazz");
+}
+
+#[sqlx::test]
+async fn tracks_carry_their_artist_and_disc_and_search_finds_them_by_artist(db: PgPool) {
+    let (app, token) = signed_in(db).await;
+    let sampler = seed(app.db(), album("Bravo Hits", "Verschiedene Interpreten")).await;
+    let track = seed_track(app.db(), sampler, 1, "/m/1.mp3", 200.0).await;
+    sqlx::query("UPDATE tracks SET artist = 'Nena', title = 'Leuchtturm', disc = 2 WHERE id = $1")
+        .bind(track)
+        .execute(app.db())
+        .await
+        .unwrap();
+
+    let body = body_json(app.get(&format!("/items/{sampler}"), Some(&token)).await).await;
+    assert_eq!(body["tracks"][0]["artist"], "Nena");
+    assert_eq!(body["tracks"][0]["disc"], 2);
+
+    let body = body_json(app.get("/search?q=nena", Some(&token)).await).await;
+    assert_eq!(body["tracks"][0]["title"], "Leuchtturm");
+    assert_eq!(body["tracks"][0]["artist"], "Nena");
+    let body = body_json(app.get("/search?q=interpreten", Some(&token)).await).await;
+    assert_eq!(
+        body["artists"],
+        json!([{"name": "Verschiedene Interpreten", "role": "artist", "work_count": 1}])
+    );
+}
+
+#[sqlx::test]
+async fn a_verwalter_sets_the_genre_and_it_is_locked(db: PgPool) {
+    let app = TestApp::new(db);
+    let admin = app.user("admin", true).await;
+    let token = app.token(admin).await;
+    let id = seed(app.db(), album("Kind of Blue", "Miles Davis")).await;
+    let response = app
+        .call(
+            axum::http::Method::PATCH,
+            &format!("/items/{id}"),
+            Some(json!({ "set": { "genre": "Modal Jazz" } })),
+            Some(&token),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let (genre, locked): (Option<String>, Vec<String>) =
+        sqlx::query_as("SELECT genre, locked_fields FROM items WHERE id = $1")
+            .bind(id)
+            .fetch_one(app.db())
+            .await
+            .unwrap();
+    assert_eq!(genre.as_deref(), Some("Modal Jazz"));
+    assert!(locked.contains(&"genre".to_owned()));
 }

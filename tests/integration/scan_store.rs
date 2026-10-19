@@ -18,6 +18,7 @@ fn track(path: &str, position: i32, title: &str) -> ScannedTrack {
         path: path.into(),
         position,
         title: Some(title.into()),
+        artist: None,
         disc: None,
         duration: 10.0,
         mtime: 100.0,
@@ -36,6 +37,7 @@ fn scanned(source: &str, title: &str) -> ScannedItem {
         description: None,
         series: None,
         year: None,
+        genre: None,
         series_index: None,
         tracks: vec![track(&format!("{source}/01.mp3"), 1, "T")],
         chapters: vec![ScannedChapter {

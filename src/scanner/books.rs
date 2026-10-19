@@ -40,6 +40,8 @@ pub struct ScannedTrack {
     pub path: String,
     pub position: i32,
     pub title: Option<String>,
+    /// The track's own artist; on a sampler it differs from the album's.
+    pub artist: Option<String>,
     pub disc: Option<i32>,
     pub duration: f64,
     pub mtime: f64,
@@ -57,6 +59,7 @@ pub struct ScannedItem {
     pub description: Option<String>,
     pub series: Option<String>,
     pub year: Option<i32>,
+    pub genre: Option<String>,
     pub series_index: Option<f64>,
     pub tracks: Vec<ScannedTrack>,
     pub chapters: Vec<ScannedChapter>,
@@ -155,7 +158,8 @@ fn stem(path: &str) -> String {
         .unwrap_or_default()
 }
 
-/// Disc, then track number (file order for untagged files), then file order — numbered 1..n
+/// Disc, then track number (file order for untagged files, or for all when numbers repeat
+/// within a disc), then file order — numbered 1..n
 /// without gaps. Positions land in UNIQUE(item_id, position), so a repeated number is not
 /// cosmetic: the insert would fail.
 pub fn order_tracks(raw: &[RawTrack], file_order: &[String]) -> Vec<ScannedTrack> {
@@ -165,13 +169,21 @@ pub fn order_tracks(raw: &[RawTrack], file_order: &[String]) -> Vec<ScannedTrack
             .position(|f| f == path)
             .map_or(0, |i| i + 1) as i64
     };
+    // Several discs in one folder without a disc tag carry track numbers that start over
+    // (`1-01`, `1-02`, `2-01` …): sorting by them would interleave the discs. A number that
+    // repeats within one disc means the numbers do not order the item, the file names do.
+    let mut seen = std::collections::HashSet::new();
+    let numbers_repeat = raw
+        .iter()
+        .filter_map(|t| Some((t.tags.disc.unwrap_or(0), t.tags.track?)))
+        .any(|key| !seen.insert(key));
     let mut sorted: Vec<&RawTrack> = raw.iter().collect();
     sorted.sort_by_key(|t| {
-        (
-            t.tags.disc.unwrap_or(0),
-            t.tags.track.map_or_else(|| fallback(&t.path), i64::from),
-            fallback(&t.path),
-        )
+        let number = match t.tags.track {
+            Some(track) if !numbers_repeat => i64::from(track),
+            _ => fallback(&t.path),
+        };
+        (t.tags.disc.unwrap_or(0), number, fallback(&t.path))
     });
     sorted
         .into_iter()
@@ -180,12 +192,57 @@ pub fn order_tracks(raw: &[RawTrack], file_order: &[String]) -> Vec<ScannedTrack
             path: t.path.clone(),
             position: i as i32 + 1,
             title: Some(t.tags.title.clone().unwrap_or_else(|| stem(&t.path))),
+            artist: t.tags.artist.clone(),
             disc: t.tags.disc.map(|d| d as i32),
             duration: t.tags.duration,
             mtime: t.mtime,
             size: t.size,
         })
         .collect()
+}
+
+/// What an album without an album-artist tag is filed under, from its tracks' artists: "Various
+/// Artists" for a compilation (flagged so, or no artist on at least half of the tracks), else the
+/// artist most of the tracks have. The first file alone decided before, which put a sampler under
+/// whoever sang its first song.
+pub const VARIOUS_ARTISTS: &str = "Verschiedene Interpreten";
+
+fn album_artist_of(raw: &[RawTrack]) -> Option<String> {
+    if raw.iter().any(|t| t.tags.compilation) {
+        return Some(VARIOUS_ARTISTS.to_owned());
+    }
+    let artist = most_common(raw.iter().map(|t| t.tags.artist.as_deref()))?;
+    let count = raw
+        .iter()
+        .filter(|t| {
+            t.tags
+                .artist
+                .as_deref()
+                .is_some_and(|a| a.to_lowercase() == artist.to_lowercase())
+        })
+        .count();
+    if count * 2 < raw.len() {
+        return Some(VARIOUS_ARTISTS.to_owned());
+    }
+    Some(artist)
+}
+
+/// The value most entries share, case-insensitively, in the spelling it first appeared in; the
+/// earliest wins a tie. `None` when no entry has one.
+fn most_common<'a>(values: impl Iterator<Item = Option<&'a str>>) -> Option<String> {
+    let mut counts: Vec<(String, &'a str, usize)> = Vec::new();
+    for value in values.flatten() {
+        let key = value.to_lowercase();
+        match counts.iter_mut().find(|(k, _, _)| *k == key) {
+            Some(entry) => entry.2 += 1,
+            None => counts.push((key, value, 1)),
+        }
+    }
+    let best = counts.iter().map(|(_, _, n)| *n).max()?;
+    counts
+        .into_iter()
+        .find(|(_, _, n)| *n == best)
+        .map(|(_, value, _)| value.to_owned())
 }
 
 /// Whether two files are the same recording twice: the same title (case and spacing aside),
@@ -346,6 +403,7 @@ fn scan_unit(
             description: None,
             series,
             year: None,
+            genre: None,
             series_index,
             tracks: Vec::new(),
             chapters: Vec::new(),
@@ -409,11 +467,15 @@ fn scan_unit(
             first
                 .album_artist
                 .clone()
-                .or_else(|| first.artist.clone())
+                .or_else(|| album_artist_of(&raw))
                 .or(folder_author_or_artist),
             first.album_artist.clone(),
             first.year,
         ),
+    };
+    let genre = match kind {
+        ItemKind::Album => most_common(raw.iter().map(|t| t.tags.genre.as_deref())),
+        ItemKind::Book => None,
     };
 
     let mut chapters = Vec::new();
@@ -453,6 +515,7 @@ fn scan_unit(
         description: first.description.clone(),
         series,
         year,
+        genre,
         series_index,
         tracks,
         chapters,
@@ -801,5 +864,68 @@ mod tests {
         let problem = library_root_problem(&locked);
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
         assert_eq!(problem.as_deref(), Some("Verzeichnis ist nicht lesbar"));
+    }
+
+    #[test]
+    fn repeated_numbers_without_a_disc_tag_keep_the_file_order() {
+        let order = files(&["/a/1-01.mp3", "/a/1-02.mp3", "/a/2-01.mp3", "/a/2-02.mp3"]);
+        let raw = vec![
+            raw("/a/2-01.mp3", Some(1), None),
+            raw("/a/1-01.mp3", Some(1), None),
+            raw("/a/2-02.mp3", Some(2), None),
+            raw("/a/1-02.mp3", Some(2), None),
+        ];
+        assert_eq!(
+            paths(&order_tracks(&raw, &order)),
+            ["/a/1-01.mp3", "/a/1-02.mp3", "/a/2-01.mp3", "/a/2-02.mp3"]
+        );
+    }
+
+    fn by(path: &str, artist: Option<&str>, compilation: bool) -> RawTrack {
+        RawTrack {
+            path: path.into(),
+            tags: TrackTags {
+                artist: artist.map(Into::into),
+                compilation,
+                duration: 10.0,
+                readable: true,
+                ..TrackTags::UNREADABLE
+            },
+            mtime: 1.0,
+            size: 2,
+        }
+    }
+
+    #[test]
+    fn an_album_goes_under_the_artist_most_tracks_have() {
+        let raw = vec![
+            by("/a/1.mp3", Some("Guest"), false),
+            by("/a/2.mp3", Some("Band"), false),
+            by("/a/3.mp3", Some("band"), false),
+        ];
+        assert_eq!(album_artist_of(&raw).as_deref(), Some("Band"));
+    }
+
+    #[test]
+    fn a_sampler_goes_under_various_artists() {
+        let mixed = vec![
+            by("/a/1.mp3", Some("A"), false),
+            by("/a/2.mp3", Some("B"), false),
+            by("/a/3.mp3", Some("C"), false),
+        ];
+        assert_eq!(album_artist_of(&mixed).as_deref(), Some(VARIOUS_ARTISTS));
+        let flagged = vec![
+            by("/a/1.mp3", Some("A"), true),
+            by("/a/2.mp3", Some("A"), true),
+        ];
+        assert_eq!(album_artist_of(&flagged).as_deref(), Some(VARIOUS_ARTISTS));
+        assert_eq!(album_artist_of(&[by("/a/1.mp3", None, false)]), None);
+    }
+
+    #[test]
+    fn most_common_ignores_case_and_keeps_the_first_spelling() {
+        let values = [Some("Rock"), None, Some("Jazz"), Some("rock")];
+        assert_eq!(most_common(values.into_iter()).as_deref(), Some("Rock"));
+        assert_eq!(most_common([None, None].into_iter()), None);
     }
 }

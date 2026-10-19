@@ -129,9 +129,9 @@ async fn the_lists_let_a_verwalter_pick_tiles_for_the_bulk_editor(db: PgPool) {
 
     let (_, html) = page(&app, "/library/albums?q=back&artist=ACDC", &admin).await;
     assert!(html.contains(&format!(r#"data-pick="{album}""#)));
-    // "Alle N auswählen" sends the list's own filter.
+    // "Alle N auswählen" sends the list's own filter — which, by artist, ignores the search.
     assert!(html.contains(
-        r#"data-filter="{&#34;artist&#34;:&#34;ACDC&#34;,&#34;kind&#34;:&#34;album&#34;,&#34;missing&#34;:false,&#34;q&#34;:&#34;back&#34;}""#
+        r#"data-filter="{&#34;artist&#34;:&#34;ACDC&#34;,&#34;kind&#34;:&#34;album&#34;,&#34;missing&#34;:false}""#
     ), "{}", &html[html.find("data-selection-bar").unwrap()..][..300]);
     assert!(!html.contains("Aus Ordnernamen erkennen"));
 

@@ -22,6 +22,9 @@ pub struct TrackTags {
     pub track: Option<u32>,
     pub disc: Option<u32>,
     pub year: Option<i32>,
+    pub genre: Option<String>,
+    /// Marked as a compilation (ID3 TCMP, MP4 cpil, Vorbis COMPILATION): a various-artists album.
+    pub compilation: bool,
     /// Series name from the tags — MVNM/grouping, or a TXXX:SERIES frame.
     pub series: Option<String>,
     /// Volume number from MVIN or TXXX:SERIES-PART.
@@ -42,6 +45,8 @@ impl TrackTags {
         track: None,
         disc: None,
         year: None,
+        genre: None,
+        compilation: false,
         series: None,
         series_index: None,
         description: None,
@@ -162,6 +167,33 @@ fn year(tag: &Tag) -> Option<i32> {
     raw.get(..4)?.parse().ok()
 }
 
+/// The genre as text. ID3 files may still carry the v1 number (`17`, `(17)`, `(17)Rock`) instead
+/// of a name; those become the name from the standard list.
+fn genre(tag: &Tag) -> Option<String> {
+    genre_name(&non_empty(tag.genre())?)
+}
+
+fn genre_name(raw: &str) -> Option<String> {
+    static NUMBERED: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^(?:\(([0-9]{1,3})\)(.*)|([0-9]{1,3}))$").unwrap());
+    let Some(caps) = NUMBERED.captures(raw) else {
+        return Some(raw.to_owned());
+    };
+    if let Some(rest) = caps
+        .get(2)
+        .map(|m| m.as_str().trim())
+        .filter(|r| !r.is_empty())
+    {
+        return Some(rest.to_owned());
+    }
+    let number = caps.get(1).or_else(|| caps.get(3))?.as_str();
+    number
+        .parse::<usize>()
+        .ok()
+        .and_then(|n| lofty::id3::v1::GENRES.get(n))
+        .map(|name| (*name).to_owned())
+}
+
 pub fn read_tags(path: &Path) -> TrackTags {
     let Ok(tagged) = lofty::read_from_path(path) else {
         return TrackTags::UNREADABLE;
@@ -196,6 +228,10 @@ pub fn read_tags(path: &Path) -> TrackTags {
         track: tag.track(),
         disc: tag.disk(),
         year: year(tag),
+        genre: genre(tag),
+        compilation: tag
+            .get_string(ItemKey::FlagCompilation)
+            .is_some_and(|v| matches!(v.trim(), "1" | "true" | "True" | "TRUE")),
         series,
         series_index,
         description,
@@ -241,5 +277,15 @@ mod tests {
             Some("Perry Rhodan")
         );
         assert_eq!(native_tag(&pairs, DESCRIPTION_KEYS), None);
+    }
+
+    #[test]
+    fn genre_numbers_become_names() {
+        assert_eq!(genre_name("17").as_deref(), Some("Rock"));
+        assert_eq!(genre_name("(17)").as_deref(), Some("Rock"));
+        assert_eq!(genre_name("(17)Hard Rock").as_deref(), Some("Hard Rock"));
+        assert_eq!(genre_name("80s Pop").as_deref(), Some("80s Pop"));
+        assert_eq!(genre_name("Jazz").as_deref(), Some("Jazz"));
+        assert_eq!(genre_name("999"), None);
     }
 }

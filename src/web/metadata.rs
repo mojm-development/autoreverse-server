@@ -160,13 +160,24 @@ impl BulkEditor {
     }
 
     /// The albums list's filter: kind, search, artist and present-or-missing as shown.
-    pub fn album_filter(q: &str, artist: Option<&str>, missing: bool) -> serde_json::Value {
-        let mut filter = json!({ "kind": "album", "missing": missing });
-        if !q.is_empty() {
+    /// The bulk editor's "all matching" filter for the albums list. It has to select exactly
+    /// what the list shows: the list by artist ignores the search and the missing filter, so
+    /// this does too.
+    pub fn album_filter(
+        q: &str,
+        artist: Option<&str>,
+        genre: Option<&str>,
+        missing: bool,
+    ) -> serde_json::Value {
+        let mut filter = json!({ "kind": "album", "missing": missing && artist.is_none() });
+        if !q.is_empty() && artist.is_none() {
             filter["q"] = json!(q);
         }
         if let Some(artist) = artist {
             filter["artist"] = json!(artist);
+        }
+        if let Some(genre) = genre {
+            filter["genre"] = json!(genre);
         }
         filter
     }
@@ -187,6 +198,7 @@ mod tests {
             cover_path: None,
             artist: Some("AC/DC".into()),
             album_artist: None,
+            genre: None,
             year: Some(2010),
             author: None,
             narrator: None,
@@ -217,7 +229,8 @@ mod tests {
                 "Sortiertitel",
                 "Interpret",
                 "Album-Interpret",
-                "Jahr"
+                "Jahr",
+                "Genre"
             ]
         );
         let artist = &editor.fields[2];
@@ -250,11 +263,16 @@ mod tests {
     #[test]
     fn the_album_filter_is_what_the_list_shows() {
         assert_eq!(
-            BulkEditor::album_filter("live", Some("ACDC"), false),
-            json!({ "kind": "album", "missing": false, "q": "live", "artist": "ACDC" })
+            BulkEditor::album_filter("live", None, Some("Rock"), false),
+            json!({ "kind": "album", "missing": false, "q": "live", "genre": "Rock" })
+        );
+        // The list by artist ignores the search and the missing filter.
+        assert_eq!(
+            BulkEditor::album_filter("live", Some("ACDC"), None, true),
+            json!({ "kind": "album", "missing": false, "artist": "ACDC" })
         );
         assert_eq!(
-            BulkEditor::album_filter("", None, true),
+            BulkEditor::album_filter("", None, None, true),
             json!({ "kind": "album", "missing": true })
         );
     }

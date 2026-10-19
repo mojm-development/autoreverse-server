@@ -53,11 +53,13 @@ fn scanned(title: &str, author: &str, mtime: f64) -> ScannedItem {
         description: None,
         series: None,
         year: None,
+        genre: None,
         series_index: None,
         tracks: vec![ScannedTrack {
             path: "/library/books/Autor/Buch/01.mp3".into(),
             position: 1,
             title: Some("Track aus der Datei".into()),
+            artist: None,
             disc: None,
             duration: 10.0,
             mtime,

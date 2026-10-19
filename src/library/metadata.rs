@@ -128,6 +128,7 @@ pub const ITEM_FIELDS: &[MetadataField] = &[
         BOOK,
     ),
     number("year", "year", "year", FieldType::Int, "Jahr", BOTH),
+    text("genre", "genre", "genre", "Genre", ALBUM, 100),
 ];
 
 pub const TRACK_FIELDS: &[MetadataField] = &[
@@ -447,6 +448,7 @@ pub fn item_cell(item: &Item, field: &MetadataField) -> Cell {
         "series" => text(&item.series),
         "seriesIndex" => item.series_index.map(FieldValue::Num),
         "year" => item.year.map(|y| FieldValue::Num(f64::from(y))),
+        "genre" => text(&item.genre),
         _ => None,
     }
 }
@@ -899,7 +901,8 @@ mod tests {
                 "Sortiertitel",
                 "Interpret",
                 "Album-Interpret",
-                "Jahr"
+                "Jahr",
+                "Genre"
             ]
         );
         let book: Vec<&str> = fields_for("book").map(|f| f.wire).collect();

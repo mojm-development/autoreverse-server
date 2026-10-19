@@ -229,7 +229,8 @@ async fn play_opens_a_session_and_returns_tracks_and_chapters(db: PgPool) {
             "kind": "book",
             "has_cover": false,
             "start_position": 0,
-            "tracks": [{"id": track, "position": 1, "title": null, "duration": 120}],
+            "tracks": [{"id": track, "position": 1, "title": null, "duration": 120,
+                "artist": null, "disc": null}],
             "chapters": [{"title": "Eins", "start": 0, "end": 60.5}]
         })
         .to_string()

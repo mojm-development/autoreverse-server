@@ -245,7 +245,7 @@ async fn list(
             tokio::try_join!(
                 queries::items(&state.db, &filter),
                 // The whole shelf, not the search hits: the heading counts the library.
-                count_items(&state.db, "book", None)
+                count_items(&state.db, "book", None, None)
             )?
         }
     };

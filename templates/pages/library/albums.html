@@ -17,6 +17,7 @@
 			<input type="hidden" name="view" value="{{ view }}" />
 			<input type="hidden" name="sort" value="{{ sort }}" />
 			{% if let Some(artist) = artist %}<input type="hidden" name="artist" value="{{ artist }}" />{% endif %}
+			{% if let Some(genre) = genre %}<input type="hidden" name="genre" value="{{ genre }}" />{% endif %}
 			<span class="search-field">
 				{% call ui::icon("search") %}{% endcall %}
 				<input type="search" name="q" value="{{ q }}" placeholder="Alben durchsuchen" />
@@ -33,7 +34,7 @@
 		</div>
 	</div>
 
-	{% if !q.is_empty() || artist.is_some() || missing %}
+	{% if !q.is_empty() || artist.is_some() || genre.is_some() || missing %}
 	<div class="chips">
 		{% if !q.is_empty() %}
 		<span class="chip">Suche: {{ q }}
@@ -42,6 +43,10 @@
 		{% if let Some(artist) = artist %}
 		<span class="chip">Interpret: {{ artist }}
 			<a href="{{ clear_artist_href }}" aria-label="Interpretenfilter aufheben">×</a></span>
+		{% endif %}
+		{% if let Some(genre) = genre %}
+		<span class="chip">Genre: {{ genre }}
+			<a href="{{ clear_genre_href }}" aria-label="Genrefilter aufheben">×</a></span>
 		{% endif %}
 		{% if missing %}
 		<span class="chip">Fehlend

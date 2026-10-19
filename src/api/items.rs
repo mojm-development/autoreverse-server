@@ -45,7 +45,8 @@ struct ItemsOut {
     items: Vec<ItemSummary>,
 }
 
-/// `kind`, `q`, `artist` (exact; not in legacy), `missing=true|false`, `limit` (1–500, default 200), `offset`, and
+/// `kind`, `q`, `artist` (exact; not in legacy), `genre` (case-insensitive; not in legacy),
+/// `missing=true|false`, `limit` (1–500, default 200), `offset`, and
 /// `sort=title|added|series|played`. An unknown sort is refused rather than read as `title`: a
 /// sort that silently does something else is a bug that takes long to notice.
 async fn list(
@@ -68,6 +69,7 @@ async fn list(
             kind: non_empty("kind"),
             q: non_empty("q"),
             artist: non_empty("artist"),
+            genre: non_empty("genre"),
             missing: query.get("missing").map(|m| m == "true"),
             sort: Some(sort),
             limit,
@@ -197,6 +199,7 @@ async fn library_more(
             kind: Some(kind.to_owned()),
             q: query.get("q").filter(|v| !v.is_empty()).cloned(),
             artist: None,
+            genre: query.get("genre").filter(|v| !v.is_empty()).cloned(),
             missing: Some(query.get("missing").is_some_and(|m| m == "true")),
             sort: Some(sort),
             limit,
