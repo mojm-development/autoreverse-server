@@ -199,6 +199,7 @@ async fn run_passes(
         totals.removed += remove_vanished(&app.db, root, &found, &skipped).await? as u32;
         status.lock().last_report = Some(totals);
     }
+    crate::library::artist_covers::unify_artist_spellings(&app.db).await?;
     if !root_errors.is_empty() {
         status.lock().last_error = Some(root_errors.join(" · "));
     }

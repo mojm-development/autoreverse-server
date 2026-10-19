@@ -822,3 +822,62 @@ async fn a_verwalter_sets_the_genre_and_it_is_locked(db: PgPool) {
     assert_eq!(genre.as_deref(), Some("Modal Jazz"));
     assert!(locked.contains(&"genre".to_owned()));
 }
+
+#[sqlx::test]
+async fn artist_spellings_are_unified_to_the_most_common_or_the_locked_one(db: PgPool) {
+    use autoreverse_server::library::artist_covers::unify_artist_spellings;
+    let a = seed(&db, album("Back in Black", "AC/DC")).await;
+    let b = seed(&db, album("Highway", "AC/DC")).await;
+    let c = seed(&db, album("Powerage", "Ac/Dc")).await;
+    sqlx::query("INSERT INTO artist_covers (artist, item_id) VALUES ('Ac/Dc', $1)")
+        .bind(c)
+        .execute(&db)
+        .await
+        .unwrap();
+    let k1 = seed(&db, album("Autobahn", "kraftwerk")).await;
+    let k2 = seed(&db, album("Radio", "kraftwerk")).await;
+    let k3 = seed(&db, album("Mix", "Kraftwerk")).await;
+    sqlx::query("UPDATE items SET locked_fields = ARRAY['artist'] WHERE id = $1")
+        .bind(k3)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    unify_artist_spellings(&db).await.unwrap();
+
+    let artist = |id: i32| {
+        let db = db.clone();
+        async move {
+            sqlx::query_scalar::<_, String>("SELECT artist FROM items WHERE id = $1")
+                .bind(id)
+                .fetch_one(&db)
+                .await
+                .unwrap()
+        }
+    };
+    for id in [a, b, c] {
+        assert_eq!(artist(id).await, "AC/DC");
+    }
+    // A Verwalter's spelling wins over the majority.
+    for id in [k1, k2, k3] {
+        assert_eq!(artist(id).await, "Kraftwerk");
+    }
+    let covers: Vec<String> = sqlx::query_scalar("SELECT artist FROM artist_covers")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(covers, ["AC/DC"]);
+    assert_eq!(
+        artists(&db).await.unwrap(),
+        [
+            Artist {
+                name: "AC/DC".into(),
+                album_count: 3
+            },
+            Artist {
+                name: "Kraftwerk".into(),
+                album_count: 3
+            }
+        ]
+    );
+}
