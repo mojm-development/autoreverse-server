@@ -881,3 +881,76 @@ async fn artist_spellings_are_unified_to_the_most_common_or_the_locked_one(db: P
         ]
     );
 }
+
+#[sqlx::test]
+async fn artists_sort_by_their_sort_name_or_without_a_leading_article(db: PgPool) {
+    seed(&db, album("Gold", "Abba")).await;
+    seed(&db, album("Parachutes", "Coldplay")).await;
+    seed(&db, album("Is This It", "The Strokes")).await;
+    let beatles = seed(&db, album("Abbey Road", "The Beatles")).await;
+    sqlx::query("UPDATE items SET artist_sort = 'Beatles, The' WHERE id = $1")
+        .bind(beatles)
+        .execute(&db)
+        .await
+        .unwrap();
+    let names: Vec<String> = artists(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| a.name)
+        .collect();
+    assert_eq!(names, ["Abba", "The Beatles", "Coldplay", "The Strokes"]);
+}
+
+#[sqlx::test]
+async fn a_stored_album_sorts_without_its_article_unless_the_tags_say_otherwise(db: PgPool) {
+    use autoreverse_server::scanner::store::store_items;
+    let mut wall = scan_music_item("The Wall");
+    let mut road = scan_music_item("Abbey Road");
+    road.source_path = "/m/Beatles/Abbey Road".into();
+    road.title_sort = Some("Road, Abbey".into());
+    wall.source_path = "/m/Pink Floyd/The Wall".into();
+    let mut failures = Vec::new();
+    store_items(
+        &db,
+        &[wall, road],
+        Path::new("/nonexistent"),
+        &mut failures,
+        |_, _, _| {},
+        || false,
+    )
+    .await;
+    let keys: Vec<(String, String)> =
+        sqlx::query_as("SELECT title, sort_title FROM items ORDER BY title")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(
+        keys,
+        [
+            ("Abbey Road".into(), "road, abbey".into()),
+            ("The Wall".into(), "wall".into())
+        ]
+    );
+}
+
+fn scan_music_item(title: &str) -> ScannedItem {
+    ScannedItem {
+        source_path: String::new(),
+        kind: ItemKind::Album,
+        title: title.into(),
+        author: None,
+        artist: Some("X".into()),
+        album_artist: None,
+        description: None,
+        series: None,
+        year: None,
+        genre: None,
+        title_sort: None,
+        artist_sort: None,
+        series_index: None,
+        tracks: Vec::new(),
+        chapters: Vec::new(),
+        unchanged: false,
+    }
+}

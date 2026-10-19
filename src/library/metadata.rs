@@ -624,7 +624,7 @@ pub fn derive_sort_title(
         .find(|(f, _)| f.column == "title")
         .and_then(|(_, v)| as_text(v))
         .unwrap_or_else(|| current_title.to_owned());
-    let derived = Some(FieldValue::Text(title.to_lowercase()));
+    let derived = Some(FieldValue::Text(super::sorting::sort_key(&title)));
     if let Some(entry) = patch.iter_mut().find(|(f, _)| f.column == SORT_TITLE) {
         if entry.1.is_none() {
             entry.1 = derived;

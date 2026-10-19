@@ -145,7 +145,10 @@ async fn store_one(
         return Ok(Outcome::Unchanged);
     }
 
-    let sort_title = entry.title.to_lowercase();
+    let sort_title = match &entry.title_sort {
+        Some(tagged) => tagged.to_lowercase(),
+        None => crate::library::sorting::sort_key(&entry.title),
+    };
     let (item_id, outcome, current_cover) = match existing {
         Some(existing) => {
             // Every scanned field, each kept as stored when locked.
@@ -161,7 +164,8 @@ async fn store_one(
                      series = CASE WHEN $14 THEN $15 ELSE series END,
                      series_index = CASE WHEN $16 THEN $17 ELSE series_index END,
                      year = CASE WHEN $18 THEN $19 ELSE year END,
-                     genre = CASE WHEN $20 THEN $21 ELSE genre END
+                     genre = CASE WHEN $20 THEN $21 ELSE genre END,
+                     artist_sort = CASE WHEN $8 THEN $22 ELSE artist_sort END
                  WHERE id = $1",
             )
             .bind(existing.id)
@@ -185,6 +189,7 @@ async fn store_one(
             .bind(entry.year)
             .bind(unless_locked(locked, "genre"))
             .bind(&entry.genre)
+            .bind(&entry.artist_sort)
             .execute(&mut **tx)
             .await?;
             (existing.id, Outcome::Updated, existing.cover_path)
@@ -192,8 +197,8 @@ async fn store_one(
         None => {
             let id: i32 = sqlx::query_scalar(
                 "INSERT INTO items (kind, source_path, title, sort_title, author, artist,
-                     album_artist, description, series, series_index, year, genre)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                     album_artist, description, series, series_index, year, genre, artist_sort)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                  RETURNING id",
             )
             .bind(entry.kind.as_str())
@@ -208,6 +213,7 @@ async fn store_one(
             .bind(entry.series_index)
             .bind(entry.year)
             .bind(&entry.genre)
+            .bind(&entry.artist_sort)
             .fetch_one(&mut **tx)
             .await?;
             (id, Outcome::New, None)

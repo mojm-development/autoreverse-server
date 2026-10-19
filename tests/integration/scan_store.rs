@@ -38,6 +38,8 @@ fn scanned(source: &str, title: &str) -> ScannedItem {
         series: None,
         year: None,
         genre: None,
+        title_sort: None,
+        artist_sort: None,
         series_index: None,
         tracks: vec![track(&format!("{source}/01.mp3"), 1, "T")],
         chapters: vec![ScannedChapter {

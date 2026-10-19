@@ -254,12 +254,13 @@ pub async fn subscribe(
             Some(row) => row,
             None => sqlx::query_as(
                 "INSERT INTO items (kind, title, sort_title, description, feed_url, last_checked)
-                 VALUES ('podcast', $1, lower($1), $2, $3, now())
+                 VALUES ('podcast', $1, $4, $2, $3, now())
                  RETURNING id, title, feed_url, cover_path",
             )
             .bind(&parsed.title)
             .bind(&parsed.description)
             .bind(feed_url)
+            .bind(crate::library::sorting::sort_key(&parsed.title))
             .fetch_one(db)
             .await?,
         };

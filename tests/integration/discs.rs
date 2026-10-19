@@ -90,6 +90,8 @@ fn album(source: &str, tracks: Vec<ScannedTrack>) -> ScannedItem {
         series: None,
         year: None,
         genre: None,
+        title_sort: None,
+        artist_sort: None,
         series_index: None,
         tracks,
         chapters: Vec::new(),

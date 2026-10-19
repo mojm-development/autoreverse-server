@@ -60,6 +60,10 @@ pub struct ScannedItem {
     pub series: Option<String>,
     pub year: Option<i32>,
     pub genre: Option<String>,
+    /// The title's sort key from the tags, else derived from the title by the store.
+    pub title_sort: Option<String>,
+    /// The album artist's sort name from the tags.
+    pub artist_sort: Option<String>,
     pub series_index: Option<f64>,
     pub tracks: Vec<ScannedTrack>,
     pub chapters: Vec<ScannedChapter>,
@@ -404,6 +408,8 @@ fn scan_unit(
             series,
             year: None,
             genre: None,
+            title_sort: None,
+            artist_sort: None,
             series_index,
             tracks: Vec::new(),
             chapters: Vec::new(),
@@ -516,6 +522,12 @@ fn scan_unit(
         series,
         year,
         genre,
+        // A disc folder's tag names "Album (CD 1)"; the merged item's title has no disc suffix.
+        title_sort: first.album_sort.clone().filter(|_| discs.is_empty()),
+        artist_sort: match kind {
+            ItemKind::Album => first.artist_sort.clone(),
+            ItemKind::Book => None,
+        },
         series_index,
         tracks,
         chapters,

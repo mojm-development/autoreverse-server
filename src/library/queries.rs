@@ -385,13 +385,17 @@ pub struct Artist {
     pub album_count: i32,
 }
 
-/// Every album artist with at least one present album, case-insensitively by name.
+/// Every album artist with at least one present album, by their sort name: the one from the
+/// tags ("Beatles, The"), else the name without a leading English article.
 pub async fn artists(db: &PgPool) -> Result<Vec<Artist>, sqlx::Error> {
     sqlx::query_as(
         "SELECT artist AS name, count(*)::int AS album_count FROM items
          WHERE kind = 'album' AND artist IS NOT NULL AND missing_since IS NULL
            AND duplicate_of IS NULL
-         GROUP BY artist ORDER BY lower(artist), artist",
+         GROUP BY artist
+         ORDER BY lower(coalesce(min(artist_sort),
+                                 regexp_replace(artist, '^(the|a|an)\\s+(?=\\S)', '', 'i'))),
+                  artist",
     )
     .fetch_all(db)
     .await

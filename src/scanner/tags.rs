@@ -23,6 +23,9 @@ pub struct TrackTags {
     pub disc: Option<u32>,
     pub year: Option<i32>,
     pub genre: Option<String>,
+    /// How the album title and its artist are to be sorted (TSOA/soal, TSO2/soaa or TSOP/soar).
+    pub album_sort: Option<String>,
+    pub artist_sort: Option<String>,
     /// Marked as a compilation (ID3 TCMP, MP4 cpil, Vorbis COMPILATION): a various-artists album.
     pub compilation: bool,
     /// Series name from the tags — MVNM/grouping, or a TXXX:SERIES frame.
@@ -46,6 +49,8 @@ impl TrackTags {
         disc: None,
         year: None,
         genre: None,
+        album_sort: None,
+        artist_sort: None,
         compilation: false,
         series: None,
         series_index: None,
@@ -229,6 +234,9 @@ pub fn read_tags(path: &Path) -> TrackTags {
         disc: tag.disk(),
         year: year(tag),
         genre: genre(tag),
+        album_sort: non_empty(tag.get_string(ItemKey::AlbumTitleSortOrder)),
+        artist_sort: non_empty(tag.get_string(ItemKey::AlbumArtistSortOrder))
+            .or_else(|| non_empty(tag.get_string(ItemKey::TrackArtistSortOrder))),
         compilation: tag
             .get_string(ItemKey::FlagCompilation)
             .is_some_and(|v| matches!(v.trim(), "1" | "true" | "True" | "TRUE")),

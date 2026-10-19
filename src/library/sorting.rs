@@ -1,6 +1,22 @@
 //! SQL sort keys (legacy `library/sorting.ts`). Both are plain SQL fragments over a column
 //! expression, so they compose into `ORDER BY` clauses.
 
+/// The derived sort key of a title: lower-cased, without a leading English article — "The Wall"
+/// sorts under W, as in every music player. German articles stay: "Die drei ???" is filed under D
+/// by everyone who looks for it. A sort tag in the file or a sort title set by hand wins over this.
+pub fn sort_key(title: &str) -> String {
+    let lower = title.trim().to_lowercase();
+    for article in ["the ", "a ", "an "] {
+        if let Some(rest) = lower.strip_prefix(article) {
+            let rest = rest.trim_start();
+            if !rest.is_empty() {
+                return rest.to_owned();
+            }
+        }
+    }
+    lower
+}
+
 /// Digits are zero-padded to this width, so "10" sorts after "9".
 const NUMBER_WIDTH: u32 = 12;
 
@@ -34,4 +50,20 @@ pub fn episode_number(column: &str) -> String {
              substring(lower({column}) from '{LEADING}'::text)::int
          )"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_sort_key_drops_a_leading_english_article() {
+        assert_eq!(sort_key("The Wall"), "wall");
+        assert_eq!(sort_key("A Night at the Opera"), "night at the opera");
+        assert_eq!(sort_key("An Awesome Wave"), "awesome wave");
+        assert_eq!(sort_key("Die drei ???"), "die drei ???");
+        assert_eq!(sort_key("The"), "the");
+        assert_eq!(sort_key("A-ha Hits"), "a-ha hits");
+        assert_eq!(sort_key("Theater"), "theater");
+    }
 }

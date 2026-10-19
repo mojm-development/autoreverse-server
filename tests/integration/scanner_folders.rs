@@ -305,3 +305,22 @@ fn a_sampler_keeps_each_tracks_artist_and_goes_under_various_artists() {
         .collect();
     assert_eq!(artists, ["Nena", "Falco", "Kraftwerk"]);
 }
+
+#[test]
+fn reads_the_sort_tags_of_album_and_artist() {
+    let root = tempfile::tempdir().unwrap();
+    let file = root.path().join("Beatles/Abbey Road/01.mp3");
+    make_audio(
+        &file,
+        &[
+            ("title", "Come Together"),
+            ("artist", "The Beatles"),
+            ("album", "Abbey Road"),
+            ("album-sort", "Road, Abbey"),
+            ("artist-sort", "Beatles, The"),
+        ],
+    );
+    let tags = read_tags(&file);
+    assert_eq!(tags.album_sort.as_deref(), Some("Road, Abbey"));
+    assert_eq!(tags.artist_sort.as_deref(), Some("Beatles, The"));
+}
