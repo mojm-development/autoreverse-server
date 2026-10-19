@@ -85,9 +85,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     );
     let listener = TcpListener::bind(addr).await?;
     tracing::info!("Autoreverse läuft auf http://{addr}");
-    axum::serve(listener, app(state))
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    // The peer address feeds the per-address login throttle.
+    axum::serve(
+        listener,
+        app(state).into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     Ok(())
 }
 

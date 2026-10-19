@@ -9,7 +9,7 @@ use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::{Router, routing::get, routing::post};
 
-use crate::auth::login::perform_login;
+use crate::auth::login::{Peer, address_guard, perform_login};
 use crate::auth::session::{cleared_session_cookie, session_cookie_for};
 use crate::auth::tokens::revoke_token;
 use crate::auth::{Session, WebUser};
@@ -53,7 +53,11 @@ async fn login_page(State(state): State<AppState>, session: Session) -> WebResul
 
 /// Same login path as the API; on failure the page comes back with the API's status and German
 /// message, like SvelteKit's `fail(status, { message })`.
-async fn login_submit(State(state): State<AppState>, body: Bytes) -> WebResult<Response> {
+async fn login_submit(
+    State(state): State<AppState>,
+    peer: Peer,
+    body: Bytes,
+) -> WebResult<Response> {
     let form: HashMap<String, String> = serde_urlencoded::from_bytes(&body).unwrap_or_default();
     let field = |key: &str| form.get(key).map(String::as_str).unwrap_or("");
     match perform_login(
@@ -62,6 +66,7 @@ async fn login_submit(State(state): State<AppState>, body: Bytes) -> WebResult<R
         &state.login_semaphore,
         field("name"),
         field("password"),
+        address_guard(&state, &peer),
     )
     .await
     {

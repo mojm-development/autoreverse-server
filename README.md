@@ -63,8 +63,13 @@ data you have backups of.
 **Users**
 
 - Argon2id password hashing
-- Bearer tokens for API clients, session cookies for the web UI, one resolver behind both
-- Login throttling (`429` with `Retry-After`)
+- Bearer tokens for API clients, session cookies for the web UI, one resolver behind both; the
+  database holds only a SHA-256 of each token, and a token unused for 180 days expires
+- Login throttling (`429` with `Retry-After`), per name and per public client address
+- Protection against cross-site requests (`Origin`, `Sec-Fetch-Site`), clickjacking protection and
+  a Content-Security-Policy without inline scripts
+- Files, artwork and chapters named by a feed on the internet are never fetched from the local
+  network
 - Admin/non-admin split: user creation and library configuration are admin-only
 - Per-user playback preferences
 

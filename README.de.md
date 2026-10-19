@@ -68,7 +68,10 @@ von denen du Backups hast.
   in der Datenbank liegt nur ein SHA-256 der Tokens, nach 180 Tagen ohne Nutzung verfallen sie
 - Schutz gegen Anfragen fremder Seiten (`Origin`, `Sec-Fetch-Site`), Clickjacking-Schutz und eine
   Content-Security-Policy ohne Inline-Skripte
-- Drosselung bei Fehlanmeldungen (`429` mit `Retry-After`)
+- Drosselung bei Fehlanmeldungen (`429` mit `Retry-After`), pro Name und pro öffentlicher
+  Client-Adresse
+- Dateien, Artwork und Kapitel, die ein Feed aus dem Internet nennt, lädt der Server nie aus dem
+  lokalen Netz
 - Trennung Verwalter/Benutzer: Benutzeranlage und Bibliothekskonfiguration nur für Verwalter
 - Wiedergabeeinstellungen pro Benutzer
 

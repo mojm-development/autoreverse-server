@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::validate::ApiJson;
 use crate::auth::ApiUser;
-use crate::auth::login::perform_login;
+use crate::auth::login::{Peer, address_guard, perform_login};
 use crate::auth::session::cleared_session_cookie;
 use crate::auth::tokens::revoke_token;
 use crate::error::ApiResult;
@@ -33,6 +33,7 @@ struct TokenOut {
 
 async fn login(
     State(state): State<AppState>,
+    peer: Peer,
     ApiJson(body): ApiJson<LoginBody>,
 ) -> ApiResult<Json<TokenOut>> {
     let token = perform_login(
@@ -41,6 +42,7 @@ async fn login(
         &state.login_semaphore,
         &body.name,
         &body.password,
+        address_guard(&state, &peer),
     )
     .await?;
     Ok(Json(TokenOut { token }))

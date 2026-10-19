@@ -17,6 +17,8 @@ pub struct AppState {
     pub db: PgPool,
     pub config: Arc<Config>,
     pub login_throttle: Arc<LoginThrottle>,
+    /// The same per client address (see `auth::login::throttled_address`).
+    pub login_throttle_by_address: Arc<LoginThrottle>,
     pub login_semaphore: Arc<Semaphore>,
     /// The one scan status of this process (legacy `scanState`).
     pub scan: ScanStatus,
@@ -30,6 +32,9 @@ impl AppState {
             db,
             config: Arc::new(config),
             login_throttle: Arc::new(LoginThrottle::new()),
+            login_throttle_by_address: Arc::new(
+                LoginThrottle::new().with_limit(crate::auth::login::ATTEMPTS_PER_ADDRESS),
+            ),
             login_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_LOGIN_HASHES)),
             scan: ScanStatus::default(),
             http: crate::podcasts::http_client(),

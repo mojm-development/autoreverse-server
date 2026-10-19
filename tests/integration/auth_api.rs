@@ -17,9 +17,16 @@ async fn perform_login_returns_a_token_on_correct_credentials(db: PgPool) {
     let app = TestApp::new(db);
     app.user("oliver", false).await;
     let (throttle, semaphore) = (LoginThrottle::new(), Semaphore::new(4));
-    let token = perform_login(app.db(), &throttle, &semaphore, "oliver", "hunter2hunter2")
-        .await
-        .unwrap();
+    let token = perform_login(
+        app.db(),
+        &throttle,
+        &semaphore,
+        "oliver",
+        "hunter2hunter2",
+        None,
+    )
+    .await
+    .unwrap();
     assert!(token.len() > 30);
 }
 
@@ -28,7 +35,7 @@ async fn perform_login_rejects_a_wrong_password_with_401(db: PgPool) {
     let app = TestApp::new(db);
     app.user("oliver", false).await;
     let (throttle, semaphore) = (LoginThrottle::new(), Semaphore::new(4));
-    let err = perform_login(app.db(), &throttle, &semaphore, "oliver", "wrong")
+    let err = perform_login(app.db(), &throttle, &semaphore, "oliver", "wrong", None)
         .await
         .unwrap_err();
     assert_eq!(err.status, StatusCode::UNAUTHORIZED);
@@ -43,9 +50,9 @@ async fn perform_login_throttles_after_ten_attempts_and_always_releases_the_sema
     app.user("oliver", false).await;
     let (throttle, semaphore) = (LoginThrottle::new(), Semaphore::new(4));
     for _ in 0..10 {
-        let _ = perform_login(app.db(), &throttle, &semaphore, "oliver", "wrong").await;
+        let _ = perform_login(app.db(), &throttle, &semaphore, "oliver", "wrong", None).await;
     }
-    let err = perform_login(app.db(), &throttle, &semaphore, "oliver", "wrong")
+    let err = perform_login(app.db(), &throttle, &semaphore, "oliver", "wrong", None)
         .await
         .unwrap_err();
     assert_eq!(err.status, StatusCode::TOO_MANY_REQUESTS);
@@ -63,11 +70,18 @@ async fn perform_login_counts_names_case_insensitively(db: PgPool) {
     app.user("oliver", false).await;
     let (throttle, semaphore) = (LoginThrottle::new(), Semaphore::new(4));
     for _ in 0..10 {
-        let _ = perform_login(app.db(), &throttle, &semaphore, "Oliver", "wrong").await;
+        let _ = perform_login(app.db(), &throttle, &semaphore, "Oliver", "wrong", None).await;
     }
-    let err = perform_login(app.db(), &throttle, &semaphore, "OLIVER", "hunter2hunter2")
-        .await
-        .unwrap_err();
+    let err = perform_login(
+        app.db(),
+        &throttle,
+        &semaphore,
+        "OLIVER",
+        "hunter2hunter2",
+        None,
+    )
+    .await
+    .unwrap_err();
     assert_eq!(err.status, StatusCode::TOO_MANY_REQUESTS);
 }
 
@@ -79,9 +93,16 @@ async fn perform_login_answers_503_when_the_semaphore_is_exhausted_without_touch
     app.user("oliver", false).await;
     let (throttle, semaphore) = (LoginThrottle::new(), Semaphore::new(1));
     let _held = semaphore.try_acquire().unwrap();
-    let err = perform_login(app.db(), &throttle, &semaphore, "oliver", "hunter2hunter2")
-        .await
-        .unwrap_err();
+    let err = perform_login(
+        app.db(),
+        &throttle,
+        &semaphore,
+        "oliver",
+        "hunter2hunter2",
+        None,
+    )
+    .await
+    .unwrap_err();
     assert_eq!(err.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(
         err.detail,
@@ -321,4 +342,47 @@ async fn unknown_api_paths_are_404_with_detail(db: PgPool) {
     let response = app.get("/does-not-exist", None).await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     assert!(body_json(response).await["detail"].is_string());
+}
+
+// --- per address ------------------------------------------------------------------------------
+
+async fn login_from(app: &TestApp, ip: &str, name: &str) -> StatusCode {
+    use axum::extract::ConnectInfo;
+    let mut request = axum::http::Request::post("/auth/login")
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(
+            serde_json::json!({ "name": name, "password": "falsch" }).to_string(),
+        ))
+        .unwrap();
+    let addr: std::net::SocketAddr = format!("{ip}:40000").parse().unwrap();
+    request.extensions_mut().insert(ConnectInfo(addr));
+    app.send(request).await.status()
+}
+
+#[sqlx::test]
+async fn one_public_address_trying_many_names_is_throttled(db: PgPool) {
+    let app = TestApp::new(db);
+    for i in 0..autoreverse_server::auth::login::ATTEMPTS_PER_ADDRESS {
+        let status = login_from(&app, "93.184.216.34", &format!("name{i}")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "attempt {i}");
+    }
+    assert_eq!(
+        login_from(&app, "93.184.216.34", "noch-ein-name").await,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    // Another address is not affected.
+    assert_eq!(
+        login_from(&app, "1.1.1.1", "noch-ein-name").await,
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[sqlx::test]
+async fn a_private_address_is_never_throttled_as_a_whole(db: PgPool) {
+    // Behind a reverse proxy everybody arrives from its private address.
+    let app = TestApp::new(db);
+    for i in 0..(autoreverse_server::auth::login::ATTEMPTS_PER_ADDRESS + 5) {
+        let status = login_from(&app, "172.18.0.2", &format!("name{i}")).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "attempt {i}");
+    }
 }
