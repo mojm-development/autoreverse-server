@@ -35,7 +35,8 @@ pub struct ScanCard {
 /// One entry of the pass or phase list.
 pub struct Step {
     pub label: &'static str,
-    /// `waiting`, `running` or `done` (CSS hooks on `data-state`).
+    /// `waiting`, `running`, `done` or, for a pass whose root was unreadable, `skipped` (CSS hooks
+    /// on `data-state`).
     pub state: &'static str,
     pub status: &'static str,
 }
@@ -209,6 +210,9 @@ fn pass_steps(p: &ScanProgress) -> Vec<Step> {
         .zip(1..)
         .map(|(library, pass)| {
             let (state, status) = match pass.cmp(&p.pass) {
+                std::cmp::Ordering::Less if p.unreadable.contains(&pass) => {
+                    ("skipped", "Nicht lesbar")
+                }
                 std::cmp::Ordering::Less => ("done", "Fertig"),
                 std::cmp::Ordering::Equal => ("running", "Läuft"),
                 std::cmp::Ordering::Greater => ("waiting", "Wartet"),
@@ -383,6 +387,7 @@ mod tests {
             passes: 2,
             found: 812,
             current: Some("Pink Floyd/The Wall".into()),
+            unreadable: Vec::new(),
             phase_started: Instant::now(),
         }
     }
@@ -420,6 +425,16 @@ mod tests {
         assert_eq!((live.amount.as_str(), live.percent), ("812", None));
         assert_eq!(live.elapsed, "02:14");
         assert_eq!(card.poll_interval(), "1s");
+    }
+
+    #[test]
+    fn a_pass_skipped_for_an_unreadable_root_is_not_shown_as_done() {
+        let mut p = progress(Phase::Scanning, None, 0);
+        p.unreadable = vec![1];
+        let card = ScanCard::new(&running(p), Utc::now(), Instant::now());
+        let books = &card.passes[0];
+        assert_eq!((books.state, books.status), ("skipped", "Nicht lesbar"));
+        assert_eq!(card.passes[1].state, "running");
     }
 
     #[test]

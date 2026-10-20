@@ -1,6 +1,9 @@
 {#- legacy ScanStatusCard.svelte, redesigned (src/web/scan_card.rs). htmx re-fetches the card:
     every second while a scan runs, every five seconds otherwise. The Protokoll toggle survives the
-    swap (static/js/app.js). No live region: the card is replaced every second. -#}
+    swap (static/js/app.js). No live region: the card is replaced every second. A poll that comes
+    while another request on the card is in flight is dropped; Starten/Abbrechen replace (abort)
+    an in-flight poll rather than queue behind it, since the poll would detach the button and htmx
+    would then discard the queued click. -#}
 <section
 	class="card scan-card"
 	id="scan-card"
@@ -8,7 +11,7 @@
 	hx-get="/settings/scan/card"
 	hx-trigger="every {{ card.poll_interval() }}"
 	hx-swap="outerHTML"
-	hx-sync="this:queue last"
+	hx-sync="this:drop"
 >
 	<header class="scan-head">
 		<div>
@@ -101,9 +104,9 @@
 
 	<footer class="scan-actions">
 		{% if card.running %}
-		<button class="secondary" type="button" hx-post="/settings/scan/cancel" hx-target="#scan-card" hx-swap="outerHTML" hx-disabled-elt="this"{% if card.cancel_requested %} disabled{% endif %}>{% if card.cancel_requested %}Wird abgebrochen …{% else %}Abbrechen{% endif %}</button>
+		<button class="secondary" type="button" hx-post="/settings/scan/cancel" hx-target="#scan-card" hx-swap="outerHTML" hx-sync="closest .scan-card:replace" hx-disabled-elt="this"{% if card.cancel_requested %} disabled{% endif %}>{% if card.cancel_requested %}Wird abgebrochen …{% else %}Abbrechen{% endif %}</button>
 		{% else %}
-		<button class="primary" type="button" hx-post="/settings/scan/start" hx-target="#scan-card" hx-swap="outerHTML" hx-disabled-elt="this">Scan starten</button>
+		<button class="primary" type="button" hx-post="/settings/scan/start" hx-target="#scan-card" hx-swap="outerHTML" hx-sync="closest .scan-card:replace" hx-disabled-elt="this">Scan starten</button>
 		{% endif %}
 		<button class="secondary" type="button" data-scan-log-toggle aria-controls="scan-log" aria-expanded="false">Protokoll <span class="mono">({{ card.log.len() }})</span></button>
 	</footer>

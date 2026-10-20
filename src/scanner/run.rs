@@ -100,6 +100,7 @@ async fn run_passes(
     let covers_dir =
         std::path::absolute(&app.config.cover_dir).unwrap_or_else(|_| app.config.cover_dir.clone());
     let mut root_errors = Vec::new();
+    let mut unreadable: Vec<u32> = Vec::new();
     let mut skipped: Vec<String> = Vec::new();
     let mut totals = ScanReport::default();
 
@@ -117,6 +118,7 @@ async fn run_passes(
         };
         if let Some(problem) = problem {
             root_errors.push(format!("{root}: {problem}"));
+            unreadable.push(index as u32 + 1);
             continue;
         }
 
@@ -138,6 +140,7 @@ async fn run_passes(
             passes: passes.len() as u32,
             found: 0,
             current: None,
+            unreadable: unreadable.clone(),
             phase_started: Instant::now(),
         });
 

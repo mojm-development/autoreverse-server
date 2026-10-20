@@ -203,8 +203,12 @@
 	content: '✓ ';
 	color: var(--a);
 }
-.scan-card .scan-pass[data-state='waiting'] .scan-pass-name {
+.scan-card .scan-pass[data-state='waiting'] .scan-pass-name,
+.scan-card .scan-pass[data-state='skipped'] .scan-pass-name {
 	color: var(--dim);
+}
+.scan-card .scan-pass[data-state='skipped'] .scan-pass-state {
+	color: var(--danger);
 }
 
 .scan-card .scan-phases {

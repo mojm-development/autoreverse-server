@@ -51,6 +51,8 @@ pub struct ScanProgress {
     pub found: u32,
     /// The folder last read or stored, relative to the root.
     pub current: Option<String>,
+    /// Earlier passes (1-based) whose root could not be read and that were skipped whole.
+    pub unreadable: Vec<u32>,
     /// When the phase began: rate and remaining time.
     #[serde(skip)]
     pub phase_started: Instant,
