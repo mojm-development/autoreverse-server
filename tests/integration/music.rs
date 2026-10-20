@@ -27,7 +27,7 @@ fn scan_music(root: &Path) -> Vec<ScannedItem> {
         ItemKind::Album,
         &Default::default(),
         &mut Vec::new(),
-        |_, _| {},
+        |_| {},
         || false,
     )
 }

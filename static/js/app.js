@@ -38,6 +38,9 @@ function renderThemeToggles() {
 let scanLogOpen = false;
 function renderScanLog() {
 	for (const log of document.querySelectorAll('[data-scan-log]')) log.hidden = !scanLogOpen;
+	for (const toggle of document.querySelectorAll('[data-scan-log-toggle]')) {
+		toggle.setAttribute('aria-expanded', String(scanLogOpen));
+	}
 }
 
 document.addEventListener('click', (event) => {

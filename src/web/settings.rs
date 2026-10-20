@@ -12,6 +12,7 @@ use axum::response::Html;
 use axum::{Router, routing::get, routing::post};
 
 use super::layout::Shell;
+use super::scan_card::ScanCard;
 use crate::api::scan::{cancel_scan, start_scan};
 use crate::auth::preferences::{
     Preferences, SKIP_MAX, SKIP_MIN, SPEED_MAX, SPEED_MIN, set_preferences,
@@ -20,7 +21,6 @@ use crate::auth::{WebAdmin, WebUser};
 use crate::error::WebResult;
 use crate::library::paths::{LibraryPaths, get_library_paths, set_library_paths};
 use crate::library::queries::{LibraryCounts, count_missing, delete_missing, library_counts};
-use crate::scanner::state::{Phase, ScanState};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
@@ -351,96 +351,6 @@ async fn scan_page(
     ))
 }
 
-/// Counts shown under the status line: live while running, else the last report.
-pub struct Counts {
-    pub new: u32,
-    pub updated: u32,
-    pub unchanged: u32,
-    pub removed: u32,
-    pub skipped: u32,
-}
-
-/// What `partials/scan_card.html` shows (legacy `ScanStatusCard.svelte`). htmx polls it: every
-/// second while a scan runs, every five seconds otherwise.
-pub struct ScanCard {
-    pub running: bool,
-    pub has_progress: bool,
-    pub stat_line: String,
-    pub determinate: bool,
-    pub percent: u32,
-    pub counts: Option<Counts>,
-    pub last_error: Option<String>,
-    pub skipped_line: String,
-}
-
-impl ScanCard {
-    pub fn poll_interval(&self) -> &'static str {
-        if self.running { "1s" } else { "5s" }
-    }
-}
-
-impl From<&ScanState> for ScanCard {
-    fn from(s: &ScanState) -> Self {
-        let progress = s.progress.as_ref();
-        let total = progress.and_then(|p| p.total).filter(|t| *t > 0);
-        let processed = progress.map_or(0, |p| p.processed);
-        let percent = total.map_or(0, |t| {
-            ((f64::from(processed) / f64::from(t)) * 100.0)
-                .round()
-                .min(100.0) as u32
-        });
-        let phase = match progress.map(|p| p.phase) {
-            Some(Phase::Storing) => "Wird gespeichert",
-            _ => "Ordner werden gelesen",
-        };
-        let root_label = progress
-            .and_then(|p| p.root.as_deref())
-            .and_then(|root| root.trim_end_matches('/').rsplit('/').next())
-            .filter(|name| !name.is_empty());
-        let stat_line = [
-            Some(phase.to_owned()),
-            root_label.map(str::to_owned),
-            total.map(|t| format!("{processed} von {t}")),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(" · ");
-        let counts = match (s.running, progress, s.last_report) {
-            (true, Some(p), _) => Some(Counts {
-                new: p.new,
-                updated: p.updated,
-                unchanged: p.unchanged,
-                removed: 0,
-                skipped: p.skipped,
-            }),
-            (_, _, Some(r)) => Some(Counts {
-                new: r.new,
-                updated: r.updated,
-                unchanged: r.unchanged,
-                removed: r.removed,
-                skipped: r.skipped,
-            }),
-            _ => None,
-        };
-        let skipped_line = if s.last_skipped.is_empty() {
-            "—".to_owned()
-        } else {
-            s.last_skipped.join(", ")
-        };
-        ScanCard {
-            running: s.running,
-            has_progress: progress.is_some(),
-            stat_line,
-            determinate: total.is_some(),
-            percent,
-            counts,
-            last_error: s.last_error.clone(),
-            skipped_line,
-        }
-    }
-}
-
 #[derive(Template)]
 #[template(path = "partials/scan_card.html")]
 struct ScanCardPartial {
@@ -465,53 +375,4 @@ async fn scan_start(State(state): State<AppState>, _admin: WebAdmin) -> WebResul
 async fn scan_cancel(State(state): State<AppState>, _admin: WebAdmin) -> WebResult<Html<String>> {
     let _ = cancel_scan(&state);
     render_card(&state)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::scanner::state::{ScanProgress, ScanReport};
-
-    #[test]
-    fn card_shows_phase_root_and_count_while_running() {
-        let state = ScanState {
-            running: true,
-            progress: Some(ScanProgress {
-                phase: Phase::Storing,
-                root: Some("/media/Hörbücher/".into()),
-                total: Some(8),
-                processed: 2,
-                new: 1,
-                updated: 0,
-                unchanged: 1,
-                skipped: 0,
-            }),
-            ..Default::default()
-        };
-        let card = ScanCard::from(&state);
-        assert_eq!(card.stat_line, "Wird gespeichert · Hörbücher · 2 von 8");
-        assert_eq!(card.percent, 25);
-        assert!(card.determinate);
-        assert_eq!(card.counts.as_ref().unwrap().new, 1);
-        assert_eq!(card.poll_interval(), "1s");
-    }
-
-    #[test]
-    fn card_falls_back_to_the_last_report_when_idle() {
-        let state = ScanState {
-            last_report: Some(ScanReport {
-                new: 3,
-                removed: 1,
-                ..Default::default()
-            }),
-            last_skipped: vec!["/a: kaputt".into()],
-            ..Default::default()
-        };
-        let card = ScanCard::from(&state);
-        let counts = card.counts.as_ref().unwrap();
-        assert_eq!((counts.new, counts.removed), (3, 1));
-        assert_eq!(card.skipped_line, "/a: kaputt");
-        assert_eq!(card.poll_interval(), "5s");
-        assert!(ScanCard::from(&ScanState::default()).counts.is_none());
-    }
 }

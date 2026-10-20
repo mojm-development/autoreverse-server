@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}Anmelden · Autoreverse{% endblock %}
-{% block head %}<link rel="stylesheet" href="/css/pages/login.css" />{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/login.css" />{% endblock %}
 {% block body %}
 <div class="login" style="--a: var(--book)">
 	<div class="branding">

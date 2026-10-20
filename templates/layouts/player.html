@@ -6,31 +6,31 @@
 {% block layout_head %}
 		{#- All page styles and page scripts up front: a boosted navigation swaps the body only,
 		    the head of the next page is never read. -#}
-		<link rel="stylesheet" href="/css/player.css" />
-		<link rel="stylesheet" href="/css/pages/library.css" />
-		<link rel="stylesheet" href="/css/pages/books.css" />
-		<link rel="stylesheet" href="/css/pages/book.css" />
-		<link rel="stylesheet" href="/css/pages/series.css" />
-		<link rel="stylesheet" href="/css/pages/albums.css" />
-		<link rel="stylesheet" href="/css/pages/album.css" />
-		<link rel="stylesheet" href="/css/pages/artists.css" />
-		<link rel="stylesheet" href="/css/pages/artist.css" />
-		<link rel="stylesheet" href="/css/pages/settings.css" />
-		<link rel="stylesheet" href="/css/pages/now-playing.css" />
-		<link rel="stylesheet" href="/css/pages/favorites.css" />
-		<link rel="stylesheet" href="/css/pages/search.css" />
-		<link rel="stylesheet" href="/css/pages/playlists.css" />
-		<link rel="stylesheet" href="/css/pages/podcasts.css" />
-		<link rel="stylesheet" href="/css/editors.css" />
-		<link rel="stylesheet" href="/css/pages/error.css" />
-		<script src="/js/books.js" defer></script>
-		<script src="/js/artists.js" defer></script>
-		<script src="/js/series.js" defer></script>
-		<script src="/js/playlists.js" defer></script>
-		<script src="/js/podcasts.js" defer></script>
-		<script type="module" src="/js/player/main.js"></script>
-		<script type="module" src="/js/metadata/editor.js"></script>
-		<script type="module" src="/js/pages.js"></script>
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/player.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/library.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/books.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/book.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/series.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/albums.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/album.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/artists.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/artist.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/settings.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/now-playing.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/favorites.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/search.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/playlists.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/podcasts.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/editors.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/error.css" />
+		<script src="{{ crate::web::assets::prefix() }}/js/books.js" defer></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/artists.js" defer></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/series.js" defer></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/playlists.js" defer></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/podcasts.js" defer></script>
+		<script type="module" src="{{ crate::web::assets::prefix() }}/js/player/main.js"></script>
+		<script type="module" src="{{ crate::web::assets::prefix() }}/js/metadata/editor.js"></script>
+		<script type="module" src="{{ crate::web::assets::prefix() }}/js/pages.js"></script>
 {% endblock %}
 {% block body %}
 <div class="boost-root" hx-boost="true">

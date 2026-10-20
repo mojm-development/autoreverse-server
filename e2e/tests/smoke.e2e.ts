@@ -44,7 +44,7 @@ test('full journey: login, scan, browse, play, progress persists across reload',
 	await page.goto('/settings/scan');
 	await page.getByRole('button', { name: 'Scan starten' }).click();
 	await expect(page.getByText('Scan läuft')).toBeVisible();
-	await expect(page.getByText(/neu 2/)).toBeVisible({ timeout: 30_000 });
+	await expect(page.locator('#scan-card [data-count="new"] dd')).toHaveText('2', { timeout: 30_000 });
 
 	await page.goto('/library/books');
 	await page.getByText('Buch', { exact: true }).click();

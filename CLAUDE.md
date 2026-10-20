@@ -158,7 +158,9 @@ lives in `static/js/` (player store and UI, metadata editors, infinite scroll, p
 is plain CSS: design tokens in `static/css/tokens.css` (dark by default,
 `:root[data-theme='light']` override, fixed accents `--music` / `--book` / `--podcast`), shared
 classes in `app.css` (`.eyebrow`, `.mono`, `.pill`, `.badge`), components in `components.css`,
-page styles in `css/pages/`. Prefer existing tokens and classes over new local values. Markup
+page styles in `css/pages/`. Prefer existing tokens and classes over new local values. Templates link
+CSS and JS as `{{ crate::web::assets::prefix() }}/css/…` (`/v/<digest of static/>/…`), so a deploy
+changes every asset URL and no browser or proxy cache keeps an old file. Markup
 (classes, ARIA roles, texts) mirrors legacy so the e2e specs and the design comparison hold.
 
 ## Testing layers

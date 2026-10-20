@@ -1,48 +1,124 @@
-{#- legacy ScanStatusCard.svelte. htmx re-fetches the card: every second while a scan runs,
-    every five seconds otherwise. The Protokoll toggle survives the swap (static/js/app.js). -#}
-<div
+{#- legacy ScanStatusCard.svelte, redesigned (src/web/scan_card.rs). htmx re-fetches the card:
+    every second while a scan runs, every five seconds otherwise. The Protokoll toggle survives the
+    swap (static/js/app.js). No live region: the card is replaced every second. A poll that comes
+    while another request on the card is in flight is dropped; Starten/Abbrechen replace (abort)
+    an in-flight poll rather than queue behind it, since the poll would detach the button and htmx
+    would then discard the queued click. -#}
+<section
 	class="card scan-card"
 	id="scan-card"
+	aria-label="Bibliotheksscan"
 	hx-get="/settings/scan/card"
 	hx-trigger="every {{ card.poll_interval() }}"
 	hx-swap="outerHTML"
+	hx-sync="this:drop"
 >
-	{% if card.running %}
-	<span class="eyebrow">Scan läuft</span>
-	{% if card.has_progress %}
-	<p class="stat mono">{{ card.stat_line }}</p>
-	{% if card.determinate %}
-	<div class="bar" role="progressbar" aria-label="Scan-Fortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ card.percent }}">
-		<div class="fill" style="width: {{ card.percent }}%"></div>
-	</div>
-	{% else %}
-	<div class="bar indeterminate" role="progressbar" aria-label="Scan-Fortschritt">
-		<div class="fill"></div>
-	</div>
+	<header class="scan-head">
+		<div>
+			<span class="eyebrow">{% if card.running %}Scan läuft{% else %}Kein Scan aktiv{% endif %}</span>
+			<h2>{{ card.title }}</h2>
+		</div>
+		{% if let Some(pass) = card.pass_label %}<span class="scan-pass-label mono">{{ pass }}</span>{% endif %}
+	</header>
+
+	{% if !card.passes.is_empty() %}
+	<ol class="scan-passes" aria-label="Durchgänge">
+		{% for pass in card.passes %}
+		<li class="scan-pass" data-state="{{ pass.state }}"{% if pass.active() %} aria-current="step"{% endif %}>
+			<span class="scan-pass-name">{{ pass.label }}</span>
+			<span class="scan-pass-state mono">{{ pass.status }}</span>
+		</li>
+		{% endfor %}
+	</ol>
 	{% endif %}
+
+	{% if !card.phases.is_empty() %}
+	<ol class="scan-phases" aria-label="Phasen des Durchgangs">
+		{% for phase in card.phases %}
+		<li data-state="{{ phase.state }}"{% if phase.active() %} aria-current="step"{% endif %}>
+			<span class="mono">{{ loop.index }}</span>
+			<span>{{ phase.label }}</span>
+			<span class="vh">{{ phase.status }}</span>
+		</li>
+		{% endfor %}
+	</ol>
 	{% endif %}
-	{% else %}
-	<span class="eyebrow">Kein Scan aktiv</span>
-	{% endif %}
-	{% if let Some(counts) = card.counts %}
-	<div class="report mono">
-		<span>neu {{ counts.new }}</span>
-		<span>geändert {{ counts.updated }}</span>
-		<span>unverändert {{ counts.unchanged }}</span>
-		<span>entfernt {{ counts.removed }}</span>
-		<span>übersprungen {{ counts.skipped }}</span>
-	</div>
-	{% endif %}
-	<div class="actions">
-		{% if card.running %}
-		<button class="outline" hx-post="/settings/scan/cancel" hx-target="#scan-card" hx-swap="outerHTML">Abbrechen</button>
+
+	{% if let Some(live) = card.live %}
+	<div class="scan-progress">
+		<div class="scan-progress-head">
+			<p class="scan-quantity">
+				<strong class="mono">{{ live.amount }}</strong>
+				<span>{{ live.amount_label }}</span>
+			</p>
+			{% if let Some(percent) = live.percent %}<span class="scan-percent mono">{{ percent }} %</span>{% endif %}
+		</div>
+		{% if let Some(percent) = live.percent %}
+		<progress class="scan-bar" max="100" value="{{ percent }}" aria-label="{{ live.phase }}" aria-valuetext="{{ live.progress_text }}">{{ percent }} %</progress>
 		{% else %}
-		<button class="primary" hx-post="/settings/scan/start" hx-target="#scan-card" hx-swap="outerHTML">Scan starten</button>
+		<progress class="scan-bar" aria-label="{{ live.phase }}" aria-valuetext="{{ live.progress_text }}"></progress>
 		{% endif %}
-		<button class="link" type="button" data-scan-log-toggle>Protokoll</button>
+		{% if let Some(note) = live.note %}<p class="scan-note">{{ note }}</p>{% endif %}
+		<dl class="scan-timing">
+			<div><dt>Laufzeit</dt><dd class="mono">{{ live.elapsed }}</dd></div>
+			<div><dt>Restzeit dieser Phase</dt><dd class="mono">{{ live.remaining }}</dd></div>
+			<div><dt>Ordner/s</dt><dd class="mono">{{ live.rate }}</dd></div>
+		</dl>
+		{% if let Some(current) = live.current %}
+		<div class="scan-current">
+			<span class="scan-note">Zuletzt gelesen</span>
+			<p class="mono">{{ current }}</p>
+		</div>
+		{% endif %}
 	</div>
-	<div class="log mono" data-scan-log hidden>
-		{% if let Some(error) = card.last_error %}<p>Fehler: {{ error }}</p>{% endif %}
-		<p>Übersprungen: {{ card.skipped_line }}</p>
+	{% endif %}
+
+	{% if let Some(last) = card.last %}
+	<div class="scan-last">
+		<p class="scan-outcome">{{ last.outcome }}</p>
+		<dl class="scan-timing">
+			<div><dt>Gestartet</dt><dd>{{ last.started }}</dd></div>
+			{% if let Some(duration) = last.duration %}<div><dt>Dauer</dt><dd class="mono">{{ duration }}</dd></div>{% endif %}
+		</dl>
 	</div>
-</div>
+	{% else if !card.running %}
+	<p class="scan-note">Noch kein Scan. Hörbücher und Musik werden nacheinander eingelesen.</p>
+	{% endif %}
+
+	{% if let Some(counts) = card.counts %}
+	<section class="scan-results" aria-label="Scan-Ergebnis">
+		<span class="eyebrow">{% if card.counts_running %}Bisher in diesem Scan{% else %}Ergebnis{% endif %}</span>
+		<dl class="scan-counts">
+			<div data-count="new"><dt>Neu</dt><dd class="mono">{{ counts.new }}</dd></div>
+			<div data-count="updated"><dt>Geändert</dt><dd class="mono">{{ counts.updated }}</dd></div>
+			<div data-count="unchanged"><dt>Unverändert</dt><dd class="mono">{{ counts.unchanged }}</dd></div>
+			<div data-count="removed"><dt>Entfernt</dt><dd class="mono">{% if let Some(removed) = counts.removed %}{{ removed }}{% else %}—{% endif %}</dd></div>
+			<div data-count="skipped"><dt>Übersprungen</dt><dd class="mono">{{ counts.skipped }}</dd></div>
+		</dl>
+	</section>
+	{% endif %}
+
+	{% if let Some(error) = card.last_error %}
+	<p class="scan-error">{{ error }}</p>
+	{% endif %}
+
+	<footer class="scan-actions">
+		{% if card.running %}
+		<button class="secondary" type="button" hx-post="/settings/scan/cancel" hx-target="#scan-card" hx-swap="outerHTML" hx-sync="closest .scan-card:replace" hx-disabled-elt="this"{% if card.cancel_requested %} disabled{% endif %}>{% if card.cancel_requested %}Wird abgebrochen …{% else %}Abbrechen{% endif %}</button>
+		{% else %}
+		<button class="primary" type="button" hx-post="/settings/scan/start" hx-target="#scan-card" hx-swap="outerHTML" hx-sync="closest .scan-card:replace" hx-disabled-elt="this">Scan starten</button>
+		{% endif %}
+		<button class="secondary" type="button" data-scan-log-toggle aria-controls="scan-log" aria-expanded="false">Protokoll <span class="mono">({{ card.log.len() }})</span></button>
+	</footer>
+
+	<div class="scan-log" id="scan-log" data-scan-log hidden>
+		{% if card.log.is_empty() %}
+		<p class="scan-note">Keine Fehler, kein Ordner übersprungen.</p>
+		{% else %}
+		<ul>
+			{% for entry in card.log %}<li class="mono">{{ entry }}</li>
+			{% endfor %}
+		</ul>
+		{% endif %}
+	</div>
+</section>
