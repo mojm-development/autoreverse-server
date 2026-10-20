@@ -4,16 +4,16 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<script src="/js/theme.js"></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/theme.js"></script>
 		<title>{% block title %}Autoreverse{% endblock %}</title>
 		<link rel="icon" href="/favicon.png" sizes="any" />
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-		<link rel="stylesheet" href="/css/app.css" />
-		<link rel="stylesheet" href="/css/components.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/app.css" />
+		<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/components.css" />
 		{% block layout_head %}{% endblock %}
 		{% block head %}{% endblock %}
-		<script src="/js/htmx-2.0.4.min.js" defer></script>
-		<script src="/js/app.js" defer></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/htmx-2.0.4.min.js" defer></script>
+		<script src="{{ crate::web::assets::prefix() }}/js/app.js" defer></script>
 	</head>
 	<body>
 		{% include "partials/icon_sprite.html" %}

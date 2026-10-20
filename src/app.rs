@@ -18,8 +18,13 @@ use crate::state::AppState;
 use crate::{api, web};
 
 pub fn app(state: AppState) -> Router {
-    let static_files =
-        ServeDir::new(&state.config.static_dir).not_found_service(not_found.into_service());
+    web::assets::init(&state.config.static_dir);
+    // Only the static files answer under `/v/<version>/`, pages do not.
+    let static_files = Router::new()
+        .fallback_service(
+            ServeDir::new(&state.config.static_dir).not_found_service(not_found.into_service()),
+        )
+        .layer(middleware::from_fn(web::assets::serve_versioned));
     Router::new()
         .merge(api::router())
         .merge(web::router())

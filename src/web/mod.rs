@@ -2,6 +2,7 @@
 
 pub mod albums;
 pub mod artists;
+pub mod assets;
 pub mod books;
 pub mod duplicates;
 pub mod errors;

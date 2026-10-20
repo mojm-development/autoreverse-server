@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% import "partials/ui.html" as ui %}
 {% block title %}Fehler {{ status }} · Autoreverse{% endblock %}
-{% block head %}<link rel="stylesheet" href="/css/pages/error.css" />{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ crate::web::assets::prefix() }}/css/pages/error.css" />{% endblock %}
 {% block body %}
 <div class="error-page">
 	<div class="brand">{% call ui::brand_mark(30) %}{% endcall %}<span class="wordmark">Autoreverse</span></div>
