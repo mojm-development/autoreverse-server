@@ -3,7 +3,9 @@
 
 use std::path::Path;
 
-use autoreverse_server::scanner::books::{ItemKind, KnownFiles, ScannedItem, scan_tree};
+use autoreverse_server::scanner::books::{
+    ItemKind, KnownFiles, ScannedItem, TreeProgress, scan_tree,
+};
 use autoreverse_server::scanner::chapters::read_chapters;
 use autoreverse_server::scanner::tags::read_tags;
 
@@ -15,7 +17,7 @@ fn scan(root: &Path, known: &KnownFiles) -> Vec<ScannedItem> {
         ItemKind::Book,
         known,
         &mut Vec::new(),
-        |_, _| {},
+        |_| {},
         || false,
     )
 }
@@ -32,6 +34,39 @@ fn known_entry(path: &Path) -> (String, (f64, i64)) {
         path.to_str().unwrap().to_owned(),
         (mtime, metadata.len() as i64),
     )
+}
+
+#[test]
+fn reports_the_folders_found_while_listing_then_each_folder_read() {
+    let root = tempfile::tempdir().unwrap();
+    for dir in ["A/Eins", "A/Zwei", "B"] {
+        std::fs::create_dir_all(root.path().join(dir)).unwrap();
+    }
+    let events = std::sync::Mutex::new(Vec::new());
+    scan_tree(
+        root.path(),
+        ItemKind::Book,
+        &KnownFiles::new(),
+        &mut Vec::new(),
+        |progress| {
+            let event = match progress {
+                TreeProgress::Found(found) => format!("found {found}"),
+                TreeProgress::Read { total, dir, .. } => {
+                    assert!(dir.starts_with(root.path()));
+                    format!("read of {total}")
+                }
+            };
+            events.lock().unwrap().push(event);
+        },
+        || false,
+    );
+    let events = events.into_inner().unwrap();
+    // The root and four folders below it, counted while listing; then each read once.
+    assert_eq!(
+        events[..4],
+        ["found 2", "found 3", "found 4", "found 5"].map(String::from)
+    );
+    assert_eq!(events[4..], ["read of 5"; 5].map(String::from));
 }
 
 #[test]
@@ -292,7 +327,7 @@ fn a_sampler_keeps_each_tracks_artist_and_goes_under_various_artists() {
         ItemKind::Album,
         &KnownFiles::new(),
         &mut Vec::new(),
-        |_, _| {},
+        |_| {},
         || false,
     );
     let item = &scanned[0];

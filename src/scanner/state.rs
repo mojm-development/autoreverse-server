@@ -3,6 +3,7 @@
 //! writes its progress into it.
 
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Instant;
 
 use serde::Serialize;
 
@@ -22,16 +23,37 @@ pub enum Phase {
     Storing,
 }
 
+/// Which library a pass scans.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Library {
+    Books,
+    Music,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ScanProgress {
     pub phase: Phase,
     pub root: Option<String>,
+    /// `None` while the folders are still being listed.
     pub total: Option<u32>,
     pub processed: u32,
     pub new: u32,
     pub updated: u32,
     pub unchanged: u32,
     pub skipped: u32,
+    // Beyond legacy, which the clients ignore: where in the run the scan is.
+    pub library: Library,
+    /// 1-based pass of `passes`.
+    pub pass: u32,
+    pub passes: u32,
+    /// Folders found so far while listing the root, before `total` is known.
+    pub found: u32,
+    /// The folder last read or stored, relative to the root.
+    pub current: Option<String>,
+    /// When the phase began: rate and remaining time.
+    #[serde(skip)]
+    pub phase_started: Instant,
 }
 
 /// The wire shape of `/scan`, `/scan/status` and `/scan/cancel` as well.

@@ -15,6 +15,7 @@ pub mod metadata;
 pub mod player;
 pub mod playlists;
 pub mod podcasts;
+pub mod scan_card;
 pub mod search;
 pub mod series;
 pub mod settings;

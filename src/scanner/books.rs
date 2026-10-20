@@ -103,8 +103,8 @@ pub fn library_root_problem(root: &Path) -> Option<String> {
 
 /// The root and every directory below it, depth first in `read_dir` order. Symlinked
 /// directories are not followed (no cycles), unreadable ones are skipped.
-pub fn all_directories(root: &Path) -> Vec<PathBuf> {
-    fn walk(dir: &Path, found: &mut Vec<PathBuf>) {
+pub fn all_directories(root: &Path, on_found: &dyn Fn(usize)) -> Vec<PathBuf> {
+    fn walk(dir: &Path, found: &mut Vec<PathBuf>, on_found: &dyn Fn(usize)) {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return;
         };
@@ -116,11 +116,12 @@ pub fn all_directories(root: &Path) -> Vec<PathBuf> {
         dirs.sort();
         for sub in dirs {
             found.push(sub.clone());
-            walk(&sub, found);
+            on_found(found.len());
+            walk(&sub, found, on_found);
         }
     }
     let mut found = vec![root.to_path_buf()];
-    walk(root, &mut found);
+    walk(root, &mut found, on_found);
     found
 }
 
@@ -585,9 +586,21 @@ fn units(root: &Path, dirs: Vec<PathBuf>) -> Vec<Unit> {
         .collect()
 }
 
+/// What [`scan_tree`] reports while it works.
+pub enum TreeProgress<'a> {
+    /// Still listing the root: this many folders so far.
+    Found(usize),
+    /// `dir` was read, the `processed`th folder of `total`.
+    Read {
+        processed: usize,
+        total: usize,
+        dir: &'a Path,
+    },
+}
+
 /// Scans every folder under `root`, several at once (rayon, one thread per core): reading tags
 /// and ffprobe are per folder and independent. The result keeps the walk's order. A folder that
-/// fails is recorded in `failures` and left out. `on_progress(processed, total)` after each
+/// fails is recorded in `failures` and left out. `on_progress` while listing and after each
 /// folder; `cancelled()` is asked before each and skips the rest — the caller must then not
 /// treat the result as complete.
 pub fn scan_tree(
@@ -595,10 +608,11 @@ pub fn scan_tree(
     kind: ItemKind,
     known: &KnownFiles,
     failures: &mut Vec<ScanFailure>,
-    on_progress: impl Fn(usize, usize) + Sync,
+    on_progress: impl Fn(TreeProgress) + Sync,
     cancelled: impl Fn() -> bool + Sync,
 ) -> Vec<ScannedItem> {
-    let units = units(root, all_directories(root));
+    let dirs = all_directories(root, &|found| on_progress(TreeProgress::Found(found)));
+    let units = units(root, dirs);
     let known_per_folder = known_per_folder(known);
     let processed = AtomicUsize::new(0);
     let outcomes: Vec<Option<io::Result<Option<ScannedItem>>>> = units
@@ -608,7 +622,11 @@ pub fn scan_tree(
                 return None;
             }
             let outcome = scan_unit(root, &unit.dir, &unit.discs, kind, known, &known_per_folder);
-            on_progress(processed.fetch_add(1, Ordering::Relaxed) + 1, units.len());
+            on_progress(TreeProgress::Read {
+                processed: processed.fetch_add(1, Ordering::Relaxed) + 1,
+                total: units.len(),
+                dir: &unit.dir,
+            });
             Some(outcome)
         })
         .collect();

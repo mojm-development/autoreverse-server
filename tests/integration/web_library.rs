@@ -382,11 +382,12 @@ async fn the_scan_card_polls_and_starts_a_scan(db: PgPool) {
         .await;
     assert_eq!(response.status(), StatusCode::OK);
     let card = body_text(response).await;
-    assert!(card.starts_with("<div") && card.contains(r#"id="scan-card""#));
+    assert!(card.starts_with("<section") && card.contains(r#"id="scan-card""#));
     app.wait_for_scan().await;
 
-    // No paths configured: the card's log says so.
+    // No paths configured: the card and its log say so.
     let (_, card) = page(&app, "/settings/scan/card", &admin).await;
+    assert!(card.contains("Mit Fehlern beendet"));
     assert!(card.contains("Fehler: Bibliothekspfade sind noch nicht konfiguriert"));
-    assert!(card.contains("Übersprungen: —"));
+    assert!(card.contains("Protokoll <span class=\"mono\">(1)</span>"));
 }

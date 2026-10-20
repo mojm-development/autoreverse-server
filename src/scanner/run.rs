@@ -9,8 +9,10 @@ use std::path::PathBuf;
 
 use chrono::{SecondsFormat, Utc};
 
-use super::books::{ItemKind, ScanFailure, library_root_problem, scan_tree};
-use super::state::{Phase, ScanProgress, ScanReport, ScanStatus};
+use std::time::Instant;
+
+use super::books::{ItemKind, ScanFailure, TreeProgress, library_root_problem, scan_tree};
+use super::state::{Library, Phase, ScanProgress, ScanReport, ScanStatus};
 use super::store::{known_files, remove_vanished, store_items};
 use crate::library::paths::get_library_paths;
 use crate::state::AppState;
@@ -47,6 +49,9 @@ impl Drop for FinishGuard {
 /// Runs a scan to the end. The caller has already claimed the status with `try_start`.
 pub async fn run_scan(app: AppState) {
     let status = app.scan.clone();
+    // Stamped before anything can fail, so the duration of a scan that only reports an error is
+    // its own and not the previous scan's.
+    status.lock().started_at = Some(now_iso());
     let paths = match get_library_paths(&app.db).await {
         Ok(paths) => paths,
         Err(e) => {
@@ -66,7 +71,6 @@ pub async fn run_scan(app: AppState) {
     };
     {
         let mut state = status.lock();
-        state.started_at = Some(now_iso());
         state.finished_at = None;
         state.cancelled = false;
         state.last_error = None;
@@ -99,7 +103,7 @@ async fn run_passes(
     let mut skipped: Vec<String> = Vec::new();
     let mut totals = ScanReport::default();
 
-    for (root, kind) in passes {
+    for (index, (root, kind)) in passes.iter().enumerate() {
         if status.cancel_requested() {
             status.lock().cancelled = true;
             break;
@@ -126,6 +130,15 @@ async fn run_passes(
             updated: totals.updated,
             unchanged: totals.unchanged,
             skipped: totals.skipped,
+            library: match kind {
+                ItemKind::Book => Library::Books,
+                ItemKind::Album => Library::Music,
+            },
+            pass: index as u32 + 1,
+            passes: passes.len() as u32,
+            found: 0,
+            current: None,
+            phase_started: Instant::now(),
         });
 
         let (scanned, mut root_failures) = {
@@ -138,12 +151,34 @@ async fn run_passes(
                     kind,
                     &known,
                     &mut failures,
-                    |processed, total| {
-                        status.update_progress(|p| {
-                            // Folders finish on several threads; a late report must not go back.
-                            p.processed = p.processed.max(processed as u32);
-                            p.total = Some(total as u32);
-                        })
+                    |progress| match progress {
+                        TreeProgress::Found(found) => {
+                            status.update_progress(|p| p.found = found as u32)
+                        }
+                        TreeProgress::Read {
+                            processed,
+                            total,
+                            dir,
+                        } => {
+                            let current = dir
+                                .strip_prefix(&root_path)
+                                .ok()
+                                .map(|d| d.to_string_lossy().into_owned())
+                                .filter(|d| !d.is_empty());
+                            status.update_progress(|p| {
+                                if p.total.is_none() {
+                                    // Listing is over: rate and remaining time count from here.
+                                    p.phase_started = Instant::now();
+                                }
+                                // Folders finish on several threads; a late report must not go
+                                // back.
+                                p.processed = p.processed.max(processed as u32);
+                                p.total = Some(total as u32);
+                                if current.is_some() {
+                                    p.current = current;
+                                }
+                            })
+                        }
                     },
                     || status.cancel_requested(),
                 );
@@ -163,6 +198,8 @@ async fn run_passes(
             p.phase = Phase::Storing;
             p.processed = 0;
             p.total = Some(scanned.len() as u32);
+            p.current = None;
+            p.phase_started = Instant::now();
         });
         let report = store_items(
             &app.db,
