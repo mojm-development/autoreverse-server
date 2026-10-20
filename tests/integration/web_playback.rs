@@ -183,24 +183,28 @@ async fn versioned_asset_urls_serve_the_current_file(db: PgPool) {
     let app = TestApp::new(db);
     let prefix = autoreverse_server::web::assets::prefix();
     assert!(prefix.starts_with("/v/") && prefix.len() > 3, "{prefix}");
-    // The current version and one from before a deploy both get the file, cacheable for good.
-    for uri in [
-        format!("{prefix}/js/player/store.js"),
-        "/v/0123456789ab/css/player.css".to_owned(),
-    ] {
-        let response = app.get(&uri, None).await;
-        assert_eq!(response.status(), StatusCode::OK, "{uri}");
-        assert_eq!(
-            header_str(&response, header::CACHE_CONTROL),
-            "public, max-age=31536000, immutable",
-            "{uri}"
-        );
-    }
-    let missing = app.get("/v/0123456789ab/css/nope.css", None).await;
+    // The current version gets the file, cacheable for good.
+    let current = app.get(&format!("{prefix}/js/player/store.js"), None).await;
+    assert_eq!(current.status(), StatusCode::OK);
+    assert_eq!(
+        header_str(&current, header::CACHE_CONTROL),
+        "public, max-age=31536000, immutable"
+    );
+    // Another version (before a deploy, after a rollback) is sent to the current one, uncached:
+    // no cache may hold today's file under yesterday's URL.
+    let other = app.get("/v/0123456789ab/css/player.css?x=1", None).await;
+    assert_eq!(other.status(), StatusCode::FOUND);
+    assert_eq!(
+        header_str(&other, header::LOCATION),
+        format!("{prefix}/css/player.css?x=1")
+    );
+    assert_eq!(header_str(&other, header::CACHE_CONTROL), "no-store");
+
+    let missing = app.get(&format!("{prefix}/css/nope.css"), None).await;
     assert_eq!(missing.status(), StatusCode::NOT_FOUND);
     assert!(missing.headers().get(header::CACHE_CONTROL).is_none());
     // Pages do not answer under the prefix.
-    let page = app.get("/v/0123456789ab/login", None).await;
+    let page = app.get(&format!("{prefix}/login"), None).await;
     assert_eq!(page.status(), StatusCode::NOT_FOUND);
 }
 

@@ -2,15 +2,16 @@
 //! is a digest of everything in the static dir. A deploy that changes a file changes every URL, so
 //! neither a browser nor a caching reverse proxy keeps serving an old file — or an error it stored
 //! while the server restarted. It is a path prefix rather than a query, so the relative imports of
-//! the ES modules (`./store.js`) carry it too. The unprefixed paths keep working.
+//! the ES modules (`./store.js`) carry it too. The unprefixed paths keep working. Only the current
+//! version's files exist; the server keeps no history of earlier ones.
 
 use std::path::Path;
 use std::sync::OnceLock;
 
 use axum::extract::Request;
-use axum::http::{HeaderValue, Uri, header};
+use axum::http::{HeaderValue, StatusCode, Uri, header};
 use axum::middleware::Next;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use sha2::{Digest, Sha256};
 
 static VERSION: OnceLock<String> = OnceLock::new();
@@ -56,11 +57,33 @@ fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, Vec<u8>)>) {
     }
 }
 
-/// Serves `/v/<anything>/css/app.css` as `/css/app.css`, whatever the version: a page rendered
-/// before a deploy still gets files, the current ones. A versioned URL never changes its contents,
-/// so the browser may keep the answer for a year.
+/// Serves `/v/<version>/css/app.css` as `/css/app.css`. Only the current version is answered with
+/// the file, cacheable for a year: its URL never changes its contents. Any other version — a page
+/// rendered before a deploy, or after a rollback — is redirected to the current prefix without
+/// being cached, so no cache ever holds one version's file under another version's URL, and the
+/// ES modules a page imports all resolve under the same prefix.
 pub async fn serve_versioned(mut request: Request, next: Next) -> Response {
-    let Some(uri) = unversioned(request.uri()) else {
+    let Some((version, target)) = split(request.uri()) else {
+        return next.run(request).await;
+    };
+    let Some(current) = VERSION.get() else {
+        // Not initialised (cannot happen behind `app()`): serve, but promise nothing.
+        if let Ok(uri) = target.parse::<Uri>() {
+            *request.uri_mut() = uri;
+        }
+        return next.run(request).await;
+    };
+    if version != current {
+        return (
+            StatusCode::FOUND,
+            [
+                (header::LOCATION, format!("/v/{current}{target}")),
+                (header::CACHE_CONTROL, "no-store".to_owned()),
+            ],
+        )
+            .into_response();
+    }
+    let Ok(uri) = target.parse::<Uri>() else {
         return next.run(request).await;
     };
     *request.uri_mut() = uri;
@@ -74,30 +97,36 @@ pub async fn serve_versioned(mut request: Request, next: Next) -> Response {
     response
 }
 
-fn unversioned(uri: &Uri) -> Option<Uri> {
+/// `/v/abc/css/app.css?x` → (`abc`, `/css/app.css?x`).
+fn split(uri: &Uri) -> Option<(&str, String)> {
     let rest = uri.path().strip_prefix("/v/")?;
-    let path = &rest[rest.find('/')?..];
+    let slash = rest.find('/')?;
+    let (version, path) = rest.split_at(slash);
     let target = match uri.query() {
         Some(query) => format!("{path}?{query}"),
         None => path.to_owned(),
     };
-    target.parse().ok()
+    Some((version, target))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn stripped(uri: &str) -> Option<String> {
-        unversioned(&uri.parse().unwrap()).map(|uri| uri.to_string())
+    fn stripped(uri: &str) -> Option<(String, String)> {
+        let uri: Uri = uri.parse().unwrap();
+        split(&uri).map(|(version, target)| (version.to_owned(), target))
     }
 
     #[test]
-    fn the_version_prefix_is_stripped() {
-        assert_eq!(stripped("/v/abc123/css/app.css").unwrap(), "/css/app.css");
+    fn the_version_prefix_is_split_off() {
+        assert_eq!(
+            stripped("/v/abc123/css/app.css").unwrap(),
+            ("abc123".to_owned(), "/css/app.css".to_owned())
+        );
         assert_eq!(
             stripped("/v/old/js/player/store.js?x=1").unwrap(),
-            "/js/player/store.js?x=1"
+            ("old".to_owned(), "/js/player/store.js?x=1".to_owned())
         );
     }
 
