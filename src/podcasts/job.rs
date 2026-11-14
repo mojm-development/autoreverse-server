@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use super::relocate::relocate_legacy_downloads;
 use super::retention::refresh_all_and_retain;
+use crate::settings::{Ticker, period_hours};
 use crate::state::AppState;
 
 /// Spawns the job; returns at once.
@@ -31,23 +32,32 @@ pub fn start(state: AppState) {
     });
 }
 
-async fn refresh_loop(state: AppState) {
-    let hours = state.config.podcast_refresh_hours;
-    if hours <= 0.0 {
-        tracing::info!(
-            "[podcasts] automatische Aktualisierung ist aus (AUTOREVERSE_PODCAST_REFRESH_HOURS=0)"
-        );
-        return;
+fn log_period(period: Option<Duration>) {
+    match period {
+        None => tracing::info!("[podcasts] automatische Aktualisierung ist aus"),
+        Some(p) => {
+            let hours = p.as_secs_f64() / 3600.0;
+            tracing::info!(
+                "[podcasts] Feeds werden alle {hours} {} aktualisiert",
+                if hours == 1.0 { "Stunde" } else { "Stunden" }
+            );
+        }
     }
-    tracing::info!(
-        "[podcasts] Feeds werden alle {hours} {} aktualisiert",
-        if hours == 1.0 { "Stunde" } else { "Stunden" }
+}
+
+/// Once at the start when refreshing is on, then every so many hours (Einstellungen → Server);
+/// a changed interval counts from the moment it is saved. A run that takes longer than the
+/// interval is not followed by a burst of catch-up runs.
+async fn refresh_loop(state: AppState) {
+    let mut ticker = Ticker::new(
+        &state.settings,
+        |s| period_hours(s.podcast_refresh_hours),
+        log_period,
     );
-    let mut interval = tokio::time::interval(Duration::from_secs_f64(hours * 3600.0));
-    // A run that takes longer than the interval is not followed by a burst of catch-up runs.
-    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    loop {
-        interval.tick().await;
+    if state.settings.get().podcast_refresh_hours > 0.0 {
+        run_once(&state).await;
+    }
+    while ticker.tick().await {
         run_once(&state).await;
     }
 }

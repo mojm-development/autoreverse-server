@@ -7,7 +7,7 @@
 //! with an album here and those named as the artist of a track (a sampler's songs).
 //!
 //! Answers are kept in `artist_info`. The job in [`job`] fetches them ahead of time for every such
-//! artist and asks again after `AUTOREVERSE_ARTIST_INFO_DAYS` (a month by default), so a page
+//! artist and asks again after the interval set under Einstellungen → Server (a month by default), so a page
 //! never waits for a catalogue: a request finds the answer kept, an outdated one is served at once
 //! and renewed behind the scenes, and only an artist the job has not reached yet is asked for
 //! while the request waits. Pictures are stored under `artists/info/` — those of album artists by
@@ -489,7 +489,7 @@ impl Renewing {
 /// unreachable one leaves the old answer, or none, and the next request asks again.
 pub async fn artist_info(state: &AppState, artist: &str) -> Result<ArtistInfo, sqlx::Error> {
     let kept = stored(&state.db, artist).await?;
-    let refresh_days = state.config.artist_info_days;
+    let refresh_days = state.settings.get().artist_info_days;
     if let Some(info) = kept
         .as_ref()
         .filter(|info| is_fresh(info, Utc::now(), refresh_days))
@@ -501,7 +501,7 @@ pub async fn artist_info(state: &AppState, artist: &str) -> Result<ArtistInfo, s
         info: Stored::default(),
         fetched_at: None,
     };
-    if !state.config.artist_info {
+    if !state.settings.get().artist_info {
         return Ok(kept.unwrap_or(unknown));
     }
     if let Some(outdated) = kept {

@@ -27,7 +27,7 @@ async fn page(State(state): State<AppState>, user: WebUser, uri: Uri) -> WebResu
     let shell = Shell::load(&state, &user, &uri).await?;
     let page = DiscoverPage {
         shell,
-        ai_enabled: state.config.ai.is_some(),
+        ai_enabled: state.settings.get().ai().is_some(),
     };
     Ok(Html(page.render()?))
 }

@@ -827,7 +827,7 @@ async fn render_settings(
         sections,
         keep_default: get_keep_default(&state.db).await?,
         keep_max: KEEP_MAX,
-        refresh_hint: refresh_hint(state.config.podcast_refresh_hours),
+        refresh_hint: refresh_hint(state.settings.get().podcast_refresh_hours),
         search: Search {
             query: String::new(),
         },

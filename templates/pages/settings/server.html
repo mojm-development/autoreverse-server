@@ -1,0 +1,114 @@
+{#- Settings → Server (new in Rust, admins): what used to be environment variables. Saved through
+    `settings::change`, the same as `PATCH /server/settings`, and in effect at once. -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Server · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-playback settings-server">
+	<h1>Server</h1>
+	<form method="POST" action="/settings/server" class="form">
+		<fieldset>
+			<legend class="eyebrow">Hintergrund</legend>
+			<label>
+				<span class="title">Bibliothek scannen alle … Stunden</span>
+				<input type="number" name="scanHours" min="0" max="{{ max_hours }}" step="any" value="{{ s.scan_hours }}" />
+				<span class="hint">0 schaltet den automatischen Scan ab.</span>
+			</label>
+			<label>
+				<span class="title">Podcasts aktualisieren alle … Stunden</span>
+				<input type="number" name="podcastHours" min="0" max="{{ max_hours }}" step="any" value="{{ s.podcast_refresh_hours }}" />
+				<span class="hint">0 schaltet die automatische Aktualisierung ab.</span>
+			</label>
+		</fieldset>
+		<fieldset>
+			<legend class="eyebrow">Interpreten</legend>
+			<label class="switch">
+				<input type="checkbox" name="artistInfo"{% if s.artist_info %} checked{% endif %} />
+				<span>
+					<span class="title">Biografie, Bilder und Hits holen</span>
+					<span class="hint">Von TheAudioDB und Apples Musikkatalog. Gesendet wird nur der Name eines Interpreten der Bibliothek.</span>
+				</span>
+			</label>
+			<label>
+				<span class="title">Neu abfragen nach … Tagen</span>
+				<input type="number" name="artistInfoDays" min="0" max="{{ max_days }}" step="any" value="{{ s.artist_info_days }}" />
+				<span class="hint">0 fragt jeden Interpreten nur einmal.</span>
+			</label>
+		</fieldset>
+		<fieldset>
+			<legend class="eyebrow">Lautheit</legend>
+			<label class="switch">
+				<input type="checkbox" name="loudness"{% if s.loudness %} checked{% endif %} />
+				<span>
+					<span class="title">Musik ohne Lautheits-Tags messen</span>
+					<span class="hint">Tags werden immer gelesen. Das Messen dekodiert jede Datei einmal.</span>
+				</span>
+			</label>
+			<label>
+				<span class="title">Alben gleichzeitig messen</span>
+				<input type="number" name="loudnessThreads" min="0" max="{{ max_threads }}" step="1" value="{{ s.loudness_threads }}" />
+				<span class="hint">0 = automatisch ({{ threads_default }} auf diesem Rechner).</span>
+			</label>
+		</fieldset>
+		<fieldset>
+			<legend class="eyebrow">Funktionen</legend>
+			<label class="switch">
+				<input type="checkbox" name="radio"{% if s.radio %} checked{% endif %} />
+				<span>
+					<span class="title">Internetradio</span>
+					<span class="hint">Aus: kein „Radio“ in den Oberflächen, die Sender-Routen antworten 404.</span>
+				</span>
+			</label>
+			<label class="switch">
+				<input type="checkbox" name="radioDirectory"{% if s.radio_directory %} checked{% endif %} />
+				<span>
+					<span class="title">Sender in radio-browser.info suchen</span>
+					<span class="hint">Aus: Sender lassen sich nur per Adresse hinzufügen.</span>
+				</span>
+			</label>
+			<label class="switch">
+				<input type="checkbox" name="devices"{% if s.devices %} checked{% endif %} />
+				<span>
+					<span class="title">Fernsteuerung zwischen Geräten</span>
+					<span class="hint">Aus: kein „Geräte“ im Player, die Routen antworten 404.</span>
+				</span>
+			</label>
+		</fieldset>
+		<fieldset>
+			<legend class="eyebrow">KI-Vorschläge</legend>
+			<label>
+				<span class="title">Anbieter</span>
+				<select name="aiProvider">
+					<option value=""{% if ai_provider.is_empty() %} selected{% endif %}>Aus</option>
+					<option value="anthropic"{% if ai_provider == "anthropic" %} selected{% endif %}>Anthropic</option>
+					<option value="ollama"{% if ai_provider == "ollama" %} selected{% endif %}>Ollama</option>
+				</select>
+			</label>
+			<label>
+				<span class="title">Modell</span>
+				<input type="text" name="aiModel" list="ai-models" value="{{ ai_model }}" autocomplete="off" />
+				<datalist id="ai-models">{% for model in anthropic_models %}<option value="{{ model }}"></option>{% endfor %}</datalist>
+				<span class="hint">Leer: das Standardmodell des Anbieters (bei Ollama nötig).</span>
+			</label>
+			<label>
+				<span class="title">Adresse</span>
+				<input type="url" name="aiUrl" value="{{ ai_url }}" placeholder="Standardadresse des Anbieters" autocomplete="off" />
+			</label>
+			<label>
+				<span class="title">API-Schlüssel</span>
+				<input type="password" name="aiApiKey" value="" autocomplete="new-password" placeholder="{% if has_api_key %}gespeichert – leer lassen, um ihn zu behalten{% else %}nur für Anthropic nötig{% endif %}" />
+			</label>
+			{% if has_api_key %}
+			<label class="switch">
+				<input type="checkbox" name="aiApiKeyRemove" />
+				<span><span class="title">Gespeicherten Schlüssel löschen</span></span>
+			</label>
+			{% endif %}
+		</fieldset>
+		<div class="save">
+			<button type="submit" class="primary">Speichern</button>
+			<span class="saved" role="status" aria-live="polite"{% if saved %} data-flash{% endif %}>{% if saved %}Gespeichert{% endif %}</span>
+		</div>
+		{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+	</form>
+</div>
+{% endblock %}

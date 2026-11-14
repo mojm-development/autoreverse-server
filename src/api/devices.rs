@@ -46,7 +46,7 @@ impl FromRequestParts<AppState> for DevicesUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        if !state.config.devices {
+        if !state.settings.get().devices {
             return Err(ApiError::not_found(DEVICES_OFF));
         }
         ApiUser::from_request_parts(parts, state)

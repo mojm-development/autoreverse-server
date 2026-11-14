@@ -289,7 +289,7 @@ impl SearchLogos {
     /// small enough, a picture — and on a server that does not ask the directory.
     pub async fn get(state: &AppState, directory_id: &str) -> Option<Arc<Logo>> {
         let id = directory_id.trim().to_ascii_lowercase();
-        if !state.config.radio_directory || !is_directory_id(&id) {
+        if !state.settings.get().radio_directory_on() || !is_directory_id(&id) {
             return None;
         }
         let state = state.clone();

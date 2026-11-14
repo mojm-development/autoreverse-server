@@ -277,8 +277,9 @@ async fn the_settings_overview_lists_what_the_user_may_open(db: PgPool) {
 
     let (_, html) = page(&app, "/settings", &admin).await;
     let overview = &html[html.find(r#"data-testid="settings-overview""#).unwrap()..];
-    assert_eq!(overview.matches(r#"class="card""#).count(), 8);
+    assert_eq!(overview.matches(r#"class="card""#).count(), 9);
     assert!(overview.contains("Doppelte Alben"));
+    assert!(overview.contains(r#"href="/settings/server""#));
     assert!(html.contains("<h1>Einstellungen</h1>"));
 
     let (_, html) = page(&app, "/settings", &user).await;
@@ -286,6 +287,7 @@ async fn the_settings_overview_lists_what_the_user_may_open(db: PgPool) {
     assert!(overview.contains("Wiedergabe"));
     assert!(!overview.contains("Bibliotheken"));
     assert!(!overview.contains("Doppelte Alben"));
+    assert!(!overview.contains(r#"href="/settings/server""#));
 }
 
 #[sqlx::test]
@@ -297,6 +299,7 @@ async fn admin_sections_send_a_non_admin_back_to_the_library(db: PgPool) {
         "/settings/libraries",
         "/settings/scan",
         "/settings/scan/card",
+        "/settings/server",
     ] {
         let response = app.get_with_cookie(uri, &user).await;
         assert_eq!(response.status(), StatusCode::SEE_OTHER, "{uri}");

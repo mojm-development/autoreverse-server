@@ -90,7 +90,7 @@ pub async fn add_from_directory(
     user_id: i32,
     directory_id: &str,
 ) -> Result<(Station, bool), AddError> {
-    if !state.config.radio_directory {
+    if !state.settings.get().radio_directory_on() {
         return Err(AddError::DirectoryOff);
     }
     let directory_id = directory_id.trim().to_ascii_lowercase();

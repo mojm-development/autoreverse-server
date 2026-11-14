@@ -41,6 +41,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 http-body-util = "0.1.5"
 tempfile = "3.27.0"
 tower = { version = "0.5.3", features = ["util"] }
+# Paused time for the tests of jobs that wait for hours.
+tokio = { version = "1.53.3", features = ["full", "test-util"] }
 
 # argon2 at m=64 MiB is unbearably slow unoptimised; the tests hash a lot.
 [profile.dev.package.argon2]

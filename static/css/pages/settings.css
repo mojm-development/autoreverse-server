@@ -679,3 +679,55 @@
 		flex-wrap: wrap;
 	}
 }
+
+/* Settings → Server: the playback page's form, in groups. */
+.settings-server .form {
+	max-width: 440px;
+	gap: 22px;
+}
+.settings-server fieldset {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0;
+	padding: 0 0 18px;
+	border: none;
+	border-bottom: 1px solid var(--line);
+}
+.settings-server legend {
+	margin-bottom: 10px;
+}
+.settings-server label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.settings-server label.switch {
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 10px;
+}
+.settings-server label.switch input {
+	margin-top: 3px;
+	accent-color: var(--a);
+}
+.settings-server .title {
+	display: block;
+	font: 500 13px var(--font-sans);
+}
+.settings-server .hint {
+	display: block;
+	color: var(--faint);
+	font-size: 12px;
+}
+.settings-server input[type='text'],
+.settings-server input[type='url'],
+.settings-server input[type='password'],
+.settings-server select {
+	height: 32px;
+	padding: 0 10px;
+	border-radius: var(--radius-md);
+	background: var(--panel);
+	border: 1px solid var(--line);
+	color: var(--text);
+}

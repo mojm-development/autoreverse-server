@@ -36,11 +36,11 @@ struct StatusOut {
 }
 
 async fn status(State(state): State<AppState>, _user: ApiUser) -> Json<StatusOut> {
-    let config = state.config.ai.as_ref();
+    let config = state.settings.get().ai();
     Json(StatusOut {
         enabled: config.is_some(),
-        provider: config.map(|c| c.provider.wire()),
-        model: config.map(|c| c.model.clone()),
+        provider: config.as_ref().map(|c| c.provider.wire()),
+        model: config.map(|c| c.model),
     })
 }
 
@@ -49,9 +49,9 @@ async fn status(State(state): State<AppState>, _user: ApiUser) -> Json<StatusOut
 async fn admit<'a>(
     state: &'a AppState,
     user: &ApiUser,
-) -> Result<(&'a AiConfig, SemaphorePermit<'a>), ApiError> {
+) -> Result<(AiConfig, SemaphorePermit<'a>), ApiError> {
     let config =
-        state.config.ai.as_ref().ok_or_else(|| {
+        state.settings.get().ai().ok_or_else(|| {
             ApiError::new(StatusCode::SERVICE_UNAVAILABLE, "Keine KI eingerichtet")
         })?;
     if let Some(remaining) = state
@@ -102,13 +102,13 @@ async fn playlist(
         return Err(ApiError::unprocessable("prompt muss 1–500 Zeichen haben"));
     }
     let (config, _permit) = admit(&state, &user).await?;
-    let result = music::playlist(config, &state.http, &state.db, wish).await;
+    let result = music::playlist(&config, &state.http, &state.db, wish).await;
     Ok(Json(result.map_err(failed)?))
 }
 
 async fn suggestions(State(state): State<AppState>, user: ApiUser) -> ApiResult<Json<Suggestions>> {
     let (config, _permit) = admit(&state, &user).await?;
-    let result = music::suggestions(config, &state.http, &state.db, user.id).await;
+    let result = music::suggestions(&config, &state.http, &state.db, user.id).await;
     Ok(Json(result.map_err(failed)?))
 }
 
@@ -130,7 +130,7 @@ struct DiscoverOut {
 
 async fn discover(State(state): State<AppState>, user: ApiUser) -> ApiResult<Json<DiscoverOut>> {
     let (config, _permit) = admit(&state, &user).await?;
-    let artists = music::discover(config, &state.http, &state.db, user.id)
+    let artists = music::discover(&config, &state.http, &state.db, user.id)
         .await
         .map_err(failed)?;
     Ok(Json(DiscoverOut { artists }))
