@@ -1,5 +1,6 @@
 //! Optional language-model suggestions: playlists from a sentence, what to hear next and artists
-//! that might fit. Off unless `AUTOREVERSE_AI_PROVIDER` is set.
+//! that might fit. Off unless a provider is chosen under Einstellungen → Server
+//! ([`crate::settings::AiSettings`]).
 //!
 //! Only names from the library leave the server. Every id a model answers with is checked against
 //! what was offered, so an invented entry never reaches a client.
@@ -17,6 +18,13 @@ const ANTHROPIC_URL: &str = "https://api.anthropic.com";
 const ANTHROPIC_VERSION: &str = "2026-10-21";
 const ANTHROPIC_DEFAULT_MODEL: &str = "claude-haiku-5-5";
 const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
+/// The models a client may offer when Anthropic is chosen; any other name is accepted too.
+pub const ANTHROPIC_MODELS: &[&str] = &[
+    "claude-haiku-5-5",
+    "claude-sonnet-5-5",
+    "claude-opus-5-5",
+    "claude-fable-5-2",
+];
 /// Models whose declined requests the API can re-run on another model.
 const MODELS_WITH_FALLBACK: [&str; 4] = [
     "claude-opus-5-5",
@@ -65,19 +73,24 @@ impl fmt::Debug for AiConfig {
 }
 
 impl AiConfig {
-    /// `None` when no provider is set. A half-finished setup stops the server instead of failing
-    /// on the first click.
-    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Option<Self>, String> {
-        let value = |key: &str| lookup(key).filter(|v| !v.trim().is_empty());
-        let Some(provider) = value("AUTOREVERSE_AI_PROVIDER") else {
+    /// `None` when no provider is chosen; an error, in German, for a half-finished setup — the
+    /// settings refuse to store one.
+    pub fn from_settings(settings: &crate::settings::AiSettings) -> Result<Option<Self>, String> {
+        let value = |v: &Option<String>| {
+            v.as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .map(str::to_owned)
+        };
+        let Some(provider) = value(&settings.provider) else {
             return Ok(None);
         };
-        let url = value("AUTOREVERSE_AI_URL").map(|u| u.trim_end_matches('/').to_owned());
-        let model = value("AUTOREVERSE_AI_MODEL");
-        match provider.trim().to_lowercase().as_str() {
+        let url = value(&settings.url).map(|u| u.trim_end_matches('/').to_owned());
+        let model = value(&settings.model);
+        match provider.to_lowercase().as_str() {
             "anthropic" => {
-                let api_key = value("AUTOREVERSE_AI_API_KEY")
-                    .ok_or("AUTOREVERSE_AI_API_KEY fehlt für den Anbieter anthropic")?;
+                let api_key =
+                    value(&settings.api_key).ok_or("Für Anthropic fehlt der API-Schlüssel")?;
                 Ok(Some(AiConfig {
                     provider: Provider::Anthropic,
                     model: model.unwrap_or_else(|| ANTHROPIC_DEFAULT_MODEL.into()),
@@ -87,11 +100,11 @@ impl AiConfig {
             }
             "ollama" => Ok(Some(AiConfig {
                 provider: Provider::Ollama,
-                model: model.ok_or("AUTOREVERSE_AI_MODEL fehlt für den Anbieter ollama")?,
+                model: model.ok_or("Für Ollama fehlt das Modell")?,
                 base_url: url.unwrap_or_else(|| OLLAMA_URL.into()),
                 api_key: None,
             })),
-            other => Err(format!("AUTOREVERSE_AI_PROVIDER unbekannt: {other}")),
+            other => Err(format!("Unbekannter KI-Anbieter „{other}“")),
         }
     }
 
@@ -207,7 +220,7 @@ mod tests {
             .iter()
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
-        AiConfig::from_lookup(|key| map.get(key).cloned())
+        AiConfig::from_settings(&crate::settings::from_env(|key| map.get(key).cloned()).ai)
     }
 
     #[test]

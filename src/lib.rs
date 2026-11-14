@@ -15,6 +15,7 @@ pub mod library;
 pub mod podcasts;
 pub mod scanner;
 pub mod serialize;
+pub mod settings;
 pub mod state;
 pub mod stations;
 pub mod streaming;

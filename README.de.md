@@ -196,19 +196,20 @@ Danach, weiterhin in der Weboberfläche:
 | `AUTOREVERSE_DATA`                  | nein                  | `./data` (`/data` im Image)                                       | Basisverzeichnis für servereigene Dateien. `covers/`, `podcasts/`, `artists/` und `radio/` entstehen darin automatisch. |
 | `AUTOREVERSE_ADMIN_USER`            | nur beim ersten Start | —                                                                 | Benutzername des ersten Verwalterkontos.                                                                      |
 | `AUTOREVERSE_ADMIN_PASSWORD`        | nur beim ersten Start | —                                                                 | Passwort dieses Kontos.                                                                                       |
-| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | nein                  | `1`                                                               | Wie oft der Server alle Feeds aktualisiert und die Downloads nachhält. `0` schaltet den Hintergrundlauf ab.   |
 | `ORIGIN`                            | hinter einem Proxy    | aus dem `Host`-Header abgeleitet, Protokoll als `http` angenommen | Öffentliche URL des Servers. Siehe [Betrieb hinter einem Reverse Proxy](#betrieb-hinter-einem-reverse-proxy). |
-| `AUTOREVERSE_LOUDNESS`              | nein                  | an; `0` schaltet ab                                               | Ob Musik ohne Lautheits-Tags im Hintergrund gemessen wird (siehe [Lautstärke](#lautstärke)). Aus: Es werden nur Tags gelesen. |
-| `AUTOREVERSE_LOUDNESS_THREADS`      | nein                  | halbe Kernzahl, höchstens 4                                       | Wie viele Alben beim Messen gleichzeitig dekodiert werden. |
-| `AUTOREVERSE_RADIO`                 | nein                  | an; `0` schaltet ab                                               | Internet-Radiosender. Aus: Die Routen unter `/radio/stations` antworten mit 404, die Weboberfläche hat kein „Radio". |
-| `AUTOREVERSE_RADIO_DIRECTORY`       | nein                  | an; `0` schaltet ab                                               | Ob Sender in radio-browser.info gesucht werden können. Aus: Der Server fragt das Verzeichnis nicht, Sender kommen nur per Adresse hinzu. Dorthin gesendet werden nur Suchwörter, ein Ländercode und die ids von Sendern. |
 | `AUTOREVERSE_RADIO_DIRECTORY_URL`   | nein                  | `https://all.api.radio-browser.info`                              | Basisadresse des Verzeichnisses: ein Name für alle seine Server. Bei Bedarf auf einen einzelnen Server (`https://de1.api.radio-browser.info`) oder einen Spiegel zeigen. |
-| `AUTOREVERSE_DEVICES`               | nein                  | an; `0` schaltet ab                                               | Fernsteuerung zwischen den Geräten eines Kontos (siehe [Fernsteuerung](#fernsteuerung)). Aus: Die `/me/devices`-Routen antworten 404, der Web-Player zeigt kein „Geräte". |
-| `AUTOREVERSE_ARTIST_INFO`           | nein                  | an; `0` schaltet ab                                               | Ob der Server TheAudioDB und Apples Musikkatalog nach Biografie, Bildern und den meistgehörten Titeln eines Interpreten fragt. Gesendet wird nur der Name, und nur für Interpreten der Bibliothek. |
-| `AUTOREVERSE_ARTIST_INFO_DAYS`      | nein                  | `30`; `0` fragt nie erneut                                        | Nach wie vielen Tagen die Angaben eines Interpreten neu abgefragt werden. Ein Hintergrund-Job holt sie vorab für jeden Interpreten der Bibliothek (Album-Interpreten und Interpreten einzelner Titel), dazu die Bilder der Album-Interpreten; eine Seite kommt aus dem Gespeicherten und wartet nie auf einen Katalog, außer bei einem Interpreten, den der Job noch nicht erreicht hat. Unbekannte Namen werden spätestens nach einer Woche erneut gefragt. |
 | `HOST` / `PORT`                     | nein                  | `0.0.0.0` / `3000`                                                | Wo der Server lauscht.                                                                                        |
 | `AUTOREVERSE_STATIC`                | nein                  | `static/` neben dem Binary, sonst `./static` (`/app/static` im Image) | CSS, JS und Icons. Findet der Server sie nicht, startet er nicht.                                         |
 | `RUST_LOG`                          | nein                  | `autoreverse_server=info,tower_http=warn`                         | Log-Filter.                                                                                                   |
+
+Alles andere stellt ein Verwalter zur Laufzeit unter Einstellungen → Server ein (oder über
+[`PATCH /server/settings`](#server-einstellungen)), sofort wirksam: die Intervalle von
+Bibliotheks-Scan, Podcast-Aktualisierung und Interpreten-Angaben, das Messen der Lautheit,
+Internetradio und sein Verzeichnis, die Fernsteuerung und das Sprachmodell für Vorschläge. Frühere
+Versionen lasen das aus `AUTOREVERSE_SCAN_HOURS`, `AUTOREVERSE_PODCAST_REFRESH_HOURS`,
+`AUTOREVERSE_ARTIST_INFO`/`_DAYS`, `AUTOREVERSE_LOUDNESS`/`_THREADS`, `AUTOREVERSE_RADIO`/`_DIRECTORY`,
+`AUTOREVERSE_DEVICES` und `AUTOREVERSE_AI_*`: Der erste Start dieser Version übernimmt sie einmal
+und warnt bei späteren Starts im Log, solange sie noch gesetzt sind.
 
 Den Schalter `AUTOREVERSE_AUTO_MIGRATE` gibt es nicht mehr: Die Migrationen sind ins Binary
 kompiliert und werden bei jedem Start eingespielt.
@@ -409,6 +410,7 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `GET` `DELETE`         | `/me/devices`, `/me/devices/events`, `/me/devices/{device_id}` | Die Online-Geräte des Kontos, der Ereignisstrom eines Geräts, Abmelden – siehe [Fernsteuerung](#fernsteuerung) |
 | `PUT` `POST`           | `/me/devices/{device_id}/state`, `…/commands`, `…/transfer` | Melden, was läuft; ein anderes Gerät steuern; die Wiedergabe übertragen |
 | `GET`                  | `/server/info`                                    | Bestandszahlen, für Verwalter auch Benutzerzahl; `radio`, `radio_directory`, `devices`; `web_url`, siehe [Als Link teilen](#als-link-teilen) |
+| `GET` `PATCH`          | `/server/settings`                                | Verwalter: die Einstellungen des Servers, siehe [Server-Einstellungen](#server-einstellungen) |
 | `GET`                  | `/ai/status`                                      | Ob ein Sprachmodell eingerichtet ist                                        |
 | `GET` `POST`           | `/ai/feed`, `/ai/feed/refresh`                    | Der „Entdecken"-Feed, siehe [Entdecken-Feed](#entdecken-feed); seine KI-Teile neu erzeugen |
 | `POST`                 | `/ai/playlist`, `/ai/suggestions`, `/ai/discover` | Playlist aus einem Satz (`{prompt}`), Albumvorschläge, neue Interpreten — brauchen ein Modell |
@@ -808,7 +810,7 @@ dem Ordner des Titels hinausführt, wird übergangen.
 Titel-Radio, die Listen oben) sowie die `tracks` von `POST /ai/playlist` und der
 `mixes` in `GET /ai/feed` — trägt `has_lyrics: Wahrheitswert`, damit ein Client seinen
 Songtext-Knopf nur zeigt, wo er irgendwohin führt. Das Kennzeichen pflegt der Bibliotheks-Scan:
-Jeder Scan (der automatische alle `AUTOREVERSE_SCAN_HOURS` oder ein von Hand gestarteter) sucht
+Jeder Scan (der automatische im Abstand aus Einstellungen → Server oder ein von Hand gestarteter) sucht
 die Dateien neben jedem Titel, auch in Ordnern, die er sonst als unverändert überspringt, und
 liest die Tags einer Datei einmal je Fassung der Datei nach Songtexten. Eine Mediathek aus der
 Zeit vor dieser Funktion bekommt ihre Kennzeichen also mit dem ersten Scan nach dem Update, ohne
@@ -859,7 +861,7 @@ Gemessen wird nur **Musik**. Hörbücher und Podcast-Folgen behalten `null`, sof
 keine Tags tragen — Hunderte Stunden Sprache zu dekodieren, brächte nichts.
 
 **Der Mess-Durchgang** läuft im Hintergrund nach jedem Scan und bei jedem Start, Album für
-Album, `AUTOREVERSE_LOUDNESS_THREADS` Alben gleichzeitig (Standard: halbe Kernzahl, höchstens
+Album, so viele Alben gleichzeitig wie unter Einstellungen → Server eingestellt (Standard: halbe Kernzahl, höchstens
 4). Er ist wiederaufnehmbar — ein Album wird in einem Zug geschrieben, ein Neustart macht mit
 den noch offenen Alben weiter — und endet mit dem Server. Eine Datei, die sich nicht dekodieren
 lässt, steht im Log, bleibt `null` und wird nicht erneut versucht, bis sie sich ändert (Größe
@@ -869,7 +871,7 @@ verschoben, ein CD-Ordner jetzt als Teil seines Albums gelesen): Seine Titel wer
 und gemessen und behalten bis dahin ihre alten Werte. Ein Album, dessen Dateien gerade nicht erreichbar sind, wird zurückgestellt. `GET /scan/status`
 meldet den Durchgang als `"loudness": {"running", "total", "processed", "failed"}`
 (`total`/`processed` in Alben, `failed` in Dateien); die Scan-Karte in den Web-Einstellungen
-zeigt dasselbe. `AUTOREVERSE_LOUDNESS=0` schaltet das Messen ab; Tags werden trotzdem gelesen.
+zeigt dasselbe. Unter Einstellungen → Server abgeschaltet wird nichts gemessen; Tags werden trotzdem gelesen.
 
 **Eine vorhandene Mediathek** braucht kein Zutun: Nach dem Update liest der Server einmal die
 Lautheits-Tags aller Titel (beim Start und bei jedem Scan) und misst den Rest im Hintergrund.
@@ -969,8 +971,8 @@ Um einen Radio-Titel zu spielen, ohne den Fortschritt seines Albums anzufassen: 
 Internetradio: Jedes Konto führt seine eigene Liste öffentlicher Sender und hört sie **über
 diesen Server**. Ein Gerät spricht nur mit dem Server — eine Adresse, eine Anmeldung —, und der
 Server liest den laufenden Titel aus dem Strom. `GET /server/info` nennt, ob es das Feature gibt
-(`radio`) und ob Sender gesucht werden können (`radio_directory`); mit `AUTOREVERSE_RADIO=0`
-antwortet jede Route unten mit `404` „Radio ist auf diesem Server abgeschaltet".
+(`radio`) und ob Sender gesucht werden können (`radio_directory`); ist Radio unter
+Einstellungen → Server abgeschaltet, antwortet jede Route unten mit `404` „Radio ist auf diesem Server abgeschaltet".
 
 Ein Sender auf der Leitung:
 
@@ -985,7 +987,7 @@ unbekannt. Die Adresse des Stroms selbst geht nie an einen Client.
 | Methode und Pfad                        | Antwort                                                                                  |
 | --------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `GET /radio/stations`                   | `200 {"stations": [Station…]}` in der Reihenfolge des Nutzers.                           |
-| `GET /radio/stations/search?q=&country=&limit=` | `200 {"results": […]}` aus dem Verzeichnis: `q` 1–100 Zeichen, `country` zwei Buchstaben (optional), `limit` 1–50 (Standard 25). Jeder Treffer ist ein Sender ohne `id`, mit `directory_id`, `has_logo` (nach dem Logo zu fragen lohnt sich: Das Verzeichnis nennt eines oder eine Webseite, deren Symbol einspringen kann — anzuzeigen über die Route unten, die trotzdem `404` antworten kann), `logo_url` (die Adresse des Verzeichnisses, kann `null` sein; bleibt für ältere Clients, nicht laden) und `added` (der Nutzer hat ihn schon). Vom Verzeichnis als kaputt gemeldete Sender und HLS-Sender fehlen. `404` „Die Sendersuche ist auf diesem Server abgeschaltet" bei `AUTOREVERSE_RADIO_DIRECTORY=0`, `502`, wenn das Verzeichnis nicht erreichbar ist. |
+| `GET /radio/stations/search?q=&country=&limit=` | `200 {"results": […]}` aus dem Verzeichnis: `q` 1–100 Zeichen, `country` zwei Buchstaben (optional), `limit` 1–50 (Standard 25). Jeder Treffer ist ein Sender ohne `id`, mit `directory_id`, `has_logo` (nach dem Logo zu fragen lohnt sich: Das Verzeichnis nennt eines oder eine Webseite, deren Symbol einspringen kann — anzuzeigen über die Route unten, die trotzdem `404` antworten kann), `logo_url` (die Adresse des Verzeichnisses, kann `null` sein; bleibt für ältere Clients, nicht laden) und `added` (der Nutzer hat ihn schon). Vom Verzeichnis als kaputt gemeldete Sender und HLS-Sender fehlen. `404` „Die Sendersuche ist auf diesem Server abgeschaltet" bei abgeschaltetem Verzeichnis (Einstellungen → Server), `502`, wenn das Verzeichnis nicht erreichbar ist. |
 | `GET /radio/stations/search/logo?id=&size=` | Das Logo eines Suchtreffers: `id` ist dessen `directory_id`, `size` wie bei Covern. `200` mit dem Bild, sonst `404` „Kein Logo", siehe unten. |
 | `POST /radio/stations`                  | Body `{"directory_id": "…"}` (Daten und Logo aus dem Verzeichnis) oder `{"stream_url": "…", "name": "…", "homepage": "…"?}` (das Logo ist dann das Symbol dieser Webseite, wenn sie eines hat). `201 Station`; `200` mit dem vorhandenen Sender, wenn der Nutzer ihn schon hat (gleiche `directory_id`, gleiche Adresse oder derselbe Strom hinter einer Playlist-Datei). |
 | `PATCH /radio/stations/{id}`            | Body `{"name"?: "…", "position"?: n}` — umbenennen, verschieben (ab 1, hinter dem Ende ist das Ende; die Positionen bleiben lückenlos). `200 Station`. |
@@ -1092,16 +1094,16 @@ Sammlung. **Der Server ruft außerdem die Webseite des Senders ab** — die Home
 Verzeichnis nennt, oder die beim Hinzufügen per Adresse angegebene — und die Symbole, die diese
 Seite nennt, wann immer ein Logo gefragt ist und das Verzeichnis keines hat, das sich laden
 lässt: wenn das Logo eines Suchtreffers angefragt wird, wenn ein Sender hinzugefügt wird, und
-im Hintergrund für gespeicherte Sender ohne Logo (Letzteres auch mit
-`AUTOREVERSE_RADIO_DIRECTORY=0`). Diese Anfragen tragen nichts außer der Kennung
+im Hintergrund für gespeicherte Sender ohne Logo (Letzteres auch bei
+abgeschaltetem Verzeichnis). Diese Anfragen tragen nichts außer der Kennung
 `Autoreverse/<Version>`. Sender, ihre Webseiten und die Server der Logos sehen die Adresse des
 Servers, nicht die des Hörers.
 
 ### Fernsteuerung
 
 Die Geräte eines Kontos sehen, was auf den anderen läuft, steuern einander und übernehmen die
-Wiedergabe voneinander. `GET /server/info` nennt `devices: true`, wo ein Server das anbietet; mit
-`AUTOREVERSE_DEVICES=0` antwortet jede Route unten mit `404` „Die Fernsteuerung ist auf diesem
+Wiedergabe voneinander. `GET /server/info` nennt `devices: true`, wo ein Server das anbietet; bei
+unter Einstellungen → Server abgeschalteter Fernsteuerung antwortet jede Route unten mit `404` „Die Fernsteuerung ist auf diesem
 Server abgeschaltet".
 
 **Der Server ist nur Vermittler.** Er hält die Geräte im Arbeitsspeicher, je Konto getrennt, und
@@ -1197,6 +1199,19 @@ Läuft auf einem anderen Gerät etwas und im Browser nichts, ist der Mini-Player
 Fernbedienung: „Läuft auf …", Play/Pause, Zurück/Weiter, Position, Lautstärke und „Hier
 weiterhören". Shuffle und Wiederholen kennt der Web-Player nicht und übergeht diese beiden
 Befehle.
+
+### Server-Einstellungen
+
+Was ein Verwalter unter Einstellungen → Server einstellt, für Clients, die dieselbe Seite anbieten.
+Beide Routen nur für Verwalter (sonst `403`); jede Änderung wird gespeichert und wirkt sofort, ohne
+Neustart. Die Felder und ihre Grenzen stehen im englischen README unter
+[Server settings](README.md#server-settings).
+
+- `GET /server/settings` liefert alle Werte; vom API-Schlüssel nur `ai.has_api_key`.
+- `PATCH /server/settings` nimmt beliebige dieser Felder, ändert genau diese und antwortet wie
+  `GET`. In `ai` setzt `api_key` den Schlüssel, `null` oder `""` löscht ihn, ohne das Feld bleibt
+  er. Eine Änderung wird als Ganzes geprüft und als Ganzes mit `422` und deutschem `detail`
+  abgelehnt.
 
 ### Wiedergabelisten
 

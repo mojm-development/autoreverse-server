@@ -1017,9 +1017,8 @@ async fn a_token_revoked_elsewhere_ends_its_stream_soon(db: PgPool) {
 
 #[sqlx::test]
 async fn the_switch_takes_the_routes_away(db: PgPool) {
-    let config =
-        Config::from_lookup(|key| (key == "AUTOREVERSE_DEVICES").then(|| "0".to_owned())).unwrap();
-    let app = TestApp::with_config(db, config);
+    let app = TestApp::new(db);
+    app.state.settings.update(|s| s.devices = false);
     let token = login(&app, "oskar").await;
     let state = track_state(true, 1.0, "2026-11-13T12:00:00Z");
     for (method, path, body) in [
@@ -1094,9 +1093,8 @@ async fn the_web_player_shows_the_devices_only_where_the_server_offers_them(db: 
     assert!(html.contains(r#"data-action="devices""#));
     assert!(html.contains("Hier weiterhören"));
 
-    let config =
-        Config::from_lookup(|key| (key == "AUTOREVERSE_DEVICES").then(|| "0".to_owned())).unwrap();
-    let off = TestApp::with_config(db, config);
+    let off = TestApp::new(db);
+    off.state.settings.update(|s| s.devices = false);
     let html = crate::common::body_text(off.get_with_cookie("/library", &cookie).await).await;
     assert!(html.contains(r#"data-mini-player hidden data-devices="false""#));
     assert!(!html.contains("data-devices-panel"));

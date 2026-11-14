@@ -78,11 +78,19 @@ fn catalogues_know_acdc(web: &FakeWeb) {
             {"wrapperType": "artist", "artistName": "AC/DC"},
             {"trackName": "Thunderstruck", "collectionName": "The Razors Edge", "trackTimeMillis": 292000},
             {"trackName": "Big Gun", "collectionName": "Big Gun - Single", "trackTimeMillis": 260000},
+            // The answer to entity=album: the same path here, told apart by wrapperType.
+            {"wrapperType": "collection", "collectionName": "Back in Black", "trackCount": 10,
+             "releaseDate": "1980-07-25T07:00:00Z", "artworkUrl100": web.url("/art/bib/100x100bb.jpg")},
+            {"wrapperType": "collection", "collectionName": "The Razors Edge", "trackCount": 12,
+             "releaseDate": "1990-09-24T07:00:00Z"},
+            {"wrapperType": "collection", "collectionName": "Big Gun - Single", "trackCount": 1,
+             "releaseDate": "1993-06-01T07:00:00Z"},
         ]})
         .to_string(),
     );
     web.set("/pic/thumb", 200, PNG);
     web.set("/pic/wide", 200, PNG);
+    web.set("/art/bib/600x600bb.jpg", 200, PNG);
 }
 
 #[sqlx::test]
@@ -121,9 +129,12 @@ async fn the_overview_matches_the_chart_to_the_library_and_asks_the_catalogues_o
                        "has_lyrics": false,
             "gain_db": null, "album_gain_db": null, "peak": null},
              "has_cover": false},
-            {"title": "Big Gun", "album": "Big Gun", "duration": 260, "track": null,
-             "has_cover": false},
         ])
+    );
+    // "Big Gun" is not here: it is no hit of this library. Of the albums, the one missing.
+    assert_eq!(
+        body["missing_albums"],
+        json!([{"index": 1, "title": "Back in Black", "year": 1980, "track_count": 10, "has_cover": true}])
     );
     assert!(body["fetched_at"].as_str().unwrap().ends_with('Z'));
 
@@ -132,7 +143,8 @@ async fn the_overview_matches_the_chart_to_the_library_and_asks_the_catalogues_o
     assert_eq!(again["biography"], "A band.");
     assert_eq!(again["biography_language"], "en");
     assert_eq!(web.hits("/adb/search.php"), 1);
-    assert_eq!(web.hits("/apple/lookup"), 1);
+    // Songs and albums.
+    assert_eq!(web.hits("/apple/lookup"), 2);
 }
 
 #[sqlx::test]
@@ -265,15 +277,12 @@ async fn switched_off_the_server_asks_nobody(db: PgPool) {
     let web = FakeWeb::start().await;
     catalogues_know_acdc(&web);
     let data = library.data().to_str().unwrap().to_owned();
-    let mut config = Config::from_lookup(|key| match key {
-        "AUTOREVERSE_DATA" => Some(data.clone()),
-        "AUTOREVERSE_ARTIST_INFO" => Some("0".into()),
-        _ => None,
-    })
-    .unwrap();
+    let mut config =
+        Config::from_lookup(|key| (key == "AUTOREVERSE_DATA").then(|| data.clone())).unwrap();
     config.audiodb_url = web.url("/adb");
     config.music_catalog_url = web.url("/apple");
     let app = TestApp::with_config(db, config);
+    app.state.settings.update(|s| s.artist_info = false);
     let token = token(&app).await;
     album(app.db(), "AC/DC", "The Razors Edge").await;
 
@@ -368,11 +377,12 @@ async fn the_job_asks_about_every_artist_once_and_fetches_the_pictures_of_album_
     let done = job::pass(&app.state, Duration::ZERO, Duration::ZERO)
         .await
         .unwrap();
-    // The fake catalogue knows AC/DC only; both pictures are AC/DC's.
+    // The fake catalogue knows AC/DC only: two pictures and the cover of the missing album.
     assert_eq!(done.found, 1);
     assert_eq!(done.unknown, 2);
     assert_eq!(done.failed, 0);
-    assert_eq!(done.pictures, 2);
+    assert_eq!(done.pictures, 3);
+    assert_eq!(web.hits("/art/bib/600x600bb.jpg"), 1);
     assert_eq!(web.hits("/pic/thumb"), 1);
     assert_eq!(web.hits("/adb/search.php"), 3);
 
@@ -397,10 +407,10 @@ async fn the_job_asks_again_when_an_answer_is_older_than_the_setting(db: PgPool)
     album(app.db(), "Neu", "Erstes").await;
     album(app.db(), "Niemand", "Erstes").await;
     sqlx::query(
-        "INSERT INTO artist_info (artist, found, info, fetched_at) VALUES
-             ('Alt', true, '{}', now() - interval '10 days'),
-             ('Neu', true, '{}', now() - interval '2 days'),
-             ('Niemand', false, '{}', now() - interval '8 days')",
+        r#"INSERT INTO artist_info (artist, found, info, fetched_at) VALUES
+             ('Alt', true, '{"albums": []}', now() - interval '10 days'),
+             ('Neu', true, '{"albums": []}', now() - interval '2 days'),
+             ('Niemand', false, '{}', now() - interval '8 days')"#,
     )
     .execute(app.db())
     .await
@@ -412,42 +422,75 @@ async fn the_job_asks_again_when_an_answer_is_older_than_the_setting(db: PgPool)
     assert!(job::due(app.db(), 0.0).await.unwrap().is_empty());
 }
 
-/// AC/DC as before, with a cover for the song that is not in the library.
-fn catalogues_know_acdc_with_a_cover(web: &FakeWeb) {
-    catalogues_know_acdc(web);
-    web.set(
-        "/apple/lookup",
-        200,
-        json!({"results": [
-            {"trackName": "Big Gun", "collectionName": "Big Gun - Single", "trackTimeMillis": 260000,
-             "artworkUrl100": web.url("/art/100x100bb.jpg")},
-        ]})
-        .to_string(),
+#[sqlx::test]
+async fn the_hits_are_the_charts_songs_the_library_has_in_the_charts_order(db: PgPool) {
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc(&web);
+    let mut chart = vec![json!({"wrapperType": "artist", "artistName": "AC/DC"})];
+    for n in 1..=14 {
+        chart.push(json!({"trackName": format!("Song {n}"), "collectionName": "Live", "trackTimeMillis": 200000}));
+    }
+    web.set("/apple/lookup", 200, json!({"results": chart}).to_string());
+    let app = app_with(db, &library.data(), &web);
+    let token = token(&app).await;
+    let live = album(app.db(), "AC/DC", "Live").await;
+    // Not song 1 and 2; the library has 3 to 14, but a page shows ten.
+    for n in (3..=14).rev() {
+        track(app.db(), live, n, &format!("Song {n}"), 200.0).await;
+    }
+
+    let body = body_json(app.get("/artists/AC%2FDC/info", Some(&token)).await).await;
+    let titles: Vec<&str> = body["top_tracks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["title"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        titles,
+        (3..=12).map(|n| format!("Song {n}")).collect::<Vec<_>>()
     );
-    web.set("/art/600x600bb.jpg", 200, PNG);
+    assert!(
+        body["top_tracks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| !t["track"].is_null())
+    );
 }
 
 #[sqlx::test]
-async fn a_songs_cover_is_fetched_once_and_then_served_from_the_servers_disk(db: PgPool) {
+async fn a_missing_albums_cover_is_fetched_once_and_then_served_from_the_servers_disk(db: PgPool) {
     let library = TempLibrary::new();
     let web = FakeWeb::start().await;
-    catalogues_know_acdc_with_a_cover(&web);
+    catalogues_know_acdc(&web);
     let app = app_with(db, &library.data(), &web);
     let token = token(&app).await;
-    album(app.db(), "AC/DC", "The Razors Edge").await;
+    album(app.db(), "AC/DC", "The Razors Edge (Remastered)").await;
 
     let body = body_json(app.get("/artists/AC%2FDC/info", Some(&token)).await).await;
-    assert_eq!(body["top_tracks"][0]["has_cover"], true);
+    assert_eq!(body["missing_albums"][0]["index"], 1);
     for _ in 0..2 {
-        let response = app.get("/artists/AC%2FDC/top/0/cover", Some(&token)).await;
+        let response = app
+            .get("/artists/AC%2FDC/albums/1/cover", Some(&token))
+            .await;
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(header_str(&response, header::CONTENT_TYPE), "image/png");
     }
-    assert_eq!(web.hits("/art/600x600bb.jpg"), 1);
-    let beyond = app.get("/artists/AC%2FDC/top/1/cover", Some(&token)).await;
-    assert_eq!(beyond.status(), StatusCode::NOT_FOUND);
-    assert_eq!(body_json(beyond).await["detail"], "Kein Bild");
-    let anonymous = app.get("/artists/AC%2FDC/top/0/cover", None).await;
+    assert_eq!(web.hits("/art/bib/600x600bb.jpg"), 1);
+    // One the catalogue has no cover for, one it does not have at all.
+    for index in ["0", "5", "x"] {
+        let response = app
+            .get(
+                &format!("/artists/AC%2FDC/albums/{index}/cover"),
+                Some(&token),
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{index}");
+        assert_eq!(body_json(response).await["detail"], "Kein Bild");
+    }
+    let anonymous = app.get("/artists/AC%2FDC/albums/1/cover", None).await;
     assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -461,35 +504,38 @@ async fn a_cover_address_outside_the_catalogue_is_never_fetched(db: PgPool) {
     web.set(
         "/apple/lookup",
         200,
-        json!({"results": [{"trackName": "Big Gun", "artworkUrl100": elsewhere.url("/secret/100x100bb.jpg")}]})
-            .to_string(),
+        json!({"results": [{"wrapperType": "collection", "collectionName": "Back in Black",
+                            "trackCount": 10, "artworkUrl100": elsewhere.url("/secret/100x100bb.jpg")}]})
+        .to_string(),
     );
     let app = app_with(db, &library.data(), &web);
     let token = token(&app).await;
     album(app.db(), "AC/DC", "The Razors Edge").await;
     app.get("/artists/AC%2FDC/info", Some(&token)).await;
 
-    let response = app.get("/artists/AC%2FDC/top/0/cover", Some(&token)).await;
+    let response = app
+        .get("/artists/AC%2FDC/albums/0/cover", Some(&token))
+        .await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
     assert_eq!(elsewhere.hits("/secret/600x600bb.jpg"), 0);
 }
 
 #[sqlx::test]
-async fn the_job_fetches_song_covers_and_asks_again_about_answers_kept_without_them(db: PgPool) {
+async fn the_job_asks_again_about_answers_kept_without_albums(db: PgPool) {
     use autoreverse_server::library::artist_info::job;
     use std::time::Duration;
 
     let library = TempLibrary::new();
     let web = FakeWeb::start().await;
-    catalogues_know_acdc_with_a_cover(&web);
+    catalogues_know_acdc(&web);
     let app = app_with(db, &library.data(), &web);
     album(app.db(), "AC/DC", "The Razors Edge").await;
-    // As kept before songs had covers, and only yesterday.
+    // As kept before albums were asked for, and only yesterday.
     sqlx::query(
         "INSERT INTO artist_info (artist, found, info, fetched_at)
          VALUES ('AC/DC', true, $1, now() - interval '1 day')",
     )
-    .bind(json!({"top_tracks": [{"title": "Big Gun", "album": "Big Gun", "duration": 260.0}]}))
+    .bind(json!({"top_tracks": [{"title": "Big Gun", "album": "Big Gun", "duration": 260.0, "artwork": null}]}))
     .execute(app.db())
     .await
     .unwrap();
@@ -499,8 +545,6 @@ async fn the_job_fetches_song_covers_and_asks_again_about_answers_kept_without_t
         .await
         .unwrap();
     assert_eq!(done.found, 1);
-    // Two pictures and the cover.
     assert_eq!(done.pictures, 3);
-    assert_eq!(web.hits("/art/600x600bb.jpg"), 1);
     assert!(job::due(app.db(), 30.0).await.unwrap().is_empty());
 }

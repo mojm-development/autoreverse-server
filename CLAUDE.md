@@ -147,10 +147,31 @@ server and the one `library_config` row.
 The books and music roots are the single row in `library_config`, set at runtime under
 Einstellungen → Bibliotheken, not via env. Env decides `DATABASE_URL`, `AUTOREVERSE_DATA`
 (covers, artist images, playlist covers under `playlists/`, fetched artist pictures under `artists/info/`, station logos under
-`radio/logos/`, downloaded episodes as `<Podcast>/<Folge>.<ext>`), the first admin,
-`AUTOREVERSE_PODCAST_REFRESH_HOURS`, `AUTOREVERSE_LOUDNESS`/`_THREADS`, `AUTOREVERSE_ARTIST_INFO`/`_DAYS`, `AUTOREVERSE_DEVICES`, `ORIGIN`, `HOST`/`PORT`
-and `AUTOREVERSE_STATIC` (else `static/` beside the binary, else `./static`; the server refuses
-to start without it).
+`radio/logos/`, downloaded episodes as `<Podcast>/<Folge>.<ext>`), the first admin, `ORIGIN`,
+`AUTOREVERSE_TRUSTED_PROXIES`, `HOST`/`PORT` and `AUTOREVERSE_STATIC` (else `static/` beside the
+binary, else `./static`; the server refuses to start without it) — what is needed before the
+database or would lock an admin out if it were wrong.
+
+### Server settings
+
+Everything else an operator may want to change lives in `settings::Settings`: the intervals of
+scan, podcast refresh and artist info, loudness on/off and threads, radio and its directory,
+devices, the language model (provider, model, URL, API key). One JSON row in `server_settings`,
+loaded by `main` (`settings::load`; the first start takes the former `AUTOREVERSE_*` variables over
+once, later starts ignore them and warn), held in `AppState::settings` (`settings::Shared`, a
+`watch` channel). Rules that must hold:
+
+- **Read it live, never copy it at start**: `state.settings.get()` where a value is used. Jobs
+  wait through `settings::Ticker` (period from a setting, wakes on a change, other settings do
+  not move its next run) or `subscribe()`; switching something on must not need a restart.
+- **One way to change it**: `settings::change` (validates the whole patch with `settings::apply`,
+  stores, publishes, starts what was switched on). `PATCH /server/settings` and Einstellungen →
+  Server both go through it; `422` with a German `detail` for anything that does not hold.
+- **The API key never leaves the server**: `settings::Out` carries `has_api_key` only;
+  `AiSettings` and `AiConfig` have hand-written `Debug` impls without it.
+- Tests change settings with `app.state.settings.update(|s| …)`; `Config` no longer has these
+  fields. A new runtime option belongs here (plus `Out`, `apply`, the web form, README "Server
+  settings"), not in `Config` — the three apps build their settings pages against that contract.
 
 ### Schema
 
@@ -216,13 +237,16 @@ groups by a hash of the name and looks the name up only for the entries that mak
 
 ### Artist info
 
-`library::artist_info` behind `GET /artists/{name}/info` and `…/pictures/{index}`: biography,
-facts and pictures from TheAudioDB, the most played songs from Apple's catalogue, kept in
-`artist_info`. Only names of the library are ever sent (`is_library_artist`: an album artist or a
+`library::artist_info` behind `GET /artists/{name}/info`, `…/pictures/{index}` and
+`…/albums/{index}/cover`: biography,
+facts and pictures from TheAudioDB, the chart (50 songs) and the albums from Apple's catalogue,
+kept in `artist_info`. The page lists the chart's songs the library has (`best_hit`, ten at most)
+and the catalogue's albums the library lacks (`missing_albums`, editions folded by `loose`).
+Only names of the library are ever sent (`is_library_artist`: an album artist or a
 track's own artist). `artist_info::job` fetches answers ahead of time for all of them, slowly
 (`PACE`; both catalogues limit requests per minute), and the pictures of album artists and the
-covers of their most played songs (`top_cover`, from Apple's image hosts only); answers
-older than `AUTOREVERSE_ARTIST_INFO_DAYS` are due again. A request never waits for a catalogue when
+covers of their missing albums (from Apple's image hosts only); answers
+older than `Settings::artist_info_days` are due again. A request never waits for a catalogue when
 anything is kept — an outdated answer is served and renewed in a task (`Renewing` keeps it to one
 per artist) — so keep any new catalogue call out of the request path.
 
@@ -335,8 +359,8 @@ Not `library::radio` — that is the Titel-Radio above. Rules that must hold:
   there is no renderer). `logos::backfill` catches up on stored stations without a logo (from
   the directory, or with a homepage) when a list is read — in the background, each station
   once in a while (`SearchLogos::claim`); it is the one case where the directory is asked
-  without a user searching or adding, and that does not happen with
-  `AUTOREVERSE_RADIO_DIRECTORY=0` (the station's own homepage is still looked at).
+  without a user searching or adding, and that does not happen with the directory switched off
+  (the station's own homepage is still looked at).
 - The stream route plays only rows of the caller's own list; the address comes out of the
   database, never out of the request. It must never become a proxy for arbitrary URLs — which
   is also why HLS is refused (`probe::HLS_UNSUPPORTED`) rather than rewritten.
@@ -349,8 +373,8 @@ Not `library::radio` — that is the Titel-Radio above. Rules that must hold:
 - Radio is booked nowhere: no session, no progress, no `listen_events` (the ledger knows items
   and their tracks only). The web player's store plays a station as `current.live` (`playStation`), which
   switches off progress, sessions, seeking, the queue and autoplay.
-- `AUTOREVERSE_RADIO=0` → every route 404 (`api::stations::RadioUser` checks before the login),
-  no "Radio" in sidebar and chips (`Shell::radio`); `AUTOREVERSE_RADIO_DIRECTORY=0` → no
+- `Settings::radio` off → every route 404 (`api::stations::RadioUser` checks before the login),
+  no "Radio" in sidebar and chips (`Shell::radio`); `radio_directory_on()` false → no
   request to the directory at all (homepages of stored stations are another matter, see
   above). `/server/info` reports both as `radio`, `radio_directory`.
 
@@ -380,7 +404,7 @@ control"); the three apps are built against it, so it only ever grows. Rules tha
 - Streams outlive the request that authenticated them: both logouts call `Hub::close_token`,
   and `api::devices::watch_token` looks the token up again every `Timing::recheck`. `main`
   calls `Hub::close_all` on shutdown, or a graceful shutdown would wait for the streams.
-- `AUTOREVERSE_DEVICES=0` → every route 404 (`DevicesUser` checks before the login), no
+- `Settings::devices` off → every route 404 (`DevicesUser` checks before the login), no
   "Geräte" in the web player (`Shell::devices`), `/server/info` `devices: false`.
 - Web player: all tabs of a browser share one device id, and exactly one tab holds the stream
   (`createElection`: the playing tab wins, agreed over a `BroadcastChannel`). A tab that lost

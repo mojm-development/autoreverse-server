@@ -61,7 +61,7 @@ impl FromRequestParts<AppState> for RadioUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        if !state.config.radio {
+        if !state.settings.get().radio {
             return Err(ApiError::not_found(RADIO_OFF));
         }
         ApiUser::from_request_parts(parts, state)
@@ -137,7 +137,7 @@ async fn search(
     RadioUser(user): RadioUser,
     ApiQuery(query): ApiQuery<QueryMap>,
 ) -> ApiResult<Json<SearchOut>> {
-    if !state.config.radio_directory {
+    if !state.settings.get().radio_directory_on() {
         return Err(ApiError::not_found(DIRECTORY_OFF));
     }
     let q = query.get("q").map_or("", |q| q.trim());
@@ -198,7 +198,7 @@ async fn search_logo(
     headers: HeaderMap,
     ApiQuery(query): ApiQuery<QueryMap>,
 ) -> ApiResult<Response> {
-    if !state.config.radio_directory {
+    if !state.settings.get().radio_directory_on() {
         return Err(ApiError::not_found(DIRECTORY_OFF));
     }
     let size = thumb_size(&query)?;

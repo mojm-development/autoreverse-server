@@ -43,6 +43,8 @@ pub struct AppState {
     pub devices: Arc<crate::devices::Hub>,
     /// Artists whose catalogue answers are being renewed right now.
     pub artist_info_renewing: crate::library::artist_info::Renewing,
+    /// What admins set under Einstellungen → Server; the defaults until `main` loads them.
+    pub settings: crate::settings::Shared,
 }
 
 impl AppState {
@@ -66,6 +68,7 @@ impl AppState {
             radio_logos: Arc::default(),
             devices: Arc::default(),
             artist_info_renewing: Default::default(),
+            settings: Default::default(),
         }
     }
 }

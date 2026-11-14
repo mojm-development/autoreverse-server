@@ -21,14 +21,14 @@ const FEED: &str = r#"<?xml version="1.0"?><rss version="2.0"><channel><title>Ma
 
 fn app_with(db: PgPool, data: &Path, refresh_hours: &str) -> TestApp {
     let data = data.to_str().unwrap().to_owned();
-    let hours = refresh_hours.to_owned();
-    let config = Config::from_lookup(|key| match key {
-        "AUTOREVERSE_DATA" => Some(data.clone()),
-        "AUTOREVERSE_PODCAST_REFRESH_HOURS" => Some(hours.clone()),
-        _ => None,
-    })
-    .unwrap();
-    TestApp::with_config(db, config)
+    let config =
+        Config::from_lookup(|key| (key == "AUTOREVERSE_DATA").then(|| data.clone())).unwrap();
+    let app = TestApp::with_config(db, config);
+    let hours = refresh_hours.parse().unwrap_or(0.0);
+    app.state
+        .settings
+        .update(|s| s.podcast_refresh_hours = hours);
+    app
 }
 
 async fn cookie(app: &TestApp, name: &str, admin: bool) -> (String, i32) {

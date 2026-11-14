@@ -32,6 +32,7 @@ mod scan_store;
 mod scanner_folders;
 mod security;
 mod server_info;
+mod server_settings;
 mod startup;
 mod stations;
 mod tokens;

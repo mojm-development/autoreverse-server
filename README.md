@@ -197,25 +197,21 @@ Then, still in the web UI:
 | `AUTOREVERSE_DATA`                  | no              | `./data` (`/data` in the image)                                   | Base directory for server-managed files. `covers/`, `podcasts/`, `artists/` and `radio/` are created inside it.           |
 | `AUTOREVERSE_ADMIN_USER`            | first boot only | —                                                                 | Username of the first admin account.                                                                            |
 | `AUTOREVERSE_ADMIN_PASSWORD`        | first boot only | —                                                                 | Password of that account.                                                                                       |
-| `AUTOREVERSE_PODCAST_REFRESH_HOURS` | no              | `1`                                                               | How often the server refreshes every feed and applies the download retention. `0` turns the background job off. |
 | `ORIGIN`                            | behind a proxy  | derived from the `Host` header, assuming `http`                   | The public URL of the server. See [Running behind a reverse proxy](#running-behind-a-reverse-proxy).            |
 | `AUTOREVERSE_TRUSTED_PROXIES`       | behind a proxy  | none                                      |
-| `AUTOREVERSE_AI_PROVIDER`           | no              | off; `anthropic` or `ollama`              |
-| `AUTOREVERSE_AI_API_KEY`            | for `anthropic` | —                                         |
-| `AUTOREVERSE_AI_MODEL`              | for `ollama`    | `claude-haiku-5-5` for `anthropic`        |
-| `AUTOREVERSE_AI_URL`                | no              | the provider's usual address              |
-| `AUTOREVERSE_SCAN_HOURS`            | no              | `1`, `0` turns it off                     |
-| `AUTOREVERSE_LOUDNESS`              | no              | on; `0` turns it off                      | Whether music without loudness tags is measured in the background (see [Loudness](#loudness)). Off: only tags are read. |
-| `AUTOREVERSE_LOUDNESS_THREADS`      | no              | half the cores, at most 4                 | How many albums are decoded at once while measuring. |
-| `AUTOREVERSE_ARTIST_INFO`           | no              | on; `0` turns it off                      | Whether the server asks TheAudioDB and Apple's music catalogue for an artist's biography, pictures and top tracks. Only the artist's name is sent, and only for artists of the library. |
-| `AUTOREVERSE_ARTIST_INFO_DAYS`      | no              | `30`; `0` never asks again                | After how many days an artist's answers are asked for again. A background job fetches them ahead of time for every artist of the library (album artists and artists of tracks) and the pictures of album artists; a page is served from what is kept and never waits for a catalogue, except for an artist the job has not reached yet. Names nobody knows are asked again after a week at the latest. |
-| `AUTOREVERSE_RADIO`                 | no              | on; `0` turns it off                      | Internet radio stations. Off: the `/radio/stations` routes answer 404 and the web UI has no "Radio". |
-| `AUTOREVERSE_RADIO_DIRECTORY`       | no              | on; `0` turns it off                      | Whether stations can be searched in radio-browser.info. Off: the server does not ask the directory, stations are added by address only. Only search words, a country code and the ids of stations are sent there. |
 | `AUTOREVERSE_RADIO_DIRECTORY_URL`   | no              | `https://all.api.radio-browser.info`      | The directory's base address: one name for all of its servers. Point it at a single server (`https://de1.api.radio-browser.info`) or a mirror if needed. |
-| `AUTOREVERSE_DEVICES`               | no              | on; `0` turns it off                      | Remote control between the devices of an account (see [Remote control](#remote-control)). Off: the `/me/devices` routes answer 404 and the web player shows no "Geräte". |
 | `HOST` / `PORT`                     | no              | `0.0.0.0` / `3000`                                                | Where the server listens.                                                                                       |
 | `AUTOREVERSE_STATIC`                | no              | `static/` beside the binary, else `./static` (`/app/static` in the image) | CSS, JS and icons. The server refuses to start if it cannot find them.                                  |
 | `RUST_LOG`                          | no              | `autoreverse_server=info,tower_http=warn`                         | Log filter.                                                                                                     |
+
+Everything else is set at runtime by an admin under Einstellungen → Server (or through
+[`PATCH /server/settings`](#server-settings)), in effect at once: the intervals of the library scan,
+the podcast refresh and the artist info, loudness measuring, internet radio and its directory,
+remote control and the language model for suggestions. Earlier versions read these from
+`AUTOREVERSE_SCAN_HOURS`, `AUTOREVERSE_PODCAST_REFRESH_HOURS`, `AUTOREVERSE_ARTIST_INFO`/`_DAYS`,
+`AUTOREVERSE_LOUDNESS`/`_THREADS`, `AUTOREVERSE_RADIO`/`_DIRECTORY`, `AUTOREVERSE_DEVICES` and
+`AUTOREVERSE_AI_*`: the first start of this version takes them over once and logs a warning on later
+starts while they are still set.
 
 The old `AUTOREVERSE_AUTO_MIGRATE` switch is gone: migrations are compiled into the binary and
 always applied at start.
@@ -378,9 +374,10 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET`                  | `/library/more`                                   | Next page of the web library grid (used by the web UI)                 |
 | `GET` `POST`           | `/artists/{name}/image`                           | Custom artist image; upload is admin, multipart `image`                |
 | `PUT` `DELETE`         | `/artists/{name}/cover`                           | Pick an album as the artist image, or reset to random (admin)          |
-| `GET`                  | `/artists/{name}/info?lang=`                      | Biography, facts, pictures and top tracks matched to the library       |
+| `GET`                  | `/artists/{name}/info?lang=`                      | Biography, facts, pictures; `top_tracks`: the catalogue's chart down to the songs the library has (ten at most, each with its `track`); `missing_albums`: the artist's albums in the catalogue the library lacks (`index`, `title`, `year`, `track_count`, `has_cover`), newest first |
 | `GET`                  | `/artists/{name}/pictures/{index}?size=`          | One of the pictures `info` lists, served from the server's disk        |
-| `GET`                  | `/artists/{name}/top/{index}/cover?size=`         | The record's cover of a song in `top_tracks` (`has_cover`), from the server's disk |
+| `GET`                  | `/artists/{name}/albums/{index}/cover?size=`      | The cover of an album in `missing_albums` (its `index`), from the server's disk |
+| `GET`                  | `/artists/{name}/top/{index}/cover?size=`         | Kept for older clients; `top_tracks` now only lists songs of the library, whose `has_cover` is false |
 | `GET`                  | `/search`                                         | Cross-library search, including tracks by their artist and artists; tracks whose title holds the term come before those found by their artist |
 | `GET`                  | `/radio`                                          | Similar tracks for a track, an album or an artist, see [Track radio](#track-radio) |
 | `GET` `POST`           | `/radio/stations`, `/radio/stations/search`       | Internet radio stations of the user; directory search, see [Radio stations](#radio-stations) |
@@ -415,6 +412,7 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET` `DELETE`         | `/me/devices`, `/me/devices/events`, `/me/devices/{device_id}` | The account's online devices, a device's event stream, signing off — see [Remote control](#remote-control) |
 | `PUT` `POST`           | `/me/devices/{device_id}/state`, `…/commands`, `…/transfer` | Report what plays, steer another device, hand playback over |
 | `GET`                  | `/server/info`                                    | Library counts; user count for admins; `radio`, `radio_directory`, `devices`; `web_url`, see [Sharing a link](#sharing-a-link) |
+| `GET` `PATCH`          | `/server/settings`                                | Admins: the server's settings, see [Server settings](#server-settings) |
 | `GET`                  | `/ai/status`                                      | Whether a language model is set up                                     |
 | `GET` `POST`           | `/ai/feed`, `/ai/feed/refresh`                    | The "Entdecken" feed, see [Discover feed](#discover-feed); generate its model-made parts anew |
 | `POST`                 | `/ai/playlist`, `/ai/suggestions`, `/ai/discover` | A playlist from a sentence (`{prompt}`), album suggestions, new artists — need a model |
@@ -799,7 +797,7 @@ read — a link that leads out of the track's folder is ignored.
 radio, the lists above), as well as the `tracks` of `POST /ai/playlist` and of the
 `mixes` in `GET /ai/feed` — carries `has_lyrics: boolean`, so a client shows its lyrics button
 only where it leads somewhere. The flag is kept by the library scan: every scan (the automatic
-one every `AUTOREVERSE_SCAN_HOURS`, or one started by hand) looks for the files beside every
+one at the interval set under Einstellungen → Server, or one started by hand) looks for the files beside every
 track, also in folders it otherwise skips as unchanged, and reads a file's tags for lyrics once
 per version of the file. A library from before this feature therefore gets its flags with the
 first scan after the update, without anybody doing anything; that scan reads the tags of every
@@ -847,7 +845,7 @@ Only **music** is measured. Audiobooks and podcast episodes keep `null` unless t
 carry tags — decoding hundreds of hours of speech would buy nothing.
 
 **The measuring pass** runs in the background after every scan and at every start, album by
-album, `AUTOREVERSE_LOUDNESS_THREADS` albums at a time (default: half the cores, at most 4). It
+album, as many albums at a time as Einstellungen → Server says (default: half the cores, at most 4). It
 is resumable — an album is written in one go, a restart carries on with the albums still open —
 and stops with the server. A file that cannot be decoded is logged, stays `null` and is not
 tried again until it changes (size or modification time); the same change makes any file lose
@@ -857,7 +855,7 @@ read and measured again, and until then keep their old values. An album whose fi
 reachable right now is postponed.
 `GET /scan/status` reports it as `"loudness": {"running", "total", "processed", "failed"}`
 (`total`/`processed` in albums, `failed` in files); the scan card in the web settings shows the
-same. `AUTOREVERSE_LOUDNESS=0` switches the measuring off; tags are still read.
+same. Switched off under Einstellungen → Server, nothing is measured; tags are still read.
 
 **An existing library** needs nothing done: after the update, the server reads the loudness
 tags of every track once (at start and with each scan) and then measures the rest in the
@@ -954,7 +952,8 @@ play it without a session and report it through `POST /me/listens` with its `tra
 Internet radio: every user keeps a list of public stations and plays them **through this
 server**. A device only ever talks to the server — one address, one login — and the server reads
 the running title out of the stream. `GET /server/info` says whether the feature is there
-(`radio`) and whether stations can be searched (`radio_directory`); with `AUTOREVERSE_RADIO=0`
+(`radio`) and whether stations can be searched (`radio_directory`); with radio switched off
+under Einstellungen → Server
 every route below answers `404` "Radio ist auf diesem Server abgeschaltet".
 
 A station on the wire:
@@ -970,7 +969,7 @@ unknown. The stream's own address is never sent to a client.
 | Method and path                         | Answer                                                                                   |
 | --------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `GET /radio/stations`                   | `200 {"stations": [Station…]}` in the user's order.                                      |
-| `GET /radio/stations/search?q=&country=&limit=` | `200 {"results": […]}` from the directory: `q` 1–100 characters, `country` two letters (optional), `limit` 1–50 (default 25). Each result is a station without `id`, with `directory_id`, `has_logo` (a logo is worth asking for: the directory names one, or a homepage whose icon can stand in — show it with the route below, which may still answer `404`), `logo_url` (the directory's address, may be `null`; kept for older clients, do not load it) and `added` (the user has it already). Stations the directory reports as broken, and HLS stations, are left out. `404` "Die Sendersuche ist auf diesem Server abgeschaltet" with `AUTOREVERSE_RADIO_DIRECTORY=0`, `502` when the directory cannot be reached. |
+| `GET /radio/stations/search?q=&country=&limit=` | `200 {"results": […]}` from the directory: `q` 1–100 characters, `country` two letters (optional), `limit` 1–50 (default 25). Each result is a station without `id`, with `directory_id`, `has_logo` (a logo is worth asking for: the directory names one, or a homepage whose icon can stand in — show it with the route below, which may still answer `404`), `logo_url` (the directory's address, may be `null`; kept for older clients, do not load it) and `added` (the user has it already). Stations the directory reports as broken, and HLS stations, are left out. `404` "Die Sendersuche ist auf diesem Server abgeschaltet" with the directory switched off (Einstellungen → Server), `502` when the directory cannot be reached. |
 | `GET /radio/stations/search/logo?id=&size=` | The logo of a search hit: `id` is its `directory_id`, `size` as for covers. `200` with the image, `404` "Kein Logo" otherwise, see below. |
 | `POST /radio/stations`                  | Body `{"directory_id": "…"}` (data and logo from the directory) or `{"stream_url": "…", "name": "…", "homepage": "…"?}` (the logo is then the icon of that homepage, if it has one). `201 Station`; `200` with the existing station when the user has it already (same `directory_id`, same address, or the same stream behind a playlist file). |
 | `PATCH /radio/stations/{id}`            | Body `{"name"?: "…", "position"?: n}` — rename, move (1-based, past the end is the end; positions stay gapless). `200 Station`. |
@@ -1070,7 +1069,7 @@ fetches the station's own web page** — the homepage the directory names, or th
 a station is added by address — and the icons that page names, whenever a logo is wanted and
 the directory has none that can be had: when a search hit's logo is asked for, when a station
 is added, and in the background for stored stations without a logo (this last part also with
-`AUTOREVERSE_RADIO_DIRECTORY=0`). Those requests carry nothing but the `Autoreverse/<version>`
+the directory switched off). Those requests carry nothing but the `Autoreverse/<version>`
 user agent. Senders, their web pages and the servers of logos see the server's address, not
 the listener's.
 
@@ -1078,7 +1077,7 @@ the listener's.
 
 The devices of one account see what plays on each other, steer each other and hand playback
 over ("Fernsteuerung" in the UIs). `GET /server/info` says `devices: true` where a server offers
-it; with `AUTOREVERSE_DEVICES=0` every route below answers `404` "Die Fernsteuerung ist auf
+it; switched off under Einstellungen → Server, every route below answers `404` "Die Fernsteuerung ist auf
 diesem Server abgeschaltet".
 
 **The server only passes things on.** It keeps the devices in memory, per account, and nothing
@@ -1167,6 +1166,53 @@ the fullscreen player lists the devices; a click moves playback there. While ano
 plays and the browser does not, the mini bar is its remote: "Läuft auf …", play/pause,
 previous/next, position, volume and "Hier weiterhören". The web player has no shuffle or repeat
 and ignores those two commands.
+
+### Server settings
+
+What an admin sets under Einstellungen → Server, for clients that offer the same page. Both routes
+are for admins only (`403` otherwise); every change is stored and in effect at once, no restart.
+
+`GET /server/settings` answers:
+
+```json
+{
+  "scan_hours": 1, "podcast_refresh_hours": 1,
+  "artist_info": true, "artist_info_days": 30,
+  "loudness": true, "loudness_threads": 0, "loudness_threads_default": 4,
+  "radio": true, "radio_directory": true, "devices": true,
+  "ai": {
+    "provider": "anthropic", "model": "claude-sonnet-5-5", "url": null,
+    "has_api_key": true, "enabled": true,
+    "providers": ["anthropic", "ollama"],
+    "anthropic_models": ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"]
+  }
+}
+```
+
+| Field                   | Meaning |
+| ----------------------- | ------- |
+| `scan_hours`            | Hours between automatic library scans, 0–168; `0` = never. |
+| `podcast_refresh_hours` | Hours between refreshes of every feed, 0–168; `0` = never. |
+| `artist_info`           | Whether biographies, pictures and top tracks are fetched (see `GET /artists/{name}/info`). |
+| `artist_info_days`      | Days after which an artist's answers are asked for again, 0–365; `0` = never again. |
+| `loudness`              | Whether music without loudness tags is measured (see [Loudness](#loudness)). |
+| `loudness_threads`      | Albums measured at once, 0–16; `0` = automatic, which comes to `loudness_threads_default` on this machine. |
+| `radio`                 | Internet radio stations. `radio_directory` only counts while this is on. |
+| `radio_directory`       | Whether stations can be searched in radio-browser.info. |
+| `devices`               | Remote control between the devices of an account. |
+| `ai.provider`           | `anthropic`, `ollama` or `null` (suggestions off). |
+| `ai.model`              | The model; `null` = the provider's default (Anthropic). Ollama needs one. `anthropic_models` are suggestions for a picker, any name is accepted. |
+| `ai.url`                | Another address for the provider's API; `null` = its usual one. |
+| `ai.has_api_key`        | Whether a key is stored. The key itself never leaves the server. |
+| `ai.enabled`            | Whether suggestions work with this setup. |
+
+`PATCH /server/settings` takes any of the fields above (except the read-only `loudness_threads_default`,
+`has_api_key`, `enabled`, `providers`, `anthropic_models`), changes those and answers like `GET`.
+In `ai`, `api_key` sets the key; `null` or `""` removes it; leaving it out keeps it. Texts are
+trimmed, `""` counts as `null`. The change is checked as a whole and refused as a whole with `422`
+and a German `detail`: a number out of its range, a switch that is not `true`/`false`,
+`"Keine bekannte Einstellung angegeben"` for a body without a known field, `"Für Anthropic fehlt der
+API-Schlüssel"`, `"Für Ollama fehlt das Modell"`, `"Unbekannter KI-Anbieter „…“"`.
 
 ### Playlists
 

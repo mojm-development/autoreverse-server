@@ -2,9 +2,9 @@
 //! artist's page finds it kept instead of waiting for them.
 //!
 //! A pass asks about every artist that has nothing kept yet or whose answer is older than
-//! `AUTOREVERSE_ARTIST_INFO_DAYS` — album artists first, then the artists of tracks by how many
-//! tracks they have — and fetches the pictures of album artists and the covers of their most
-//! played songs that are not stored yet. The
+//! the interval under Einstellungen → Server — album artists first, then the artists of tracks by how many
+//! tracks they have — and fetches the pictures of album artists and the covers of their albums
+//! the library lacks that are not stored yet. The
 //! catalogues are free and limit how often they may be asked, so a pass goes slowly
 //! ([`PACE`]) and pauses when they stop answering. The first pass begins shortly after the
 //! server starts and may take hours on a large library; later ones only see what has become due.
@@ -20,9 +20,9 @@ use crate::state::AppState;
 const START_DELAY: Duration = Duration::from_secs(120);
 /// How often the job looks for artists that have become due.
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 3600);
-/// Between two artists. Each takes one request to TheAudioDB and two to Apple, which allows
+/// Between two artists. Each takes one request to TheAudioDB and three to Apple, which allows
 /// about twenty a minute.
-pub const PACE: Duration = Duration::from_secs(6);
+pub const PACE: Duration = Duration::from_secs(9);
 /// After this many artists in a row could not be asked about, the catalogues are left alone for
 /// [`BACK_OFF`].
 const FAILURES_BEFORE_BACKING_OFF: usize = 5;
@@ -37,14 +37,20 @@ pub struct Pass {
     pub pictures: usize,
 }
 
-/// Spawns the job; returns at once.
+/// Spawns the job; returns at once. Switched off (Einstellungen → Server) it waits; a change of
+/// the settings starts a pass at once, so switching it on or shortening the interval needs no
+/// restart.
 pub fn start(state: AppState) {
-    if !state.config.artist_info {
-        return;
-    }
     tokio::spawn(async move {
+        let mut changes = state.settings.subscribe();
         tokio::time::sleep(START_DELAY).await;
         loop {
+            if !state.settings.get().artist_info {
+                if changes.changed().await.is_err() {
+                    return;
+                }
+                continue;
+            }
             match pass(&state, PACE, BACK_OFF).await {
                 Ok(done) if done != Pass::default() => tracing::info!(
                     "[artist-info] {} Interpreten gefunden, {} unbekannt, {} nicht erreichbar, {} Bilder geholt",
@@ -56,7 +62,10 @@ pub fn start(state: AppState) {
                 Ok(_) => {}
                 Err(e) => tracing::error!("[artist-info] Durchgang fehlgeschlagen: {e}"),
             }
-            tokio::time::sleep(CHECK_EVERY).await;
+            tokio::select! {
+                _ = tokio::time::sleep(CHECK_EVERY) => {}
+                changed = changes.changed() => if changed.is_err() { return },
+            }
         }
     });
 }
@@ -87,9 +96,9 @@ pub async fn due(db: &PgPool, refresh_days: f64) -> Result<Vec<String>, sqlx::Er
          WHERE kept.artist IS NULL
             OR ($1 > 0 AND kept.fetched_at < now() - make_interval(
                     secs => CASE WHEN kept.found THEN $1 ELSE $2 END * 86400))
-            -- Kept before songs had covers: asked once more, whatever the setting.
-            OR (kept.found AND jsonb_array_length(coalesce(kept.info->'top_tracks', '[]')) > 0
-                AND NOT jsonb_exists(kept.info->'top_tracks'->0, 'artwork'))
+            -- Kept before the catalogue was asked for albums: asked once more, whatever the
+            -- setting (`albums` is null or missing there).
+            OR (kept.found AND jsonb_typeof(kept.info->'albums') IS DISTINCT FROM 'array')
          ORDER BY best.rank, best.tracks DESC, best.artist",
     )
     .bind(found_days)
@@ -106,7 +115,11 @@ pub async fn pass(
 ) -> Result<Pass, sqlx::Error> {
     let mut done = Pass::default();
     let mut failures_in_a_row = 0;
-    for artist in due(&state.db, state.config.artist_info_days).await? {
+    for artist in due(&state.db, state.settings.get().artist_info_days).await? {
+        // Switched off meanwhile.
+        if !state.settings.get().artist_info {
+            break;
+        }
         // A page may have renewed it meanwhile.
         if state.artist_info_renewing.claim(&artist) {
             let kept = stored(&state.db, &artist).await;

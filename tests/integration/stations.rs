@@ -337,6 +337,12 @@ async fn world_timed(db: PgPool, env: &[(&str, &str)], timing: Timing) -> World 
     let library = TempLibrary::new();
     let sender = Sender::start().await;
     let mut state = AppState::new(db, config_with(&library.data(), &sender, env));
+    let settings = autoreverse_server::settings::from_env(|key| {
+        env.iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| (*v).to_owned())
+    });
+    state.settings.set(settings);
     state.radio_logos = Arc::new(SearchLogos::new(timing));
     let app = TestApp::with_state(state);
     let user = app.user("ada", false).await;

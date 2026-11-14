@@ -99,7 +99,7 @@ struct RadioPage {
 
 /// 404 inside the app frame on a server without the feature.
 fn guard(state: &AppState) -> WebResult<()> {
-    if state.config.radio {
+    if state.settings.get().radio {
         Ok(())
     } else {
         Err(WebError::not_found(RADIO_OFF))
@@ -157,7 +157,7 @@ async fn render(
         Ok(store::list(&state.db, user.id).await?)
     })?;
     logos::backfill(state, &stations);
-    let directory = state.config.radio_directory;
+    let directory = state.settings.get().radio_directory_on();
     let query: String = query.trim().chars().take(100).collect();
     let (hits, search_error) = if directory && !query.is_empty() {
         match search(state, user, &query).await? {
