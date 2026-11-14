@@ -41,6 +41,8 @@ pub struct AppState {
     pub radio_logos: Arc<crate::stations::SearchLogos>,
     /// Remote control: the devices that are online, per account, and their event streams.
     pub devices: Arc<crate::devices::Hub>,
+    /// Artists whose catalogue answers are being renewed right now.
+    pub artist_info_renewing: crate::library::artist_info::Renewing,
 }
 
 impl AppState {
@@ -63,6 +65,7 @@ impl AppState {
             radio: Arc::default(),
             radio_logos: Arc::default(),
             devices: Arc::default(),
+            artist_info_renewing: Default::default(),
         }
     }
 }

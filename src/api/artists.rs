@@ -204,9 +204,10 @@ struct InfoOut {
 }
 
 /// `GET /artists/{name}/info?lang=` (new in Rust): biography, facts, pictures and the most
-/// played tracks, each with the library's own track when there is one. The first request for an
-/// artist asks the catalogues and so takes a moment; after that the answer comes from the
-/// database. A catalogue that cannot be reached is no error here: `found` is then false.
+/// played tracks, each with the library's own track when there is one. The answer comes from the
+/// database, where the background job keeps it; only for an artist it has not reached yet are the
+/// catalogues asked while the request waits. A catalogue that cannot be reached is no error here:
+/// `found` is then false.
 async fn info(
     State(state): State<AppState>,
     _user: ApiUser,
@@ -214,7 +215,7 @@ async fn info(
     ApiQuery(query): ApiQuery<QueryMap>,
 ) -> ApiResult<Json<InfoOut>> {
     let artist = artist_name(name)?;
-    if !artist_info::is_album_artist(&state.db, &artist).await? {
+    if !artist_info::is_library_artist(&state.db, &artist).await? {
         return Err(ApiError::not_found("Interpret nicht gefunden"));
     }
     let language: String = query

@@ -279,3 +279,133 @@ async fn switched_off_the_server_asks_nobody(db: PgPool) {
     assert_eq!(body["found"], false);
     assert_eq!(web.hits("/adb/search.php"), 0);
 }
+
+/// A track on a sampler that names `artist` as its own.
+async fn guest_track(db: &PgPool, artist: &str, title: &str) -> i32 {
+    let sampler = album(db, "Various Artists", "Sampler").await;
+    let id = track(db, sampler, 1, title, 200.0).await;
+    sqlx::query("UPDATE tracks SET artist = $2 WHERE id = $1")
+        .bind(id)
+        .bind(artist)
+        .execute(db)
+        .await
+        .unwrap();
+    id
+}
+
+#[sqlx::test]
+async fn an_artist_known_only_from_a_sampler_has_a_page_too(db: PgPool) {
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc(&web);
+    let app = app_with(db, &library.data(), &web);
+    let token = token(&app).await;
+    let song = guest_track(app.db(), "AC/DC", "Thunderstruck").await;
+
+    let response = app.get("/artists/AC%2FDC/info", Some(&token)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = body_json(response).await;
+    assert_eq!(body["found"], true);
+    assert_eq!(body["top_tracks"][0]["track"]["id"], song);
+}
+
+#[sqlx::test]
+async fn an_outdated_answer_is_served_at_once_and_renewed_behind_the_scenes(db: PgPool) {
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc(&web);
+    let app = app_with(db, &library.data(), &web);
+    let token = token(&app).await;
+    album(app.db(), "AC/DC", "The Razors Edge").await;
+    sqlx::query(
+        "INSERT INTO artist_info (artist, found, info, fetched_at)
+         VALUES ('AC/DC', true, $1, now() - interval '40 days')",
+    )
+    .bind(json!({"biographies": {"en": "Old text."}, "pictures": [], "top_tracks": []}))
+    .execute(app.db())
+    .await
+    .unwrap();
+
+    let body = body_json(app.get("/artists/AC%2FDC/info", Some(&token)).await).await;
+    assert_eq!(body["biography"], "Old text.");
+
+    let mut renewed = String::new();
+    for _ in 0..100 {
+        renewed = sqlx::query_scalar("SELECT info->'biographies'->>'en' FROM artist_info")
+            .fetch_one(app.db())
+            .await
+            .unwrap();
+        if renewed != "Old text." {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert_eq!(renewed, "A band.");
+    let body = body_json(app.get("/artists/AC%2FDC/info?lang=en", Some(&token)).await).await;
+    assert_eq!(body["biography"], "A band.");
+    assert_eq!(web.hits("/adb/search.php"), 1);
+}
+
+#[sqlx::test]
+async fn the_job_asks_about_every_artist_once_and_fetches_the_pictures_of_album_artists(
+    db: PgPool,
+) {
+    use autoreverse_server::library::artist_info::job;
+    use std::time::Duration;
+
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc(&web);
+    let app = app_with(db, &library.data(), &web);
+    album(app.db(), "AC/DC", "The Razors Edge").await;
+    guest_track(app.db(), "Ein Gast", "Zu Besuch").await;
+
+    let due = job::due(app.db(), 30.0).await.unwrap();
+    assert_eq!(due, ["AC/DC", "Various Artists", "Ein Gast"]);
+
+    let done = job::pass(&app.state, Duration::ZERO, Duration::ZERO)
+        .await
+        .unwrap();
+    // The fake catalogue knows AC/DC only; both pictures are AC/DC's.
+    assert_eq!(done.found, 1);
+    assert_eq!(done.unknown, 2);
+    assert_eq!(done.failed, 0);
+    assert_eq!(done.pictures, 2);
+    assert_eq!(web.hits("/pic/thumb"), 1);
+    assert_eq!(web.hits("/adb/search.php"), 3);
+
+    // Nothing is due any more, and the pictures are on disk.
+    assert!(job::due(app.db(), 30.0).await.unwrap().is_empty());
+    let again = job::pass(&app.state, Duration::ZERO, Duration::ZERO)
+        .await
+        .unwrap();
+    assert_eq!(again, job::Pass::default());
+    assert_eq!(web.hits("/adb/search.php"), 3);
+    assert_eq!(web.hits("/pic/thumb"), 1);
+}
+
+#[sqlx::test]
+async fn the_job_asks_again_when_an_answer_is_older_than_the_setting(db: PgPool) {
+    use autoreverse_server::library::artist_info::job;
+
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    let app = app_with(db, &library.data(), &web);
+    album(app.db(), "Alt", "Erstes").await;
+    album(app.db(), "Neu", "Erstes").await;
+    album(app.db(), "Niemand", "Erstes").await;
+    sqlx::query(
+        "INSERT INTO artist_info (artist, found, info, fetched_at) VALUES
+             ('Alt', true, '{}', now() - interval '10 days'),
+             ('Neu', true, '{}', now() - interval '2 days'),
+             ('Niemand', false, '{}', now() - interval '8 days')",
+    )
+    .execute(app.db())
+    .await
+    .unwrap();
+
+    assert_eq!(job::due(app.db(), 30.0).await.unwrap(), ["Niemand"]);
+    assert_eq!(job::due(app.db(), 7.0).await.unwrap(), ["Alt", "Niemand"]);
+    // Never again: only artists that have nothing kept.
+    assert!(job::due(app.db(), 0.0).await.unwrap().is_empty());
+}

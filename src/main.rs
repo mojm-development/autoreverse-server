@@ -80,6 +80,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState::new(pool, config);
     autoreverse_server::podcasts::job::start(state.clone());
     autoreverse_server::scanner::job::start(state.clone());
+    autoreverse_server::library::artist_info::job::start(state.clone());
     // Carries on where the last run stopped, and gives an upgraded library its values without
     // waiting for a scan.
     autoreverse_server::scanner::loudness::start(&state);

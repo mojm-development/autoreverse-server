@@ -3,14 +3,22 @@
 //!
 //! The library's tags say none of this, so it comes from two public catalogues that need no
 //! account: TheAudioDB (text, facts, pictures) and Apple's music catalogue (the most played
-//! songs). Only the artist's name is sent to them, and only for artists that have an album here.
-//! Answers are kept in `artist_info` and asked for again after a month; pictures are fetched on
-//! first request and then served from `artists/info/` like any other stored image, so no client
+//! songs). Only the artist's name is sent to them, and only for artists of the library: those
+//! with an album here and those named as the artist of a track (a sampler's songs).
+//!
+//! Answers are kept in `artist_info`. The job in [`job`] fetches them ahead of time for every such
+//! artist and asks again after `AUTOREVERSE_ARTIST_INFO_DAYS` (a month by default), so a page
+//! never waits for a catalogue: a request finds the answer kept, an outdated one is served at once
+//! and renewed behind the scenes, and only an artist the job has not reached yet is asked for
+//! while the request waits. Pictures are stored under `artists/info/` — those of album artists by
+//! the job, the others on first request — and served like any other stored image, so no client
 //! ever talks to a catalogue itself.
+
+pub mod job;
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -36,9 +44,8 @@ const USER_AGENT: &str = concat!("Autoreverse-Server/", env!("CARGO_PKG_VERSION"
 const TIMEOUT: Duration = Duration::from_secs(12);
 const PICTURE_TIMEOUT: Duration = Duration::from_secs(30);
 const TOP_TRACKS: usize = 10;
-const KEEP_FOUND_DAYS: i64 = 30;
-/// A name nobody knows today may have a page tomorrow.
-const KEEP_UNKNOWN_DAYS: i64 = 1;
+/// A name nobody knows today may have a page tomorrow: asked again after a week at the latest.
+const KEEP_UNKNOWN_DAYS: f64 = 7.0;
 const MAX_PICTURES: usize = 5;
 pub const MAX_PICTURE_BYTES: usize = 8 * 1024 * 1024;
 pub const NO_PICTURE: &str = "Kein Bild";
@@ -322,7 +329,22 @@ pub async fn library_tracks(db: &PgPool, artist: &str) -> Result<Vec<TrackHit>, 
     .await
 }
 
-/// Whether the artist has a present album: nobody else has a page, and no other name is sent out.
+/// Whether the artist has a present album or is named as the artist of a track on one: nobody
+/// else has a page, and no other name is sent out.
+pub async fn is_library_artist(db: &PgPool, artist: &str) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM items WHERE kind = 'album' AND artist = $1
+                        AND missing_since IS NULL AND duplicate_of IS NULL)
+             OR EXISTS (SELECT 1 FROM tracks AS track JOIN items AS item ON item.id = track.item_id
+                        WHERE item.kind = 'album' AND track.artist = $1
+                          AND item.missing_since IS NULL AND item.duplicate_of IS NULL)",
+    )
+    .bind(artist)
+    .fetch_one(db)
+    .await
+}
+
+/// Whether the artist has a present album; only their pictures are fetched ahead of time.
 pub async fn is_album_artist(db: &PgPool, artist: &str) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM items WHERE kind = 'album' AND artist = $1
@@ -399,7 +421,7 @@ async fn fetch(state: &AppState, name: &str) -> Result<Stored, String> {
     Ok(info)
 }
 
-async fn stored(db: &PgPool, artist: &str) -> Result<Option<ArtistInfo>, sqlx::Error> {
+pub(crate) async fn stored(db: &PgPool, artist: &str) -> Result<Option<ArtistInfo>, sqlx::Error> {
     let row: Option<(bool, Json<Stored>, DateTime<Utc>)> =
         sqlx::query_as("SELECT found, info, fetched_at FROM artist_info WHERE artist = $1")
             .bind(artist)
@@ -412,22 +434,54 @@ async fn stored(db: &PgPool, artist: &str) -> Result<Option<ArtistInfo>, sqlx::E
     }))
 }
 
-fn is_fresh(info: &ArtistInfo, now: DateTime<Utc>) -> bool {
-    let keep = if info.found {
-        KEEP_FOUND_DAYS
+/// How many days an answer is kept before it is asked for again, `None` for ever (`refresh_days`
+/// 0). An unknown name never waits longer than [`KEEP_UNKNOWN_DAYS`].
+pub fn keep_days(found: bool, refresh_days: f64) -> Option<f64> {
+    if refresh_days <= 0.0 {
+        None
+    } else if found {
+        Some(refresh_days)
     } else {
-        KEEP_UNKNOWN_DAYS
-    };
-    info.fetched_at
-        .is_some_and(|at| now - at < chrono::Duration::days(keep))
+        Some(refresh_days.min(KEEP_UNKNOWN_DAYS))
+    }
 }
 
-/// What is known about `artist`, asking the catalogues when nothing recent is kept. Never an
-/// error because of them: an unreachable catalogue leaves the old answer, or none, and the next
-/// request asks again.
+fn is_fresh(info: &ArtistInfo, now: DateTime<Utc>, refresh_days: f64) -> bool {
+    let Some(at) = info.fetched_at else {
+        return false;
+    };
+    match keep_days(info.found, refresh_days) {
+        None => true,
+        Some(days) => ((now - at).num_seconds() as f64) < days * 86_400.0,
+    }
+}
+
+/// The artists whose answers are being renewed, so that a page visited twice asks only once.
+#[derive(Clone, Default)]
+pub struct Renewing(Arc<Mutex<HashSet<String>>>);
+
+impl Renewing {
+    /// True when the caller is the one to renew `artist`.
+    pub(crate) fn claim(&self, artist: &str) -> bool {
+        self.0.lock().unwrap().insert(artist.to_owned())
+    }
+
+    pub(crate) fn release(&self, artist: &str) {
+        self.0.lock().unwrap().remove(artist);
+    }
+}
+
+/// What is known about `artist`. Never waits for a catalogue when anything is kept: an outdated
+/// answer is served as it is and renewed behind the scenes. Only an artist nothing is kept for
+/// yet is asked for while the caller waits. Never an error because of the catalogues: an
+/// unreachable one leaves the old answer, or none, and the next request asks again.
 pub async fn artist_info(state: &AppState, artist: &str) -> Result<ArtistInfo, sqlx::Error> {
     let kept = stored(&state.db, artist).await?;
-    if let Some(info) = kept.as_ref().filter(|info| is_fresh(info, Utc::now())) {
+    let refresh_days = state.config.artist_info_days;
+    if let Some(info) = kept
+        .as_ref()
+        .filter(|info| is_fresh(info, Utc::now(), refresh_days))
+    {
         return Ok(info.clone());
     }
     let unknown = ArtistInfo {
@@ -438,11 +492,46 @@ pub async fn artist_info(state: &AppState, artist: &str) -> Result<ArtistInfo, s
     if !state.config.artist_info {
         return Ok(kept.unwrap_or(unknown));
     }
+    if let Some(outdated) = kept {
+        renew_later(state, artist);
+        return Ok(outdated);
+    }
+    Ok(renew(state, artist, None).await?.unwrap_or(unknown))
+}
+
+/// Renews `artist` in a task of its own, unless that is happening already.
+fn renew_later(state: &AppState, artist: &str) {
+    if !state.artist_info_renewing.claim(artist) {
+        return;
+    }
+    let state = state.clone();
+    let artist = artist.to_owned();
+    tokio::spawn(async move {
+        let kept = stored(&state.db, &artist).await;
+        match kept {
+            Ok(kept) => {
+                if let Err(e) = renew(&state, &artist, kept).await {
+                    tracing::warn!("[artist-info] {artist}: {e}");
+                }
+            }
+            Err(e) => tracing::warn!("[artist-info] {artist}: {e}"),
+        }
+        state.artist_info_renewing.release(&artist);
+    });
+}
+
+/// Asks the catalogues about `artist` and keeps the answer in place of `kept`. `None` when a
+/// catalogue could not be reached; nothing is changed then.
+pub async fn renew(
+    state: &AppState,
+    artist: &str,
+    kept: Option<ArtistInfo>,
+) -> Result<Option<ArtistInfo>, sqlx::Error> {
     let info = match fetch(state, artist).await {
         Ok(info) => info,
         Err(e) => {
             tracing::warn!("[artist-info] {artist}: {e}");
-            return Ok(kept.unwrap_or(unknown));
+            return Ok(None);
         }
     };
     let found = !info.is_empty();
@@ -461,11 +550,11 @@ pub async fn artist_info(state: &AppState, artist: &str) -> Result<ArtistInfo, s
     if kept.is_some_and(|old| old.info.pictures != info.pictures) {
         remove_pictures(&state.config.artists_dir, artist).await;
     }
-    Ok(ArtistInfo {
+    Ok(Some(ArtistInfo {
         found,
         info,
         fetched_at: Some(fetched_at),
-    })
+    }))
 }
 
 fn pictures_dir(artists_dir: &Path) -> PathBuf {
@@ -544,15 +633,51 @@ async fn download(state: &AppState, url: &Url) -> Result<(&'static str, Vec<u8>)
 /// request for it. 404 "Kein Bild" for anything that cannot be had.
 pub async fn picture(state: &AppState, artist: &str, index: usize) -> ApiResult<PathBuf> {
     let not_found = || ApiError::not_found(NO_PICTURE);
-    let artists_dir = &state.config.artists_dir;
     let info = stored(&state.db, artist).await?.ok_or_else(not_found)?;
     let wanted = info.info.pictures.get(index).ok_or_else(not_found)?;
+    if let Some(path) = stored_picture(&state.config.artists_dir, artist, index).await {
+        return Ok(path);
+    }
+    fetch_picture(state, artist, index, wanted).await
+}
+
+/// The file of picture `index`, when it has been fetched before.
+async fn stored_picture(artists_dir: &Path, artist: &str, index: usize) -> Option<PathBuf> {
     for (_, extension) in IMAGE_TYPES {
         let path = picture_path(artists_dir, artist, index, extension);
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
-            return Ok(path);
+            return Some(path);
         }
     }
+    None
+}
+
+/// Fetches the pictures of `artist` that are not stored yet; how many it got.
+pub async fn fetch_missing_pictures(state: &AppState, artist: &str) -> Result<usize, sqlx::Error> {
+    let Some(info) = stored(&state.db, artist).await? else {
+        return Ok(0);
+    };
+    let mut fetched = 0;
+    for (index, wanted) in info.info.pictures.iter().enumerate() {
+        if stored_picture(&state.config.artists_dir, artist, index)
+            .await
+            .is_none()
+            && fetch_picture(state, artist, index, wanted).await.is_ok()
+        {
+            fetched += 1;
+        }
+    }
+    Ok(fetched)
+}
+
+async fn fetch_picture(
+    state: &AppState,
+    artist: &str,
+    index: usize,
+    wanted: &Picture,
+) -> ApiResult<PathBuf> {
+    let not_found = || ApiError::not_found(NO_PICTURE);
+    let artists_dir = &state.config.artists_dir;
     let url = Url::parse(&wanted.url)
         .ok()
         .filter(|url| is_picture_source(url, &state.config.audiodb_url))
@@ -736,8 +861,19 @@ mod tests {
             info: Stored::default(),
             fetched_at: Some(now - chrono::Duration::days(days)),
         };
-        assert!(is_fresh(&aged(true, 29), now));
-        assert!(!is_fresh(&aged(true, 31), now));
-        assert!(!is_fresh(&aged(false, 2), now));
+        assert!(is_fresh(&aged(true, 29), now, 30.0));
+        assert!(!is_fresh(&aged(true, 31), now, 30.0));
+        assert!(is_fresh(&aged(false, 6), now, 30.0));
+        assert!(!is_fresh(&aged(false, 8), now, 30.0));
+        // Asked weekly, both wait the same; asked never again, nothing kept ages.
+        assert!(!is_fresh(&aged(true, 8), now, 7.0));
+        assert!(is_fresh(&aged(true, 400), now, 0.0));
+        assert!(is_fresh(&aged(false, 400), now, 0.0));
+        let never_asked = ArtistInfo {
+            found: false,
+            info: Stored::default(),
+            fetched_at: None,
+        };
+        assert!(!is_fresh(&never_asked, now, 0.0));
     }
 }

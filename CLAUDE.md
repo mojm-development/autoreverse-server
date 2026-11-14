@@ -148,7 +148,7 @@ The books and music roots are the single row in `library_config`, set at runtime
 Einstellungen → Bibliotheken, not via env. Env decides `DATABASE_URL`, `AUTOREVERSE_DATA`
 (covers, artist images, playlist covers under `playlists/`, fetched artist pictures under `artists/info/`, station logos under
 `radio/logos/`, downloaded episodes as `<Podcast>/<Folge>.<ext>`), the first admin,
-`AUTOREVERSE_PODCAST_REFRESH_HOURS`, `AUTOREVERSE_LOUDNESS`/`_THREADS`, `AUTOREVERSE_DEVICES`, `ORIGIN`, `HOST`/`PORT`
+`AUTOREVERSE_PODCAST_REFRESH_HOURS`, `AUTOREVERSE_LOUDNESS`/`_THREADS`, `AUTOREVERSE_ARTIST_INFO`/`_DAYS`, `AUTOREVERSE_DEVICES`, `ORIGIN`, `HOST`/`PORT`
 and `AUTOREVERSE_STATIC` (else `static/` beside the binary, else `./static`; the server refuses
 to start without it).
 
@@ -213,6 +213,17 @@ number of statements per request. The queries aggregate `listen_events` by user 
 they join anything (index `listen_event_user_at_cover`, which carries item, track and seconds);
 keep new ones that way. `top_artists` is the exception that has to resolve a name per row — it
 groups by a hash of the name and looks the name up only for the entries that make the list.
+
+### Artist info
+
+`library::artist_info` behind `GET /artists/{name}/info` and `…/pictures/{index}`: biography,
+facts and pictures from TheAudioDB, the most played songs from Apple's catalogue, kept in
+`artist_info`. Only names of the library are ever sent (`is_library_artist`: an album artist or a
+track's own artist). `artist_info::job` fetches answers ahead of time for all of them, slowly
+(`PACE`; both catalogues limit requests per minute), and the pictures of album artists; answers
+older than `AUTOREVERSE_ARTIST_INFO_DAYS` are due again. A request never waits for a catalogue when
+anything is kept — an outdated answer is served and renewed in a task (`Renewing` keeps it to one
+per artist) — so keep any new catalogue call out of the request path.
 
 ### Lyrics
 
