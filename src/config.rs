@@ -32,6 +32,8 @@ pub struct Config {
     /// Whether biographies, pictures and top tracks of artists are fetched from the catalogues
     /// below; `AUTOREVERSE_ARTIST_INFO=0` keeps the server from asking anybody.
     pub artist_info: bool,
+    /// Days after which an artist's catalogue answers are asked for again; 0 = never.
+    pub artist_info_days: f64,
     /// TheAudioDB (`AUTOREVERSE_AUDIODB_URL`) and the music catalogue
     /// (`AUTOREVERSE_MUSIC_CATALOG_URL`); tests point both at a local server.
     pub audiodb_url: String,
@@ -74,6 +76,7 @@ pub struct Config {
 }
 
 const DEFAULT_SCAN_HOURS: f64 = 1.0;
+const DEFAULT_ARTIST_INFO_DAYS: f64 = 30.0;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -139,6 +142,10 @@ impl Config {
             podcast_directory_url: non_empty("AUTOREVERSE_PODCAST_DIRECTORY_URL")
                 .unwrap_or_else(|| crate::podcasts::directory::DIRECTORY_URL.into()),
             artist_info: switched_on("AUTOREVERSE_ARTIST_INFO"),
+            artist_info_days: hours_setting(
+                lookup("AUTOREVERSE_ARTIST_INFO_DAYS"),
+                DEFAULT_ARTIST_INFO_DAYS,
+            ),
             radio,
             radio_directory: radio && switched_on("AUTOREVERSE_RADIO_DIRECTORY"),
             radio_directory_url: non_empty("AUTOREVERSE_RADIO_DIRECTORY_URL")
@@ -275,6 +282,15 @@ mod tests {
         assert_eq!(load(&[]).scan_hours, DEFAULT_SCAN_HOURS);
         assert_eq!(load(&[("AUTOREVERSE_SCAN_HOURS", "0")]).scan_hours, 0.0);
         assert_eq!(load(&[("AUTOREVERSE_SCAN_HOURS", "2")]).scan_hours, 2.0);
+    }
+
+    #[test]
+    fn artist_info_is_renewed_monthly_unless_told_otherwise() {
+        assert_eq!(load(&[]).artist_info_days, DEFAULT_ARTIST_INFO_DAYS);
+        let weekly = load(&[("AUTOREVERSE_ARTIST_INFO_DAYS", "7")]);
+        assert_eq!(weekly.artist_info_days, 7.0);
+        let never = load(&[("AUTOREVERSE_ARTIST_INFO_DAYS", "0")]);
+        assert_eq!(never.artist_info_days, 0.0);
     }
 
     #[test]
