@@ -3,7 +3,8 @@
 //!
 //! A pass asks about every artist that has nothing kept yet or whose answer is older than
 //! `AUTOREVERSE_ARTIST_INFO_DAYS` — album artists first, then the artists of tracks by how many
-//! tracks they have — and fetches the pictures of album artists that are not stored yet. The
+//! tracks they have — and fetches the pictures of album artists and the covers of their most
+//! played songs that are not stored yet. The
 //! catalogues are free and limit how often they may be asked, so a pass goes slowly
 //! ([`PACE`]) and pauses when they stop answering. The first pass begins shortly after the
 //! server starts and may take hours on a large library; later ones only see what has become due.
@@ -86,6 +87,9 @@ pub async fn due(db: &PgPool, refresh_days: f64) -> Result<Vec<String>, sqlx::Er
          WHERE kept.artist IS NULL
             OR ($1 > 0 AND kept.fetched_at < now() - make_interval(
                     secs => CASE WHEN kept.found THEN $1 ELSE $2 END * 86400))
+            -- Kept before songs had covers: asked once more, whatever the setting.
+            OR (kept.found AND jsonb_array_length(coalesce(kept.info->'top_tracks', '[]')) > 0
+                AND NOT jsonb_exists(kept.info->'top_tracks'->0, 'artwork'))
          ORDER BY best.rank, best.tracks DESC, best.artist",
     )
     .bind(found_days)

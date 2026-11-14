@@ -35,6 +35,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/artists/{name}/info", get(info))
         .route("/artists/{name}/pictures/{index}", get(picture))
+        .route("/artists/{name}/top/{index}/cover", get(top_cover))
         .route(
             "/artists/{name}/image",
             get(image)
@@ -183,6 +184,8 @@ struct TopTrackOut {
     duration: f64,
     /// The library's own track of this song; `null` when it is not there.
     track: Option<TrackSummary>,
+    /// Whether `GET /artists/{name}/top/{index}/cover` has the record's cover from the catalogue.
+    has_cover: bool,
 }
 
 #[derive(Serialize)]
@@ -258,6 +261,7 @@ async fn info(
                 album: top.album.clone(),
                 duration: top.duration,
                 track: artist_info::best_hit(&tracks, &artist, top).map(TrackSummary::from),
+                has_cover: top.artwork.is_some(),
             })
             .collect(),
         fetched_at: known.fetched_at.map(to_iso),
@@ -277,6 +281,30 @@ async fn picture(
     let size = thumb_size(&query)?;
     let index: usize = index.parse().map_err(|_| ApiError::not_found(NO_PICTURE))?;
     let path = artist_info::picture(&state, &artist, index).await?;
+    serve_image(
+        &path,
+        std::slice::from_ref(&state.config.artists_dir),
+        NO_PICTURE,
+        IMAGE_CACHE,
+        size,
+        &state.config.thumbs_dir,
+        &headers,
+    )
+    .await
+}
+
+/// The cover of one of the most played songs `info` lists, as the catalogue has it; for a song
+/// that is not in the library. From the server's own disk, fetched the first time it is asked for.
+async fn top_cover(
+    State(state): State<AppState>,
+    _user: ApiUser,
+    Path((artist, index)): Path<(String, String)>,
+    headers: HeaderMap,
+    ApiQuery(query): ApiQuery<QueryMap>,
+) -> ApiResult<Response> {
+    let size = thumb_size(&query)?;
+    let index: usize = index.parse().map_err(|_| ApiError::not_found(NO_PICTURE))?;
+    let path = artist_info::top_cover(&state, &artist, index).await?;
     serve_image(
         &path,
         std::slice::from_ref(&state.config.artists_dir),

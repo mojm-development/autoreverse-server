@@ -119,8 +119,10 @@ async fn the_overview_matches_the_chart_to_the_library_and_asks_the_catalogues_o
              "track": {"id": studio, "title": "Thunderstruck", "artist": null, "duration": 293,
                        "item_id": razors, "item_title": "The Razors Edge", "item_kind": "album",
                        "has_lyrics": false,
-            "gain_db": null, "album_gain_db": null, "peak": null}},
-            {"title": "Big Gun", "album": "Big Gun", "duration": 260, "track": null},
+            "gain_db": null, "album_gain_db": null, "peak": null},
+             "has_cover": false},
+            {"title": "Big Gun", "album": "Big Gun", "duration": 260, "track": null,
+             "has_cover": false},
         ])
     );
     assert!(body["fetched_at"].as_str().unwrap().ends_with('Z'));
@@ -408,4 +410,97 @@ async fn the_job_asks_again_when_an_answer_is_older_than_the_setting(db: PgPool)
     assert_eq!(job::due(app.db(), 7.0).await.unwrap(), ["Alt", "Niemand"]);
     // Never again: only artists that have nothing kept.
     assert!(job::due(app.db(), 0.0).await.unwrap().is_empty());
+}
+
+/// AC/DC as before, with a cover for the song that is not in the library.
+fn catalogues_know_acdc_with_a_cover(web: &FakeWeb) {
+    catalogues_know_acdc(web);
+    web.set(
+        "/apple/lookup",
+        200,
+        json!({"results": [
+            {"trackName": "Big Gun", "collectionName": "Big Gun - Single", "trackTimeMillis": 260000,
+             "artworkUrl100": web.url("/art/100x100bb.jpg")},
+        ]})
+        .to_string(),
+    );
+    web.set("/art/600x600bb.jpg", 200, PNG);
+}
+
+#[sqlx::test]
+async fn a_songs_cover_is_fetched_once_and_then_served_from_the_servers_disk(db: PgPool) {
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc_with_a_cover(&web);
+    let app = app_with(db, &library.data(), &web);
+    let token = token(&app).await;
+    album(app.db(), "AC/DC", "The Razors Edge").await;
+
+    let body = body_json(app.get("/artists/AC%2FDC/info", Some(&token)).await).await;
+    assert_eq!(body["top_tracks"][0]["has_cover"], true);
+    for _ in 0..2 {
+        let response = app.get("/artists/AC%2FDC/top/0/cover", Some(&token)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(header_str(&response, header::CONTENT_TYPE), "image/png");
+    }
+    assert_eq!(web.hits("/art/600x600bb.jpg"), 1);
+    let beyond = app.get("/artists/AC%2FDC/top/1/cover", Some(&token)).await;
+    assert_eq!(beyond.status(), StatusCode::NOT_FOUND);
+    assert_eq!(body_json(beyond).await["detail"], "Kein Bild");
+    let anonymous = app.get("/artists/AC%2FDC/top/0/cover", None).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test]
+async fn a_cover_address_outside_the_catalogue_is_never_fetched(db: PgPool) {
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    let elsewhere = FakeWeb::start().await;
+    elsewhere.set("/secret/600x600bb.jpg", 200, PNG);
+    catalogues_know_acdc(&web);
+    web.set(
+        "/apple/lookup",
+        200,
+        json!({"results": [{"trackName": "Big Gun", "artworkUrl100": elsewhere.url("/secret/100x100bb.jpg")}]})
+            .to_string(),
+    );
+    let app = app_with(db, &library.data(), &web);
+    let token = token(&app).await;
+    album(app.db(), "AC/DC", "The Razors Edge").await;
+    app.get("/artists/AC%2FDC/info", Some(&token)).await;
+
+    let response = app.get("/artists/AC%2FDC/top/0/cover", Some(&token)).await;
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(elsewhere.hits("/secret/600x600bb.jpg"), 0);
+}
+
+#[sqlx::test]
+async fn the_job_fetches_song_covers_and_asks_again_about_answers_kept_without_them(db: PgPool) {
+    use autoreverse_server::library::artist_info::job;
+    use std::time::Duration;
+
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc_with_a_cover(&web);
+    let app = app_with(db, &library.data(), &web);
+    album(app.db(), "AC/DC", "The Razors Edge").await;
+    // As kept before songs had covers, and only yesterday.
+    sqlx::query(
+        "INSERT INTO artist_info (artist, found, info, fetched_at)
+         VALUES ('AC/DC', true, $1, now() - interval '1 day')",
+    )
+    .bind(json!({"top_tracks": [{"title": "Big Gun", "album": "Big Gun", "duration": 260.0}]}))
+    .execute(app.db())
+    .await
+    .unwrap();
+    assert_eq!(job::due(app.db(), 30.0).await.unwrap(), ["AC/DC"]);
+
+    let done = job::pass(&app.state, Duration::ZERO, Duration::ZERO)
+        .await
+        .unwrap();
+    assert_eq!(done.found, 1);
+    // Two pictures and the cover.
+    assert_eq!(done.pictures, 3);
+    assert_eq!(web.hits("/art/600x600bb.jpg"), 1);
+    assert!(job::due(app.db(), 30.0).await.unwrap().is_empty());
 }

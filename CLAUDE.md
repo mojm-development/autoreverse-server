@@ -220,7 +220,8 @@ groups by a hash of the name and looks the name up only for the entries that mak
 facts and pictures from TheAudioDB, the most played songs from Apple's catalogue, kept in
 `artist_info`. Only names of the library are ever sent (`is_library_artist`: an album artist or a
 track's own artist). `artist_info::job` fetches answers ahead of time for all of them, slowly
-(`PACE`; both catalogues limit requests per minute), and the pictures of album artists; answers
+(`PACE`; both catalogues limit requests per minute), and the pictures of album artists and the
+covers of their most played songs (`top_cover`, from Apple's image hosts only); answers
 older than `AUTOREVERSE_ARTIST_INFO_DAYS` are due again. A request never waits for a catalogue when
 anything is kept — an outdated answer is served and renewed in a task (`Renewing` keeps it to one
 per artist) — so keep any new catalogue call out of the request path.
