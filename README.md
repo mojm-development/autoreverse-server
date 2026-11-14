@@ -374,9 +374,10 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET`                  | `/library/more`                                   | Next page of the web library grid (used by the web UI)                 |
 | `GET` `POST`           | `/artists/{name}/image`                           | Custom artist image; upload is admin, multipart `image`                |
 | `PUT` `DELETE`         | `/artists/{name}/cover`                           | Pick an album as the artist image, or reset to random (admin)          |
-| `GET`                  | `/artists/{name}/info?lang=`                      | Biography, facts, pictures and top tracks matched to the library       |
+| `GET`                  | `/artists/{name}/info?lang=`                      | Biography, facts, pictures; `top_tracks`: the catalogue's chart down to the songs the library has (ten at most, each with its `track`); `missing_albums`: the artist's albums in the catalogue the library lacks (`index`, `title`, `year`, `track_count`, `has_cover`), newest first |
 | `GET`                  | `/artists/{name}/pictures/{index}?size=`          | One of the pictures `info` lists, served from the server's disk        |
-| `GET`                  | `/artists/{name}/top/{index}/cover?size=`         | The record's cover of a song in `top_tracks` (`has_cover`), from the server's disk |
+| `GET`                  | `/artists/{name}/albums/{index}/cover?size=`      | The cover of an album in `missing_albums` (its `index`), from the server's disk |
+| `GET`                  | `/artists/{name}/top/{index}/cover?size=`         | Kept for older clients; `top_tracks` now only lists songs of the library, whose `has_cover` is false |
 | `GET`                  | `/search`                                         | Cross-library search, including tracks by their artist and artists; tracks whose title holds the term come before those found by their artist |
 | `GET`                  | `/radio`                                          | Similar tracks for a track, an album or an artist, see [Track radio](#track-radio) |
 | `GET` `POST`           | `/radio/stations`, `/radio/stations/search`       | Internet radio stations of the user; directory search, see [Radio stations](#radio-stations) |

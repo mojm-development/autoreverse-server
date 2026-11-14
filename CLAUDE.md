@@ -237,12 +237,15 @@ groups by a hash of the name and looks the name up only for the entries that mak
 
 ### Artist info
 
-`library::artist_info` behind `GET /artists/{name}/info` and `…/pictures/{index}`: biography,
-facts and pictures from TheAudioDB, the most played songs from Apple's catalogue, kept in
-`artist_info`. Only names of the library are ever sent (`is_library_artist`: an album artist or a
+`library::artist_info` behind `GET /artists/{name}/info`, `…/pictures/{index}` and
+`…/albums/{index}/cover`: biography,
+facts and pictures from TheAudioDB, the chart (50 songs) and the albums from Apple's catalogue,
+kept in `artist_info`. The page lists the chart's songs the library has (`best_hit`, ten at most)
+and the catalogue's albums the library lacks (`missing_albums`, editions folded by `loose`).
+Only names of the library are ever sent (`is_library_artist`: an album artist or a
 track's own artist). `artist_info::job` fetches answers ahead of time for all of them, slowly
 (`PACE`; both catalogues limit requests per minute), and the pictures of album artists and the
-covers of their most played songs (`top_cover`, from Apple's image hosts only); answers
+covers of their missing albums (from Apple's image hosts only); answers
 older than `Settings::artist_info_days` are due again. A request never waits for a catalogue when
 anything is kept — an outdated answer is served and renewed in a task (`Renewing` keeps it to one
 per artist) — so keep any new catalogue call out of the request path.

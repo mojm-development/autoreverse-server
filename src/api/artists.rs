@@ -36,6 +36,7 @@ pub fn router() -> Router<AppState> {
         .route("/artists/{name}/info", get(info))
         .route("/artists/{name}/pictures/{index}", get(picture))
         .route("/artists/{name}/top/{index}/cover", get(top_cover))
+        .route("/artists/{name}/albums/{index}/cover", get(album_cover))
         .route(
             "/artists/{name}/image",
             get(image)
@@ -185,6 +186,18 @@ struct TopTrackOut {
     /// The library's own track of this song; `null` when it is not there.
     track: Option<TrackSummary>,
     /// Whether `GET /artists/{name}/top/{index}/cover` has the record's cover from the catalogue.
+    /// Always false now that only songs of the library are listed: they have their album's.
+    has_cover: bool,
+}
+
+/// One of the artist's albums the library lacks, from the catalogue.
+#[derive(Serialize)]
+struct MissingAlbumOut {
+    /// For `GET /artists/{name}/albums/{index}/cover`.
+    index: usize,
+    title: String,
+    year: Option<i32>,
+    track_count: u64,
     has_cover: bool,
 }
 
@@ -203,6 +216,7 @@ struct InfoOut {
     members: Option<i32>,
     pictures: Vec<PictureOut>,
     top_tracks: Vec<TopTrackOut>,
+    missing_albums: Vec<MissingAlbumOut>,
     fetched_at: Option<String>,
 }
 
@@ -232,6 +246,13 @@ async fn info(
     } else {
         artist_info::library_tracks(&state.db, &artist).await?
     };
+    let library_albums = match &known.info.albums {
+        Some(albums) if !albums.is_empty() => {
+            artist_info::library_albums(&state.db, &artist).await?
+        }
+        _ => Vec::new(),
+    };
+    let catalogue_albums = known.info.albums.clone().unwrap_or_default();
     let biography = known.info.biography(&language);
     Ok(Json(InfoOut {
         found: known.found,
@@ -252,16 +273,32 @@ async fn info(
                 kind: picture.kind.clone(),
             })
             .collect(),
+        // The catalogue's chart, down to the songs the library has: a hit nobody can play here
+        // belongs to the albums that are missing, not to this list.
         top_tracks: known
             .info
             .top_tracks
             .iter()
-            .map(|top| TopTrackOut {
-                title: top.title.clone(),
-                album: top.album.clone(),
-                duration: top.duration,
-                track: artist_info::best_hit(&tracks, &artist, top).map(TrackSummary::from),
-                has_cover: top.artwork.is_some(),
+            .filter_map(|top| {
+                let own = artist_info::best_hit(&tracks, &artist, top)?;
+                Some(TopTrackOut {
+                    title: top.title.clone(),
+                    album: top.album.clone(),
+                    duration: top.duration,
+                    track: Some(TrackSummary::from(own)),
+                    has_cover: false,
+                })
+            })
+            .take(artist_info::TOP_TRACKS)
+            .collect(),
+        missing_albums: artist_info::missing_albums(&catalogue_albums, &library_albums)
+            .into_iter()
+            .map(|(index, album)| MissingAlbumOut {
+                index,
+                title: album.title.clone(),
+                year: album.year,
+                track_count: album.track_count,
+                has_cover: album.artwork.is_some(),
             })
             .collect(),
         fetched_at: known.fetched_at.map(to_iso),
@@ -305,6 +342,30 @@ async fn top_cover(
     let size = thumb_size(&query)?;
     let index: usize = index.parse().map_err(|_| ApiError::not_found(NO_PICTURE))?;
     let path = artist_info::top_cover(&state, &artist, index).await?;
+    serve_image(
+        &path,
+        std::slice::from_ref(&state.config.artists_dir),
+        NO_PICTURE,
+        IMAGE_CACHE,
+        size,
+        &state.config.thumbs_dir,
+        &headers,
+    )
+    .await
+}
+
+/// The cover of one of the albums `info` lists as missing, from the server's own disk; fetched
+/// from the catalogue the first time somebody asks for it.
+async fn album_cover(
+    State(state): State<AppState>,
+    _user: ApiUser,
+    Path((artist, index)): Path<(String, String)>,
+    headers: HeaderMap,
+    ApiQuery(query): ApiQuery<QueryMap>,
+) -> ApiResult<Response> {
+    let size = thumb_size(&query)?;
+    let index: usize = index.parse().map_err(|_| ApiError::not_found(NO_PICTURE))?;
+    let path = artist_info::album_cover(&state, &artist, index).await?;
     serve_image(
         &path,
         std::slice::from_ref(&state.config.artists_dir),
