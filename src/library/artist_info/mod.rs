@@ -560,6 +560,11 @@ fn is_fresh(info: &ArtistInfo, now: DateTime<Utc>, refresh_days: f64) -> bool {
     let Some(at) = info.fetched_at else {
         return false;
     };
+    // Kept before the catalogue was asked for albums: outdated, however young — the job asks
+    // again too (`job::due`), but a page should not wait for it.
+    if info.found && info.info.albums.is_none() {
+        return false;
+    }
     match keep_days(info.found, refresh_days) {
         None => true,
         Some(days) => ((now - at).num_seconds() as f64) < days * 86_400.0,
@@ -1225,7 +1230,10 @@ mod tests {
         let now = Utc::now();
         let aged = |found, days| ArtistInfo {
             found,
-            info: Stored::default(),
+            info: Stored {
+                albums: Some(Vec::new()),
+                ..Stored::default()
+            },
             fetched_at: Some(now - chrono::Duration::days(days)),
         };
         assert!(is_fresh(&aged(true, 29), now, 30.0));
@@ -1242,5 +1250,12 @@ mod tests {
             fetched_at: None,
         };
         assert!(!is_fresh(&never_asked, now, 0.0));
+        // A found answer from before albums is outdated at once; an unknown name has none anyway.
+        let mut without_albums = aged(true, 1);
+        without_albums.info.albums = None;
+        assert!(!is_fresh(&without_albums, now, 30.0));
+        without_albums.info.albums = Some(Vec::new());
+        assert!(is_fresh(&without_albums, now, 30.0));
+        assert!(is_fresh(&aged(false, 1), now, 30.0));
     }
 }
