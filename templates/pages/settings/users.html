@@ -1,0 +1,68 @@
+{#- legacy settings/users/+page.svelte, plus "Passwort setzen" and "Löschen" per account (new). -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Nutzer · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-users">
+	<h1>Nutzer <span class="count mono">{{ users.len() }}</span></h1>
+
+	{% if let Some(flash) = flash %}
+	{% match flash %}
+	{% when Flash::Success(text) %}<p class="success" role="status">{{ text }}</p>
+	{% when Flash::Error(text) %}<p class="error" role="alert">{{ text }}</p>
+	{% endmatch %}
+	{% endif %}
+
+	<details class="create"{% if create_open %} open{% endif %}>
+		<summary class="outline">Nutzer anlegen</summary>
+		<form method="POST" action="?/createUser" class="create-form">
+			<label>
+				<span class="eyebrow">Name</span>
+				<input name="name" value="{{ create_name }}" required maxlength="100" autocomplete="off" />
+			</label>
+			<label>
+				<span class="eyebrow">Passwort</span>
+				<input name="password" type="password" required minlength="{{ password_min }}" autocomplete="new-password" />
+			</label>
+			<label class="check">
+				<input type="checkbox" name="isAdmin" />
+				<span>Verwalter</span>
+			</label>
+			<button type="submit" class="primary">Anlegen</button>
+		</form>
+	</details>
+
+	<table>
+		<thead><tr><th>Konto</th><th>Rolle</th><th>Zuletzt gesehen</th><th></th></tr></thead>
+		<tbody>
+			{% for u in users %}
+			<tr>
+				<td>{{ u.name }}{% if u.is_self %} <span class="you mono">du</span>{% endif %}</td>
+				<td>{% if u.is_admin %}Verwalter{% else %}Nutzer{% endif %}</td>
+				<td>{{ u.last_seen }}</td>
+				<td class="actions">
+					<form method="POST" action="?/toggleAdmin">
+						<input type="hidden" name="userId" value="{{ u.id }}" />
+						<input type="hidden" name="isAdmin" value="{% if u.is_admin %}false{% else %}true{% endif %}" />
+						<button type="submit" class="outline">{% if u.is_admin %}Verwalter entfernen{% else %}Zu Verwalter machen{% endif %}</button>
+					</form>
+					<details class="set-password">
+						<summary class="outline">Passwort setzen</summary>
+						<form method="POST" action="?/setPassword">
+							<input type="hidden" name="userId" value="{{ u.id }}" />
+							<input name="password" type="password" required minlength="{{ password_min }}" autocomplete="new-password" aria-label="Neues Passwort für {{ u.name }}" placeholder="Neues Passwort" />
+							<button type="submit" class="primary">Setzen</button>
+						</form>
+					</details>
+					{% if !u.is_self %}
+					<form method="POST" action="?/deleteUser" hx-confirm="„{{ u.name }}“ löschen? Fortschritt, Playlists, Favoriten und Lesezeichen gehen mit.">
+						<input type="hidden" name="userId" value="{{ u.id }}" />
+						<button type="submit" class="danger">Löschen</button>
+					</form>
+					{% endif %}
+				</td>
+			</tr>
+			{% endfor %}
+		</tbody>
+	</table>
+</div>
+{% endblock %}

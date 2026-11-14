@@ -1,0 +1,106 @@
+{#- legacy library/playlists/[id]/+page.svelte: the entries, reorderable by drag and drop. New
+    here: play, rename, delete, and per entry play / up / down / remove; a description, a cover
+    of its own, a folder and sharing with the other accounts ("Details"), export and "Link
+    kopieren". The owner's controls show to the owner only, the entry controls to whoever may
+    change the entries. static/js/playlists.js handles drag and drop, static/js/player the
+    playing, static/js/share.js the link. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{{ playlist.name }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content playlist-page" style="--a: var(--music)" data-playlist-id="{{ playlist.id }}">
+	<header{% if cover_url.is_some() %} class="with-cover"{% endif %}>
+		{% if let Some(url) = cover_url %}<img class="playlist-cover" src="{{ url }}" alt="" />{% endif %}
+		<div class="head">
+		<span class="eyebrow">Playlist{% if let Some(folder) = playlist.folder %} · {{ folder }}{% endif %}{% if !mine %} · von {{ owner }}{% endif %}</span>
+		<h1>{{ playlist.name }}</h1>
+		<p class="subline">{{ subline }}{% if mine && playlist.shared %} · {% if playlist.collaborative %}geteilt, andere dürfen bearbeiten{% else %}geteilt{% endif %}{% endif %}</p>
+		{% if let Some(description) = playlist.description %}<p class="description">{{ description }}</p>{% endif %}
+		<div class="actions">
+			<button type="button" class="primary" data-action="play-playlist"{% if entries.is_empty() %} disabled{% endif %}>{% call ui::icon("play") %}{% endcall %} Abspielen</button>
+			{% if mine %}
+			<details class="rename"{% if error.is_some() %} open{% endif %}>
+				<summary>Umbenennen</summary>
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/rename">
+					<input name="name" value="{{ playlist.name }}" aria-label="Neuer Name" maxlength="100" required />
+					<button type="submit" class="primary">Speichern</button>
+				</form>
+			</details>
+			{% endif %}
+			<a class="outline" href="/playlists/{{ playlist.id }}/export?format=m3u8" download hx-boost="false">{% call ui::icon("download") %}{% endcall %} Exportieren (.m3u8)</a>
+			<button type="button" class="outline" data-copy-link="/library/playlists/{{ playlist.id }}">Link kopieren</button>
+			{% if mine %}
+			<form method="POST" action="/library/playlists/{{ playlist.id }}/delete" hx-confirm="Playlist „{{ playlist.name }}“ löschen?">
+				<button type="submit" class="danger">Löschen</button>
+			</form>
+			{% endif %}
+		</div>
+		{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+		</div>
+	</header>
+
+	{% if mine %}
+	<details class="playlist-details"{% if error.is_some() %} open{% endif %}>
+		<summary>Details und Freigabe</summary>
+		<form method="POST" action="/library/playlists/{{ playlist.id }}/details" class="details-form">
+			<label>Beschreibung
+				<textarea name="description" rows="3" maxlength="2000">{% if let Some(description) = playlist.description %}{{ description }}{% endif %}</textarea>
+			</label>
+			<label>Ordner
+				<input name="folder" list="playlist-folders" value="{% if let Some(folder) = playlist.folder %}{{ folder }}{% endif %}" maxlength="100" placeholder="Kein Ordner" autocomplete="off" />
+			</label>
+			<datalist id="playlist-folders">
+				{% for folder in folders %}<option value="{{ folder }}"></option>{% endfor %}
+			</datalist>
+			<p class="hint">Einen vorhandenen Ordner wählen oder einen neuen Namen eingeben; leer heißt: kein Ordner.</p>
+			<label class="switch"><input type="checkbox" name="shared" value="1"{% if playlist.shared %} checked{% endif %} /> Für alle auf diesem Server sichtbar</label>
+			<label class="switch"><input type="checkbox" name="collaborative" value="1"{% if playlist.collaborative %} checked{% endif %} /> Andere dürfen bearbeiten</label>
+			<p class="hint">„Andere dürfen bearbeiten“ gilt nur, solange die Playlist für alle sichtbar ist.</p>
+			<button type="submit" class="primary">Speichern</button>
+		</form>
+		<div class="cover-forms">
+			<form method="POST" action="/library/playlists/{{ playlist.id }}/cover" enctype="multipart/form-data">
+				<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Cover-Datei" required />
+				<button type="submit" class="outline">Cover hochladen</button>
+			</form>
+			{% if playlist.cover_path.is_some() %}
+			<form method="POST" action="/library/playlists/{{ playlist.id }}/cover/delete">
+				<button type="submit" class="outline">Cover entfernen</button>
+			</form>
+			{% endif %}
+			<p class="hint">JPEG, PNG, WebP oder GIF, höchstens 5 MB.</p>
+		</div>
+	</details>
+	{% endif %}
+
+	<div class="table" role="table" aria-label="Titel" data-refresh="playlist-entries">
+		{% for entry in entries %}
+		<div class="row" role="row"{% if can_edit %} draggable="true"{% endif %} data-entry-id="{{ entry.id }}" data-entry-position="{{ loop.index }}" data-entry-item="{{ entry.item_id }}" data-entry-kind="{{ entry.kind }}" data-entry-track="{% if let Some(track) = entry.track_id %}{{ track }}{% endif %}">
+			<span class="index mono">{{ loop.index }}</span>
+			<button type="button" class="icon-btn small" data-action="play-entry" data-entry-index="{{ loop.index0 }}" aria-label="{{ entry.title }} abspielen" title="Abspielen">{% call ui::icon("play") %}{% endcall %}</button>
+			<span class="title">{{ entry.title }}</span>
+			<span class="cell">{{ entry.subtitle }}</span>
+			<span class="cell mono">{{ entry.duration }}</span>
+			{% if can_edit %}
+			<span class="entry-actions">
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/entries/{{ entry.id }}/move">
+					<input type="hidden" name="position" value="{{ loop.index - 1 }}" />
+					<button type="submit" class="icon-btn small" aria-label="{{ entry.title }} nach oben" title="Nach oben"{% if loop.first %} disabled{% endif %}>{% call ui::icon("arrow-up") %}{% endcall %}</button>
+				</form>
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/entries/{{ entry.id }}/move">
+					<input type="hidden" name="position" value="{{ loop.index + 1 }}" />
+					<button type="submit" class="icon-btn small" aria-label="{{ entry.title }} nach unten" title="Nach unten"{% if loop.last %} disabled{% endif %}>{% call ui::icon("arrow-down") %}{% endcall %}</button>
+				</form>
+				<form method="POST" action="/library/playlists/{{ playlist.id }}/entries/{{ entry.id }}/delete">
+					<button type="submit" class="icon-btn small" aria-label="{{ entry.title }} entfernen" title="Entfernen">{% call ui::icon("close") %}{% endcall %}</button>
+				</form>
+			</span>
+			{% endif %}
+		</div>
+		{% endfor %}
+	</div>
+	{% if entries.is_empty() %}
+	<p class="empty">Noch keine Titel. Auf einer Album- oder Hörbuchseite und bei jeder Podcast-Folge fügt „Zur Playlist hinzufügen“ welche hinzu.</p>
+	{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{#- The four "most listened" lists of the statistics page and the year in review. Needs
+    `lists: TopLists`. The tracks are a queue the player can play: rows carry what a playlist
+    page's rows carry, and static/js/player starts them as single-track entries. -#}
+{% import "partials/ui.html" as ui %}
+<div class="top-grid">
+	{% if !lists.tracks.is_empty() %}
+	<section class="top-card" data-playlist-id="top-tracks">
+		<div class="top-head">
+			<h2>Titel</h2>
+			<button type="button" class="secondary" data-action="play-playlist">{% call ui::icon("play") %}{% endcall %} Abspielen</button>
+		</div>
+		<ol class="top-list">
+			{% for row in lists.tracks %}
+			<li class="top-row" data-entry-id="top-{{ row.id }}" data-entry-item="{{ row.item_id }}" data-entry-track="{{ row.id }}" data-entry-kind="album" style="--share: {{ row.share }}%">
+				<span class="rank mono">{{ loop.index }}</span>
+				<button type="button" class="icon-btn small" data-action="play-entry" data-entry-index="{{ loop.index0 }}" aria-label="{{ row.title }} abspielen" title="Abspielen">{% call ui::icon("play") %}{% endcall %}</button>
+				<span class="name"><span class="title">{{ row.title }}</span><span class="sub">{{ row.byline }}</span></span>
+				<span class="figures mono"><span>{{ row.time }}</span><span class="plays">{{ row.plays }}</span></span>
+			</li>
+			{% endfor %}
+		</ol>
+	</section>
+	{% endif %}
+
+	{% if !lists.albums.is_empty() %}
+	<section class="top-card">
+		<div class="top-head"><h2>Alben</h2></div>
+		<ol class="top-list">
+			{% for row in lists.albums %}
+			<li class="top-row" style="--share: {{ row.share }}%">
+				<span class="rank mono">{{ loop.index }}</span>
+				<a class="art" href="/library/albums/{{ row.id }}" aria-label="{{ row.title }}">{% if row.has_cover %}<img src="/items/{{ row.id }}/cover?size=128" alt="" loading="lazy" />{% endif %}</a>
+				<a class="name" href="/library/albums/{{ row.id }}"><span class="title">{{ row.title }}</span><span class="sub">{{ row.artist }}</span></a>
+				<span class="figures mono"><span>{{ row.time }}</span><span class="plays">{{ row.plays }}</span></span>
+			</li>
+			{% endfor %}
+		</ol>
+	</section>
+	{% endif %}
+
+	{% if !lists.artists.is_empty() %}
+	<section class="top-card">
+		<div class="top-head"><h2>Interpreten</h2></div>
+		<ol class="top-list">
+			{% for row in lists.artists %}
+			<li class="top-row" style="--share: {{ row.share }}%">
+				<span class="rank mono">{{ loop.index }}</span>
+				<span class="art round">{% if let Some(image) = row.image %}<img src="{{ image }}" alt="" loading="lazy" />{% else %}<span class="initials">{{ row.initials }}</span>{% endif %}</span>
+				{% if let Some(href) = row.href %}<a class="name" href="{{ href }}"><span class="title">{{ row.name }}</span></a>{% else %}<span class="name"><span class="title">{{ row.name }}</span></span>{% endif %}
+				<span class="figures mono"><span>{{ row.time }}</span><span class="plays">{{ row.plays }}</span></span>
+			</li>
+			{% endfor %}
+		</ol>
+	</section>
+	{% endif %}
+
+	{% if !lists.genres.is_empty() %}
+	<section class="top-card">
+		<div class="top-head"><h2>Genres</h2></div>
+		<ol class="top-list">
+			{% for row in lists.genres %}
+			<li class="top-row" style="--share: {{ row.share }}%">
+				<span class="rank mono">{{ loop.index }}</span>
+				<a class="name" href="{{ row.href }}"><span class="title">{{ row.name }}</span></a>
+				<span class="figures mono"><span>{{ row.time }}</span></span>
+			</li>
+			{% endfor %}
+		</ol>
+	</section>
+	{% endif %}
+</div>

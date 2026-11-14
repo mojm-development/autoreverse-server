@@ -1,0 +1,19 @@
+{#- legacy settings/+page.svelte -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Einstellungen · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-overview">
+	<h1>Einstellungen</h1>
+	<p class="lede">Alles, was sich an diesem Server einstellen lässt — nach Bereichen sortiert.</p>
+
+	<div class="cards" data-testid="settings-overview">
+		{% for section in sections %}
+		<a class="card" href="{{ section.href }}">
+			<span class="label">{{ section.label }}</span>
+			<span class="desc">{{ section.description }}</span>
+			{% if section.admin %}<span class="tag mono">nur Verwalter</span>{% endif %}
+		</a>
+		{% endfor %}
+	</div>
+</div>
+{% endblock %}

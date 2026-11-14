@@ -1,0 +1,78 @@
+{#- legacy library/search/+page.svelte. Esc in the field clears the search (static/js/app.js);
+    a track row plays the track (static/js/player). -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{% if q.is_empty() %}Suche{% else %}Suche: {{ q }}{% endif %} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content search-page" style="--a: var(--music)">
+	<form method="GET" action="/library/search" class="search-bar">
+		{% call ui::icon("search") %}{% endcall %}
+		<input type="search" name="q" value="{{ q }}" placeholder="Suchen…" autofocus data-search-input />
+		<span class="hint mono">esc</span>
+	</form>
+
+	{% if !q.is_empty() %}
+	<p class="meta mono">{{ total_hits }} Treffer in {{ total }} Items · {{ elapsed_ms }} ms</p>
+
+	<div class="pills">
+		<span class="pill active">Alle</span>
+		<span class="pill">Hörbücher · {{ books.len() }}</span>
+		<span class="pill">Alben · {{ albums.len() }}</span>
+		<span class="pill">Titel · {{ tracks.len() }}</span>
+		<span class="pill">Folgen · {{ podcasts.len() }}</span>
+	</div>
+
+	{% if !books.is_empty() %}
+	<section>
+		<div class="section-head">
+			<span class="eyebrow">Hörbücher</span><span class="count mono">{{ books.len() }}</span>
+		</div>
+		{% for hit in books %}{% include "partials/search_hit.html" %}{% endfor %}
+	</section>
+	{% endif %}
+
+	{% if !albums.is_empty() || !tracks.is_empty() %}
+	<section>
+		<div class="section-head">
+			<span class="eyebrow">Alben &amp; Titel</span><span class="count mono">{{ albums.len() + tracks.len() }}</span>
+		</div>
+		{% for hit in albums %}{% include "partials/search_hit.html" %}{% endfor %}
+		{% for track in tracks %}
+		<div role="row" class="row clickable" data-item-id="{{ track.item_id }}">
+			<button type="button" class="activator bare" aria-label="{{ track.title }} abspielen" data-action="play-track" data-track-id="{{ track.id }}"></button>
+			<span class="dot" style="background: var(--music)"></span>
+			<span class="title">{{ track.title }}</span>
+			<span class="row-meta">{{ track.item_title }}</span>
+			<span class="status mono">{{ track.duration }}</span>
+		</div>
+		{% endfor %}
+	</section>
+	{% endif %}
+
+	{% if !podcasts.is_empty() %}
+	<section>
+		<div class="section-head">
+			<span class="eyebrow">Podcast-Folgen</span><span class="count mono">{{ podcasts.len() }}</span>
+		</div>
+		{% for hit in podcasts %}{% include "partials/search_hit.html" %}{% endfor %}
+	</section>
+	{% endif %}
+
+	{% if !artists.is_empty() %}
+	<section>
+		<div class="section-head">
+			<span class="eyebrow">Interpreten &amp; Autoren</span><span class="count mono">{{ artists.len() }}</span>
+		</div>
+		{% for artist in artists %}
+		<a href="{{ artist.href }}" role="row" class="row">
+			<span class="dot" style="background: var(--{{ artist.accent }})"></span>
+			<span class="title">{{ artist.name }}</span>
+			<span class="row-meta">{{ artist.role }}</span>
+			<span class="status mono">{{ artist.work_count }}</span>
+		</a>
+		{% endfor %}
+	</section>
+	{% endif %}
+	{% endif %}
+</div>
+{% endblock %}

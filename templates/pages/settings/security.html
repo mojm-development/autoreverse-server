@@ -1,0 +1,26 @@
+{#- legacy settings/security/+page.svelte -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Sicherheit · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-security">
+	<h1>Sicherheit</h1>
+	<form method="POST" action="/settings/security" class="form">
+		<label>
+			<span class="eyebrow">Aktuelles Passwort</span>
+			<input name="currentPassword" type="password" required autocomplete="current-password" />
+		</label>
+		<label>
+			<span class="eyebrow">Neues Passwort</span>
+			<input name="newPassword" type="password" required minlength="{{ password_min }}" autocomplete="new-password" />
+		</label>
+		<button type="submit" class="primary">Ändern</button>
+		{% if let Some(flash) = flash %}
+		{% match flash %}
+		{% when Flash::Success(text) %}<p class="success" role="status">{{ text }}</p>
+		{% when Flash::Error(text) %}<p class="error" role="alert">{{ text }}</p>
+		{% endmatch %}
+		{% endif %}
+		<p class="hint">Nach dem Ändern werden alle anderen Geräte abgemeldet.</p>
+	</form>
+</div>
+{% endblock %}

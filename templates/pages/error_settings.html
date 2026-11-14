@@ -1,0 +1,10 @@
+{#- legacy settings/+error.svelte: the error inside the settings layout. -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Fehler {{ status }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="error-page in-shell" style="--a: var(--book)">
+	<span class="code mono">{{ status }}</span>
+	<h1>{{ message }}</h1>
+	<a class="primary" href="/library">Zur Bibliothek</a>
+</div>
+{% endblock %}

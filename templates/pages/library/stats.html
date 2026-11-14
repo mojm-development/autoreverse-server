@@ -1,0 +1,26 @@
+{#- New in Rust: what the user heard most, by period. The apps have this page too; the numbers
+    are those of GET /me/top. -#}
+{% extends "layouts/app.html" %}
+{% block title %}Statistik · Autoreverse{% endblock %}
+{% block content %}
+<div class="content stats-page" style="--a: var(--music)">
+	<header class="stats-top">
+		<div>
+			<h1>Statistik</h1>
+			<p class="lede">Was du am meisten gehört hast.</p>
+		</div>
+		<a class="pill" href="/library/review?year={{ year }}">Rückblick {{ year }}</a>
+	</header>
+	<nav class="stats-periods" aria-label="Zeitraum">
+		{% for period in periods %}<a href="{{ period.href }}" class="pill"{% if period.current %} aria-current="true"{% endif %}>{{ period.label }}</a>
+		{% endfor %}
+	</nav>
+
+	<h2 class="stats-title">Meistgehört</h2>
+	{% if lists.is_empty() %}
+	<p class="empty">In diesem Zeitraum wurde noch keine Musik gehört.</p>
+	{% else %}
+	{% include "partials/top_lists.html" %}
+	{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+# `#[sqlx::test]` creates a throwaway database per test on this server (docker compose, port 5434).
+# An exported DATABASE_URL still wins.
+[env]
+DATABASE_URL = "postgresql://autoreverse:autoreverse@localhost:5434/autoreverse"

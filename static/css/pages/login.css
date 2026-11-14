@@ -1,0 +1,86 @@
+/* login/+page.svelte */
+.login {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	min-height: 100vh;
+}
+.login .branding {
+	background: linear-gradient(
+		160deg,
+		color-mix(in oklab, var(--a) 26%, var(--sidebar)),
+		var(--sidebar) 62%
+	);
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	padding: 52px 48px;
+}
+.login .brand {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+}
+.login .wordmark {
+	font: 600 19px/1 var(--font-sans);
+}
+.login h1 {
+	font: 600 38px/1.15 var(--font-sans);
+	letter-spacing: -0.03em;
+	max-width: 12ch;
+}
+.login .branding p {
+	color: var(--dim);
+	max-width: 34ch;
+	line-height: 1.55;
+}
+.login .stats {
+	display: flex;
+	gap: 26px;
+	margin-top: 34px;
+}
+.login .stats strong {
+	display: block;
+	font-size: 20px;
+}
+.login .form-panel {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.login form {
+	width: 100%;
+	max-width: 360px;
+	display: flex;
+	flex-direction: column;
+}
+.login label {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-bottom: 16px;
+}
+.login .password-field {
+	position: relative;
+	display: block;
+}
+.login .password-field input {
+	width: 100%;
+	padding-right: 40px;
+}
+.login .password-field .icon-btn {
+	position: absolute;
+	top: 50%;
+	right: 4px;
+	transform: translateY(-50%);
+	width: 28px;
+	height: 28px;
+}
+.login .warning {
+	margin-top: 30px;
+	padding: 12px 14px;
+	border-radius: 10px;
+	border: 1px solid color-mix(in oklab, var(--music) 32%, transparent);
+	background: color-mix(in oklab, var(--music) 8%, transparent);
+	color: var(--dim);
+	font-size: 11.5px;
+}

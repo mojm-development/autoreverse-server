@@ -1,0 +1,53 @@
+{#- legacy MetadataEditor.svelte, for Verwalter on the book and album pages: a <template> that
+    static/js/metadata/editor.js clones into <body> on "Bearbeiten". Saving sends only the
+    edited fields (PATCH /items/{id}) and edited track titles (PATCH /tracks/{id}). Needs
+    `editor: MetadataEditor`. -#}
+<template data-metadata-editor-template>
+<div class="metadata-editor" data-sheet data-metadata-editor data-item-id="{{ editor.item_id }}">
+	<div class="backdrop" role="button" tabindex="-1" aria-label="Schließen" data-sheet-close></div>
+	<div class="sheet" role="dialog" aria-modal="true" aria-label="Metadaten bearbeiten">
+		<header>
+			<h2>Metadaten bearbeiten</h2>
+			<button type="button" class="icon-btn" aria-label="Schließen" data-sheet-close>{% call ui::icon("expand") %}{% endcall %}</button>
+		</header>
+
+		<div class="body">
+			<p class="lead">
+				Was du hier änderst, bleibt beim nächsten Scan stehen. Ein Feld mit Schloss verwaltest du
+				selbst — der Scanner fasst es nicht mehr an.
+			</p>
+
+			<div class="fields">
+				{% for field in editor.fields %}
+				<label class="field" data-field="{{ field.wire }}" data-type="{{ field.kind }}" data-initial="{{ field.value }}">
+					<span class="label">
+						{{ field.label }}
+						{% if field.locked %}<button type="button" class="lock active" title="Von Hand gesetzt — klicken, um es dem Scanner zurückzugeben" data-lock>von Hand</button>{% endif %}
+					</span>
+					<input type="{{ field.input_type }}" step="{{ field.step }}" value="{{ field.value }}" />
+					{% if let Some(hint) = field.hint %}<span class="hint">{{ hint }}</span>{% endif %}
+				</label>
+				{% endfor %}
+			</div>
+
+			{% if !editor.tracks.is_empty() %}
+			<h3>{{ editor.track_label }}</h3>
+			<div class="tracks">
+				{% for track in editor.tracks %}
+				<label class="track">
+					<span class="index mono">{{ track.position }}</span>
+					<input type="text" value="{{ track.title }}" data-track-id="{{ track.id }}" data-initial="{{ track.title }}" />
+				</label>
+				{% endfor %}
+			</div>
+			{% endif %}
+		</div>
+
+		<footer>
+			<span class="error" data-sheet-error hidden></span>
+			<button type="button" class="outline" data-sheet-close>Abbrechen</button>
+			<button type="button" class="primary" disabled data-editor-save>Speichern</button>
+		</footer>
+	</div>
+</div>
+</template>

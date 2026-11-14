@@ -1,0 +1,20 @@
+{#- legacy library/bookmarks/+page.svelte -#}
+{% extends "layouts/app.html" %}
+{% block title %}Lesezeichen · Autoreverse{% endblock %}
+{% block content %}
+<div class="content bookmarks-page" style="--a: var(--book)">
+	<h1>Lesezeichen <span class="count mono">{{ bookmarks.len() }}</span></h1>
+	<div class="table" role="table" aria-label="Lesezeichen">
+		{% for bookmark in bookmarks %}
+		<a href="{{ bookmark.href }}" role="row" class="row">
+			<span class="title">{{ bookmark.item_title }}</span>
+			<span class="cell">{{ bookmark.title }}</span>
+			<span class="cell mono">{{ bookmark.position }}</span>
+		</a>
+		{% endfor %}
+	</div>
+	{% if bookmarks.is_empty() %}
+	<p class="empty">Noch keine Lesezeichen.</p>
+	{% endif %}
+</div>
+{% endblock %}

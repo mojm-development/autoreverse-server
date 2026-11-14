@@ -1,0 +1,80 @@
+{#- Einstellungen → Doppelte Alben (no legacy counterpart). Each open group lists the copies of
+    one album, the recommended one first; keeping one hides the others. -#}
+{% extends "layouts/settings.html" %}
+{% block title %}Doppelte Alben · Autoreverse{% endblock %}
+{% block content %}
+<div class="settings-duplicates">
+	<h1>Doppelte Alben</h1>
+	<p class="lede">Alben mit gleichem Interpreten und Titel in mehreren Ordnern. Behalte eine Kopie, die anderen werden in der Bibliothek ausgeblendet – ihre Dateien bleiben dabei unverändert. Ausgeblendete Kopien kannst du unten endgültig von der Festplatte löschen.</p>
+
+	{% if let Some(notice) = notice %}<p class="notice" role="status">{{ notice }}</p>{% endif %}
+	{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+	{% if open.is_empty() %}
+	<p class="empty">Keine doppelten Alben offen.</p>
+	{% else %}
+	<form method="POST" action="/settings/duplicates" class="bulk">
+		<input type="hidden" name="action" value="keep-all" />
+		<span class="mono">{{ open.len() }} {% if open.len() == 1 %}Gruppe{% else %}Gruppen{% endif %} offen</span>
+		<button type="submit" class="primary">Alle Empfehlungen übernehmen</button>
+	</form>
+
+	<ul class="groups">
+		{% for group in open %}
+		<li class="group" id="{{ group.anchor }}">
+			<ul class="copies">
+				{% for copy in group.copies %}
+				<li class="copy{% if copy.recommended %} recommended{% endif %}">
+					<span class="thumb"{% if copy.has_cover %} style="background-image: url(/items/{{ copy.id }}/cover?size=128)"{% endif %}></span>
+					<span class="info">
+						<span class="title-row"><a class="title" href="/library/albums/{{ copy.id }}">{{ copy.title }}</a>{% if copy.recommended %}<span class="tag">Empfohlen</span>{% endif %}{% if copy.hidden %}<span class="tag muted">Ausgeblendet</span>{% endif %}</span>
+						<span class="meta">{{ copy.artist }}{% if let Some(year) = copy.year %} · {{ year }}{% endif %} · {{ copy.tracks_line }} · hinzugefügt {{ copy.added }}</span>
+						<span class="folder mono" title="{{ copy.folder }}">{{ copy.folder }}</span>
+					</span>
+					<form method="POST" action="/settings/duplicates">
+						<input type="hidden" name="action" value="keep" />
+						<input type="hidden" name="id" value="{{ copy.id }}" />
+						<input type="hidden" name="next" value="{{ group.next_anchor }}" />
+						<button type="submit" class="{% if copy.recommended %}primary{% else %}outline{% endif %}">Behalten</button>
+					</form>
+				</li>
+				{% endfor %}
+			</ul>
+		</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+
+	{% if !hidden.is_empty() %}
+	<div class="hidden-head">
+		<h2>Ausgeblendet <span class="count mono">{{ hidden.len() }}</span></h2>
+		<form method="POST" action="/settings/duplicates" data-confirm="Alle {{ hidden.len() }} ausgeblendeten Kopien endgültig von der Festplatte löschen? Das lässt sich nicht rückgängig machen.">
+			<input type="hidden" name="action" value="delete-hidden" />
+			<button type="submit" class="danger">Alle ausgeblendeten löschen</button>
+		</form>
+	</div>
+	<ul class="copies hidden-list">
+		{% for entry in hidden %}
+		<li class="copy">
+			<span class="thumb"{% if entry.copy.has_cover %} style="background-image: url(/items/{{ entry.copy.id }}/cover?size=128)"{% endif %}></span>
+			<span class="info">
+				<span class="title">{{ entry.copy.title }}</span>
+				<span class="meta">{{ entry.copy.artist }} · {{ entry.copy.tracks_line }} · stattdessen: {{ entry.kept }}</span>
+				<span class="folder mono" title="{{ entry.copy.folder }}">{{ entry.copy.folder }}</span>
+			</span>
+			<form method="POST" action="/settings/duplicates">
+				<input type="hidden" name="action" value="unhide" />
+				<input type="hidden" name="id" value="{{ entry.copy.id }}" />
+				<button type="submit" class="outline">Wieder einblenden</button>
+			</form>
+			<form method="POST" action="/settings/duplicates" data-confirm="„{{ entry.copy.title }}“ aus {{ entry.copy.folder }} endgültig von der Festplatte löschen?">
+				<input type="hidden" name="action" value="delete" />
+				<input type="hidden" name="id" value="{{ entry.copy.id }}" />
+				<button type="submit" class="danger">Löschen</button>
+			</form>
+		</li>
+		{% endfor %}
+	</ul>
+	{% endif %}
+</div>
+{% endblock %}

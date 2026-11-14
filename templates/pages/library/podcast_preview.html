@@ -1,0 +1,51 @@
+{#- legacy library/podcasts/preview/+page.svelte: a feed before subscribing to it. -#}
+{% extends "layouts/app.html" %}
+{% block title %}{% if let Some(feed) = feed %}{{ feed.title }}{% else %}Podcast abonnieren{% endif %} · Autoreverse{% endblock %}
+{% block content %}
+<div class="podcast-layout" style="--a: var(--podcast)">
+	{% include "partials/podcast_rail.html" %}
+	<div class="content preview-page">
+		<a class="back" href="{{ back_href }}">← Zurück zur Suche</a>
+		{% if let Some(load_error) = load_error %}
+		<p class="error">{{ load_error }}</p>
+		<p class="feed-url mono">{{ feed_url }}</p>
+		{% else if let Some(feed) = feed %}
+		<div class="hero">
+			<div class="cover-lg" style="{{ feed.cover_style() }}"></div>
+			<div class="meta">
+				<span class="eyebrow">Podcast</span>
+				<h1>{{ feed.title }}</h1>
+				<p class="subline">{{ feed.episode_count }} Folgen im Feed</p>
+				<div class="actions">
+					{% if let Some(id) = subscribed_id %}
+					<a class="primary" href="/library/podcasts/{{ id }}">Bereits abonniert</a>
+					{% else %}
+					<form method="POST" action="/library/podcasts/preview?feed={{ feed_param }}">
+						<button type="submit" class="primary">Abonnieren</button>
+					</form>
+					{% endif %}
+				</div>
+				{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+			</div>
+		</div>
+		{% if let Some(description) = feed.description %}<p class="description">{{ description }}</p>{% endif %}
+		<h2>Folgen</h2>
+		<div class="preview-episodes">
+			{% for episode in feed.episodes %}
+			<div class="preview-episode">
+				<div class="episode-head">
+					<span class="episode-title">{{ episode.title }}</span>
+					<span class="episode-date mono">{{ episode.date }}</span>
+					{% if !episode.duration.is_empty() %}<span class="episode-duration mono">{{ episode.duration }}</span>{% endif %}
+				</div>
+				{% if let Some(description) = episode.description %}<p class="episode-description">{{ description }}</p>{% endif %}
+			</div>
+			{% endfor %}
+		</div>
+		{% if feed.more() > 0 %}
+		<p class="more">… und {{ feed.more() }} weitere Folgen. Nach dem Abonnieren sind alle da.</p>
+		{% endif %}
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

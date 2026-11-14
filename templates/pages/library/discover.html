@@ -1,0 +1,118 @@
+{#- static/js/discover.js fills the page from /ai/feed and keeps it current. The rows of spoken
+    word stand outside the `ai_enabled` blocks: they come from the database, so the page has
+    something to show without a model and without any music. Each carries the accent of its own
+    kind of media instead of the page's. -#}
+{% extends "layouts/app.html" %}
+{% block title %}Entdecken · Autoreverse{% endblock %}
+{% block content %}
+<div class="content discover-page" style="--a: var(--music)" data-discover data-ai="{{ ai_enabled }}">
+	<header class="discover-top">
+		<div>
+			<h1>Entdecken</h1>
+			<p class="lede">Ausgesucht nach dem, was du hörst.</p>
+			<p class="discover-status" data-feed-hint role="status"></p>
+		</div>
+		{% if ai_enabled %}
+		<div class="discover-actions">
+			<span class="discover-updated" data-feed-status role="status"></span>
+			<button type="button" class="secondary" data-feed-refresh>Neu mischen</button>
+		</div>
+		{% endif %}
+	</header>
+
+	{% if ai_enabled %}
+	<div data-feed-hero></div>
+
+	<section class="discover-hero">
+		<h2>Playlist aus einem Satz</h2>
+		<p>Beschreibe Stimmung, Anlass oder Länge. Die Titel stammen aus deiner Mediathek.</p>
+		<form class="discover-prompt" data-ai-playlist-form hx-boost="false">
+			<input name="prompt" maxlength="500" required placeholder="Ruhige Musik für einen verregneten Sonntag" aria-label="Wunsch für die Playlist" />
+			<button type="submit" class="primary">Erstellen</button>
+		</form>
+		<div class="discover-examples" aria-label="Beispiele">
+			<button type="button" class="pill" data-ai-example>Eine Stunde konzentriert arbeiten</button>
+			<button type="button" class="pill" data-ai-example>Lange Autofahrt</button>
+			<button type="button" class="pill" data-ai-example>Abendessen mit Freunden</button>
+		</div>
+		<p class="discover-status" data-ai-playlist-status role="status"></p>
+		<div class="discover-result" data-ai-playlist-result></div>
+	</section>
+
+	<section class="discover-section" data-section="mixes" hidden>
+		<div class="head"><div><h2>Deine Mixes</h2><p>Aus deiner Sammlung, jeden Tag neu.</p></div><button type="button" class="secondary" data-feed-refresh data-mixes-again hidden>Neu erstellen</button></div>
+		<div class="discover-mixes" data-feed-mixes></div>
+		<div class="discover-mixes-empty" data-feed-mixes-empty hidden>
+			<div role="status">
+				<strong data-mixes-title></strong>
+				<p data-mixes-detail></p>
+			</div>
+			<button type="button" class="primary" data-feed-refresh>Mixes erstellen</button>
+		</div>
+	</section>
+
+	<section class="discover-section" data-section="picks" hidden>
+		<div class="head"><div><h2>Mehr aus deiner Sammlung</h2><p>Alben, die du noch nicht gehört hast.</p></div></div>
+		<div class="discover-rail" data-feed-picks></div>
+	</section>
+	{% else %}
+	<p class="discover-off">Für Playlisten und Vorschläge ist auf dem Server noch keine KI eingerichtet.</p>
+	{% endif %}
+
+	{#- Out of the listening history, not from a model: GET /me/on-repeat and /me/repeat-rewind.
+	    Each is a queue of single tracks, like a mix. -#}
+	<section class="discover-section" data-section="on-repeat" data-playlist-id="discover-on-repeat" hidden>
+		<div class="head"><div><h2>On Repeat</h2><p>Was bei dir gerade immer wieder läuft.</p></div><button type="button" class="secondary" data-action="play-playlist">Abspielen</button></div>
+		<div data-feed-on-repeat></div>
+	</section>
+
+	<section class="discover-section" data-section="repeat-rewind" data-playlist-id="discover-repeat-rewind" hidden>
+		<div class="head"><div><h2>Repeat Rewind</h2><p>Lief früher rauf und runter, seit Wochen nicht mehr.</p></div><button type="button" class="secondary" data-action="play-playlist">Abspielen</button></div>
+		<div data-feed-repeat-rewind></div>
+	</section>
+
+	<section class="discover-section" data-section="fresh" hidden>
+		<div class="head"><div><h2>Neu und ungehört</h2></div></div>
+		<div class="discover-rail" data-feed-fresh></div>
+	</section>
+
+	<section class="discover-section" data-section="rediscover" hidden>
+		<div class="head"><div><h2>Lange nicht gehört</h2><p>Die liefen früher oft.</p></div></div>
+		<div class="discover-rail" data-feed-rediscover></div>
+	</section>
+
+	<section class="discover-section spoken" data-section="episodes" style="--a: var(--podcast)" hidden>
+		<div class="head"><div><h2>Neue Folgen</h2><p>Aus deinen Podcast-Abos, noch nicht gehört.</p></div><a class="pill" href="/library/podcasts?filter=new">Alle neuen Folgen</a></div>
+		<ul class="discover-episodes" data-feed-episodes></ul>
+	</section>
+
+	<section class="discover-section spoken" data-section="series" style="--a: var(--book)" hidden>
+		<div class="head"><div><h2>Weiter in der Serie</h2><p>Der nächste Band nach dem, den du beendet hast.</p></div></div>
+		<div class="discover-rail" data-feed-series></div>
+	</section>
+
+	<section class="discover-section spoken" data-section="unstarted" style="--a: var(--book)" hidden>
+		<div class="head"><div><h2>Noch nicht gehört</h2><p>Hörbücher, die du noch nicht begonnen hast.</p></div></div>
+		<div class="discover-rail" data-feed-unstarted></div>
+	</section>
+
+	<section class="discover-section spoken" data-section="paused" style="--a: var(--book)" hidden>
+		<div class="head"><div><h2>Wieder aufnehmen</h2><p>Angefangene Hörbücher, die schon länger liegen.</p></div></div>
+		<div class="discover-rail" data-feed-paused></div>
+	</section>
+
+	{% if ai_enabled %}
+	<section class="discover-section" data-section="artists" hidden>
+		<div class="head"><div><h2>Neue Interpreten</h2><p>Noch nicht in deiner Sammlung, aber sie würden passen.</p></div></div>
+		<div class="discover-cards" data-feed-artists></div>
+	</section>
+	{% endif %}
+
+	{% if ai_enabled %}
+	<section class="discover-section" data-section="wanted" hidden>
+		<div class="head"><div><h2>Könnte dir gefallen</h2><p>Passend zu dem, was du hörst, und noch nicht in der Mediathek.</p></div></div>
+		<div class="discover-cards" data-feed-wanted></div>
+	</section>
+	{% endif %}
+</div>
+{% endblock %}

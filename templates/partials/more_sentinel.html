@@ -1,0 +1,7 @@
+{#- legacy InfiniteScroll.svelte: once in view, htmx fetches the next page and puts it in place of
+    this element (which the page brings along again if there is yet another). The CSS lifts the
+    trip wire 800px above the list's end, legacy's rootMargin; static/js/pages.js fills the
+    status line while loading and drops tiles a shifted page repeats. -#}
+{% if let Some(href) = more_href %}
+<div class="sentinel" hx-get="{{ href }}" hx-trigger="intersect once" hx-swap="outerHTML" data-loading-label="Weitere Alben werden geladen" aria-hidden="true"></div>
+{% endif %}

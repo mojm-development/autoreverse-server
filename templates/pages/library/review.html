@@ -1,0 +1,85 @@
+{#- New in Rust: a calendar year of listening, the numbers of GET /me/review. -#}
+{% extends "layouts/app.html" %}
+{% block title %}Rückblick {{ year }} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content stats-page review-page" style="--a: var(--music)">
+	<header class="stats-top">
+		<div>
+			<h1>Rückblick</h1>
+			<p class="lede">Dein Jahr {{ year }} in Autoreverse.</p>
+		</div>
+		<a class="pill" href="/library/stats">Statistik</a>
+	</header>
+	<nav class="stats-periods" aria-label="Jahr">
+		{% for chip in years %}<a href="/library/review?year={{ chip.year }}" class="pill"{% if chip.current %} aria-current="true"{% endif %}>{{ chip.year }}</a>
+		{% endfor %}
+	</nav>
+
+	{% if empty %}
+	<p class="empty">{{ year }} wurde noch nichts gehört.</p>
+	{% else %}
+	<section class="review-hero">
+		<div class="total">
+			<span class="number">{{ hours }}</span>
+			<span class="unit">Stunden gehört</span>
+		</div>
+		<div class="kinds">
+			<div class="kind-bar" aria-hidden="true">
+				{% for kind in kinds %}<span style="width: {{ kind.percent }}%; background: var(--{{ kind.accent }})"></span>{% endfor %}
+			</div>
+			<ul>
+				{% for kind in kinds %}
+				<li><span class="dot" style="background: var(--{{ kind.accent }})"></span>{{ kind.label }} <span class="mono">{{ kind.time }}</span></li>
+				{% endfor %}
+			</ul>
+		</div>
+	</section>
+
+	<section class="review-facts">
+		{% for fact in facts %}
+		<div class="fact">
+			<span class="value">{{ fact.value }}</span>
+			<span class="label">{{ fact.label }}</span>
+			{% if !fact.detail.is_empty() %}<span class="detail">{{ fact.detail }}</span>{% endif %}
+		</div>
+		{% endfor %}
+	</section>
+
+	<section class="review-months">
+		<h2 class="stats-title">Monat für Monat</h2>
+		<ol class="months" aria-label="Hörzeit je Monat">
+			{% for month in months %}
+			<li title="{{ month.label }}: {% if month.time.is_empty() %}nichts gehört{% else %}{{ month.time }}{% endif %}">
+				<span class="bar"><span class="fill" style="height: {{ month.height }}%"></span></span>
+				<span class="label mono">{{ month.label }}</span>
+			</li>
+			{% endfor %}
+		</ol>
+	</section>
+
+	{% if !lists.is_empty() %}
+	<h2 class="stats-title">Meistgehört</h2>
+	{% include "partials/top_lists.html" %}
+	{% endif %}
+
+	{% if !books.is_empty() %}
+	<section>
+		<h2 class="stats-title">Beendete Hörbücher</h2>
+		<div class="review-books">
+			{% for book in books %}
+			<a class="discover-album" href="/library/books/{{ book.id }}">
+				<div class="art">{% if book.has_cover %}<img src="/items/{{ book.id }}/cover?size=384" alt="" loading="lazy" />{% endif %}</div>
+				<span class="title ellipsis">{{ book.title }}</span>
+				<span class="artist ellipsis">{{ book.author }}</span>
+			</a>
+			{% endfor %}
+		</div>
+	</section>
+	{% endif %}
+
+	{% if let Some(first) = first %}
+	<p class="review-first">Das Jahr begann am {{ first.day }} mit <a href="{{ first.href }}">{{ first.title }}</a>.</p>
+	{% endif %}
+	{% endif %}
+</div>
+{% endblock %}

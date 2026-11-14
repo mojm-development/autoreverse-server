@@ -1,0 +1,97 @@
+{#- Internet radio stations (new in Rust): the user's stations as tiles, the directory search and
+    "add by address". A tile's button plays the station live in the web player
+    (static/js/player: `play-station`, the mini bar shows "Live" and the running title);
+    static/js/player/ui.js marks the tile that plays and fills in `[data-station-now]`. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}Radio · Autoreverse{% endblock %}
+{% block content %}
+<div class="content radio-page" style="--a: var(--music)">
+	<header>
+		<h1>Radio</h1>
+		<p class="subline">Internetsender, live über diesen Server.</p>
+	</header>
+	{% if let Some(error) = error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+	{% if stations.is_empty() %}
+	<p class="empty">Noch keine Sender. {% if directory %}Unten nach einem Sender suchen oder seine Adresse eintragen.{% else %}Unten die Adresse eines Senders eintragen.{% endif %}</p>
+	{% else %}
+	<div class="grid" data-testid="stations">
+		{% for station in stations %}
+		<div class="tile station" data-station-id="{{ station.id }}" data-station-name="{{ station.name }}" data-station-logo="{{ station.has_logo }}" aria-current="false">
+			<button type="button" class="logo" data-action="play-station" aria-label="{{ station.name }} live hören" aria-pressed="false" title="Live hören">
+				{% if station.has_logo %}<img src="/radio/stations/{{ station.id }}/logo?size=256" alt="" loading="lazy" />{% else %}{% call ui::icon("radio") %}{% endcall %}{% endif %}
+				<span class="badge live">Live</span>
+			</button>
+			<span class="title">{{ station.name }}</span>
+			<span class="subtitle">{{ station.subtitle }}</span>
+			<span class="now" data-station-now aria-live="polite"></span>
+			<details class="edit" data-dismissable>
+				<summary aria-label="{{ station.name }} bearbeiten">Bearbeiten</summary>
+				<div class="menu">
+					<form method="POST" action="/library/radio/{{ station.id }}/rename">
+						<input name="name" value="{{ station.name }}" aria-label="Neuer Name" maxlength="100" required />
+						<button type="submit" class="primary">Umbenennen</button>
+					</form>
+					<form method="POST" action="/library/radio/{{ station.id }}/delete" hx-confirm="Sender „{{ station.name }}“ entfernen?">
+						<button type="submit" class="danger">Entfernen</button>
+					</form>
+				</div>
+			</details>
+		</div>
+		{% endfor %}
+	</div>
+	{% endif %}
+
+	<section class="add-station" aria-labelledby="add-station-heading">
+		<h2 id="add-station-heading">Sender hinzufügen</h2>
+		{% if directory %}
+		<form method="GET" action="/library/radio" class="station-search" role="search">
+			<input name="q" value="{{ query }}" placeholder="Sender suchen, z. B. Jazz" aria-label="Sender suchen" maxlength="100" required />
+			<button type="submit" class="primary">Suchen</button>
+		</form>
+		<p class="hint">Gesucht wird im freien Verzeichnis radio-browser.info; dorthin geht nur der Suchbegriff.</p>
+		{% if let Some(message) = search_error %}<p class="error" role="alert">{{ message }}</p>{% endif %}
+		{% if let Some(hits) = hits %}
+		{% if hits.is_empty() %}
+		<p class="empty">Keine Treffer.</p>
+		{% else %}
+		<ul class="results" data-testid="station-results">
+			{% for hit in hits %}
+			<li>
+				{#- The placeholder shows while there is no image: none named, or removed by
+				    static/js/app.js (`data-fallback`) when the server has none to give. #}
+				<span class="hit-logo" aria-hidden="true">{% if hit.has_logo %}<img src="/radio/stations/search/logo?id={{ hit.directory_id|urlencode }}&amp;size=128" alt="" loading="lazy" data-fallback />{% endif %}{% call ui::icon("radio") %}{% endcall %}</span>
+				<span class="what">
+					<span class="name">{{ hit.name }}</span>
+					<span class="facts">{{ hit.facts }}{% if !hit.facts.is_empty() && !hit.tags.is_empty() %} · {% endif %}{{ hit.tags }}</span>
+				</span>
+				{% if hit.added %}
+				<span class="pill added">Hinzugefügt</span>
+				{% else %}
+				<form method="POST" action="/library/radio">
+					<input type="hidden" name="directory_id" value="{{ hit.directory_id }}" />
+					<input type="hidden" name="q" value="{{ query }}" />
+					<button type="submit" class="outline" aria-label="{{ hit.name }} hinzufügen">Hinzufügen</button>
+				</form>
+				{% endif %}
+			</li>
+			{% endfor %}
+		</ul>
+		{% endif %}
+		{% endif %}
+		{% endif %}
+
+		<details class="by-address"{% if !directory || !entered.stream_url.is_empty() || !entered.name.is_empty() %} open{% endif %}>
+			<summary>Mit Adresse hinzufügen</summary>
+			<form method="POST" action="/library/radio" class="station-address">
+				<input name="name" value="{{ entered.name }}" placeholder="Name" aria-label="Name des Senders" maxlength="100" required />
+				<input name="stream_url" value="{{ entered.stream_url }}" placeholder="https://… (Stream-Adresse, auch .m3u oder .pls)" aria-label="Stream-Adresse" inputmode="url" required />
+				<input type="hidden" name="q" value="{{ query }}" />
+				<button type="submit" class="primary">Hinzufügen</button>
+			</form>
+			<p class="hint">Der Server prüft die Adresse, bevor er den Sender aufnimmt. MP3-, AAC- und Ogg-Streams werden unterstützt, HLS (.m3u8) noch nicht.</p>
+		</details>
+	</section>
+</div>
+{% endblock %}

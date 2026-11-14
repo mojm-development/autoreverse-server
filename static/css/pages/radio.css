@@ -1,0 +1,248 @@
+/* /library/radio: the stations as tiles (the playlists overview's tile, with a logo that is a
+   play button), the directory search and "add by address"; plus the mini player's live state. */
+.radio-page {
+	padding: 24px 32px;
+}
+.radio-page h1 {
+	font-size: 2em;
+	font-weight: bold;
+	margin: 0;
+}
+.radio-page .subline {
+	color: var(--dim);
+	font-size: 13px;
+	margin: 4px 0 20px;
+}
+.radio-page .error {
+	color: var(--danger);
+	font-size: 12px;
+}
+.radio-page .empty,
+.radio-page .hint {
+	color: var(--faint);
+	font-size: 13px;
+}
+.radio-page .hint {
+	font-size: 12px;
+	margin: 6px 0 0;
+}
+.radio-page .grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 18px;
+}
+.radio-page .station {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+}
+.radio-page .logo {
+	position: relative;
+	aspect-ratio: 1;
+	width: 100%;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius-lg);
+	background: var(--tile);
+	color: var(--faint);
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+	cursor: pointer;
+}
+.radio-page .logo img {
+	width: 100%;
+	height: 100%;
+	/* Logos come in every shape; none of them is cropped. */
+	object-fit: contain;
+}
+.radio-page .logo .icon {
+	width: 36%;
+	height: 36%;
+}
+.radio-page .logo .live {
+	position: absolute;
+	left: 8px;
+	bottom: 8px;
+	display: none;
+}
+.radio-page .station[aria-current='true'] .logo {
+	outline: 2px solid var(--a);
+	outline-offset: 2px;
+}
+.radio-page .station[aria-current='true'] .logo .live {
+	display: inline-flex;
+}
+.radio-page .station[aria-current='true'] .title {
+	color: var(--a);
+}
+.radio-page .title,
+.radio-page .subtitle,
+.radio-page .now {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.radio-page .title {
+	font: 500 13px var(--font-sans);
+}
+.radio-page .subtitle,
+.radio-page .now {
+	font: 400 11px var(--font-sans);
+	color: var(--dim);
+}
+.radio-page .now:empty {
+	display: none;
+}
+.radio-page .edit summary,
+.radio-page .by-address summary {
+	font: 400 11px var(--font-sans);
+	color: var(--faint);
+	cursor: pointer;
+}
+.radio-page .by-address summary {
+	font-size: 13px;
+	color: var(--dim);
+	margin-top: 16px;
+}
+.radio-page .edit .menu {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-top: 8px;
+}
+.radio-page form {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+.radio-page .edit input {
+	width: 100%;
+}
+.radio-page .primary,
+.radio-page .outline,
+.radio-page .danger {
+	display: inline-flex;
+	align-items: center;
+	height: 32px;
+	padding: 0 14px;
+	border-radius: var(--radius-pill);
+	font: 500 12px var(--font-sans);
+	cursor: pointer;
+}
+.radio-page .primary {
+	border: none;
+	background: var(--a);
+	color: var(--bg);
+}
+.radio-page .outline,
+.radio-page .danger {
+	border: 1px solid var(--line-strong);
+	background: transparent;
+	color: var(--text);
+}
+.radio-page .danger {
+	color: var(--danger);
+	border-color: color-mix(in oklab, var(--danger) 40%, transparent);
+}
+.radio-page .add-station {
+	margin-top: 36px;
+	max-width: 720px;
+}
+.radio-page .add-station h2 {
+	font: 600 15px var(--font-sans);
+	margin: 0 0 12px;
+}
+.radio-page .station-search input,
+.radio-page .station-address input:not([type='hidden']) {
+	flex: 1;
+	min-width: 180px;
+}
+.radio-page .station-address {
+	margin-top: 10px;
+}
+.radio-page .results {
+	list-style: none;
+	margin: 16px 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+}
+.radio-page .results li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--line);
+}
+.radio-page .results .hit-logo {
+	flex: none;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--radius-md);
+	background: var(--tile);
+	color: var(--faint);
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+}
+.radio-page .results .hit-logo img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+.radio-page .results .hit-logo .icon {
+	width: 50%;
+	height: 50%;
+}
+/* The placeholder makes way for a logo; app.js removes a logo that cannot be loaded. */
+.radio-page .results .hit-logo img ~ .icon {
+	display: none;
+}
+.radio-page .results .what {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+.radio-page .results .name {
+	font: 500 13px var(--font-sans);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.radio-page .results .facts {
+	font: 400 11px var(--font-sans);
+	color: var(--dim);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.radio-page .results .added {
+	cursor: default;
+	flex: none;
+}
+.radio-page .results form {
+	flex: none;
+}
+
+/* The mini player while a station plays: "Live" where the time stands, in the accent colour. */
+.mini-player[data-live='true'] [data-mini-time] {
+	color: var(--a);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+@media (max-width: 700px) {
+	.radio-page {
+		padding: 16px;
+	}
+	.radio-page .grid {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 14px;
+	}
+}

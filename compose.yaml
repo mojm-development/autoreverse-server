@@ -1,0 +1,59 @@
+name: autoreverse-server
+
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    ports:
+      - '5434:5432'
+    environment:
+      POSTGRES_USER: autoreverse
+      POSTGRES_PASSWORD: autoreverse
+      POSTGRES_DB: autoreverse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U autoreverse']
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  # `make db` / `make dev` start only `postgres`; `make stack` builds and starts the app too.
+  app:
+    build: .
+    # The image runs as UID 1000. If the podcast folder on the host belongs to someone else,
+    # set that user here, e.g. user: '1001:1001'.
+    ports:
+      - '8180:3000'
+    environment:
+      DATABASE_URL: postgresql://autoreverse:autoreverse@postgres:5432/autoreverse
+      AUTOREVERSE_DATA: /data
+      # The schema is migrated at every start (migrations are compiled in); there is no switch.
+      # First-admin bootstrap, only used once against an empty `users` table — change these.
+      AUTOREVERSE_ADMIN_USER: admin
+      AUTOREVERSE_ADMIN_PASSWORD: change-me
+      # Not needed here — this stack publishes the server directly on 8180, so the
+      # Origin the browser sends and the one the server derives already agree. Put a
+      # reverse proxy in front and you must set the public URL, or form POSTs are
+      # rejected with "Cross-site POST form submissions are forbidden":
+      # ORIGIN: https://autoreverse.example.com
+    volumes:
+      # These bind mounts just make the paths available inside the container — the server
+      # itself doesn't read them from env. After first login, type the in-container paths
+      # below (/library/books, /library/music) into Settings → Bibliotheken to actually use them.
+      - ${AUTOREVERSE_BOOKS_HOST:-./dev-library/books}:/library/books:ro
+      - ${AUTOREVERSE_MUSIC_HOST:-./dev-library/music}:/library/music:ro
+      # Downloaded podcast episodes, reachable from the host. Must be writable —
+      # unlike the two library mounts above. Files land in one folder per podcast,
+      # <Podcast>/<Folge>.<ext>. Covers stay in the named volume below.
+      - ${AUTOREVERSE_PODCASTS_HOST:-./dev-library/podcasts}:/data/podcasts
+      - autoreverse-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The image's HEALTHCHECK runs `autoreverse-server healthcheck` (GET /login on loopback);
+    # the slim runtime has no wget or curl.
+
+volumes:
+  pgdata:
+  autoreverse-data:

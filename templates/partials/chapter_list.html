@@ -1,0 +1,13 @@
+{#- legacy ChapterList.svelte inside ListRow.svelte: each row plays from its chapter. Needs
+    `chapters: Vec<ChapterRow>`; the player script keeps "läuft"/"gehört" current. -#}
+<div class="table chapter-list" role="table" aria-label="Kapitel">
+	{% for chapter in chapters %}
+	<div role="row" class="row clickable" aria-current="false" title="{{ chapter.title }}" data-chapter data-start="{{ chapter.start_secs }}" data-end="{{ chapter.end_secs }}" data-title="{{ chapter.title }}" data-label="{{ chapter.label }}">
+		<button type="button" class="activator bare" aria-label="{{ chapter.title }} abspielen" data-action="play-from" data-position="{{ chapter.start_secs }}"></button>
+		<span class="index mono">{{ chapter.number }}</span>
+		<span class="title">{{ chapter.label }}</span>
+		<span class="cell state" data-chapter-state>{{ chapter.state }}</span>
+		<span class="cell mono">{{ chapter.start }}</span>
+	</div>
+	{% endfor %}
+</div>
