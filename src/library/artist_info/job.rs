@@ -2,7 +2,7 @@
 //! artist's page finds it kept instead of waiting for them.
 //!
 //! A pass asks about every artist that has nothing kept yet or whose answer is older than
-//! `AUTOREVERSE_ARTIST_INFO_DAYS` — album artists first, then the artists of tracks by how many
+//! the interval under Einstellungen → Server — album artists first, then the artists of tracks by how many
 //! tracks they have — and fetches the pictures of album artists and the covers of their most
 //! played songs that are not stored yet. The
 //! catalogues are free and limit how often they may be asked, so a pass goes slowly
@@ -37,14 +37,20 @@ pub struct Pass {
     pub pictures: usize,
 }
 
-/// Spawns the job; returns at once.
+/// Spawns the job; returns at once. Switched off (Einstellungen → Server) it waits; a change of
+/// the settings starts a pass at once, so switching it on or shortening the interval needs no
+/// restart.
 pub fn start(state: AppState) {
-    if !state.config.artist_info {
-        return;
-    }
     tokio::spawn(async move {
+        let mut changes = state.settings.subscribe();
         tokio::time::sleep(START_DELAY).await;
         loop {
+            if !state.settings.get().artist_info {
+                if changes.changed().await.is_err() {
+                    return;
+                }
+                continue;
+            }
             match pass(&state, PACE, BACK_OFF).await {
                 Ok(done) if done != Pass::default() => tracing::info!(
                     "[artist-info] {} Interpreten gefunden, {} unbekannt, {} nicht erreichbar, {} Bilder geholt",
@@ -56,7 +62,10 @@ pub fn start(state: AppState) {
                 Ok(_) => {}
                 Err(e) => tracing::error!("[artist-info] Durchgang fehlgeschlagen: {e}"),
             }
-            tokio::time::sleep(CHECK_EVERY).await;
+            tokio::select! {
+                _ = tokio::time::sleep(CHECK_EVERY) => {}
+                changed = changes.changed() => if changed.is_err() { return },
+            }
         }
     });
 }
@@ -106,7 +115,11 @@ pub async fn pass(
 ) -> Result<Pass, sqlx::Error> {
     let mut done = Pass::default();
     let mut failures_in_a_row = 0;
-    for artist in due(&state.db, state.config.artist_info_days).await? {
+    for artist in due(&state.db, state.settings.get().artist_info_days).await? {
+        // Switched off meanwhile.
+        if !state.settings.get().artist_info {
+            break;
+        }
         // A page may have renewed it meanwhile.
         if state.artist_info_renewing.claim(&artist) {
             let kept = stored(&state.db, &artist).await;

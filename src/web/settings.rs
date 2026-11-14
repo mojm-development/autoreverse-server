@@ -33,6 +33,7 @@ pub fn router() -> Router<AppState> {
         .route("/settings/scan/start", post(scan_start))
         .route("/settings/scan/cancel", post(scan_cancel))
         .route("/settings/playback", get(playback).post(playback_action))
+        .route("/settings/server", get(server).post(server_action))
         .route("/settings/about", get(about))
 }
 
@@ -67,6 +68,12 @@ pub const SECTIONS: &[Section] = &[
         href: "/settings/users",
         label: "Nutzer",
         description: "Konten anlegen und Verwalterrechte vergeben.",
+        admin: true,
+    },
+    Section {
+        href: "/settings/server",
+        label: "Server",
+        description: "Hintergrund-Jobs, Funktionen und KI-Vorschläge des Servers.",
         admin: true,
     },
     Section {
@@ -290,6 +297,113 @@ async fn playback_action(
     };
     set_preferences(&state.db, user.id, speed, back, forward).await?;
     render_playback(&state, &user, &uri, true, None).await
+}
+
+#[derive(Template)]
+#[template(path = "pages/settings/server.html")]
+struct ServerPage {
+    shell: Shell,
+    sections: Vec<&'static Section>,
+    s: crate::settings::Out,
+    ai_provider: String,
+    ai_model: String,
+    ai_url: String,
+    has_api_key: bool,
+    anthropic_models: &'static [&'static str],
+    threads_default: usize,
+    max_hours: f64,
+    max_days: f64,
+    max_threads: u32,
+    saved: bool,
+    error: Option<String>,
+}
+
+async fn render_server(
+    state: &AppState,
+    admin: &WebAdmin,
+    saved: bool,
+    error: Option<String>,
+) -> WebResult<Html<String>> {
+    let uri: Uri = "/settings/server".parse().expect("static uri");
+    let (shell, sections) = settings_shell(state, &web_user(admin), &uri).await?;
+    let s = crate::settings::Out::from(&state.settings.get());
+    let page = ServerPage {
+        ai_provider: s.ai.provider.clone().unwrap_or_default(),
+        ai_model: s.ai.model.clone().unwrap_or_default(),
+        ai_url: s.ai.url.clone().unwrap_or_default(),
+        has_api_key: s.ai.has_api_key,
+        anthropic_models: s.ai.anthropic_models,
+        threads_default: s.loudness_threads_default,
+        max_hours: crate::settings::MAX_INTERVAL_HOURS,
+        max_days: crate::settings::MAX_ARTIST_INFO_DAYS,
+        max_threads: crate::settings::MAX_LOUDNESS_THREADS,
+        s,
+        shell,
+        sections,
+        saved,
+        error,
+    };
+    Ok(Html(page.render()?))
+}
+
+/// Settings → Server: the background jobs, optional features and the language model.
+async fn server(State(state): State<AppState>, admin: WebAdmin) -> WebResult<Html<String>> {
+    render_server(&state, &admin, false, None).await
+}
+
+/// The form as the body `PATCH /server/settings` takes, checked and stored the same way. An
+/// unticked box is absent from a form, so every switch is named: present is on.
+async fn server_action(
+    State(state): State<AppState>,
+    admin: WebAdmin,
+    body: Bytes,
+) -> WebResult<Html<String>> {
+    let form: HashMap<String, String> = serde_urlencoded::from_bytes(&body).unwrap_or_default();
+    let field = |key: &str| form.get(key).map_or("", |v| v.trim());
+    let mut patch = serde_json::Map::new();
+    for (key, name) in [
+        ("scanHours", "scan_hours"),
+        ("podcastHours", "podcast_refresh_hours"),
+        ("artistInfoDays", "artist_info_days"),
+        ("loudnessThreads", "loudness_threads"),
+    ] {
+        let Some(number) = form_number(&form, key).and_then(serde_json::Number::from_f64) else {
+            return render_server(
+                &state,
+                &admin,
+                false,
+                Some("Bitte nur Zahlen eingeben.".into()),
+            )
+            .await;
+        };
+        patch.insert(name.into(), serde_json::Value::Number(number));
+    }
+    for (key, name) in [
+        ("artistInfo", "artist_info"),
+        ("loudness", "loudness"),
+        ("radio", "radio"),
+        ("radioDirectory", "radio_directory"),
+        ("devices", "devices"),
+    ] {
+        patch.insert(name.into(), form.contains_key(key).into());
+    }
+    let mut ai = serde_json::Map::new();
+    ai.insert("provider".into(), field("aiProvider").into());
+    ai.insert("model".into(), field("aiModel").into());
+    ai.insert("url".into(), field("aiUrl").into());
+    if form.contains_key("aiApiKeyRemove") {
+        ai.insert("api_key".into(), serde_json::Value::Null);
+    } else if !field("aiApiKey").is_empty() {
+        ai.insert("api_key".into(), field("aiApiKey").into());
+    }
+    patch.insert("ai".into(), ai.into());
+    match crate::settings::change(&state, &patch).await {
+        Ok(_) => render_server(&state, &admin, true, None).await,
+        Err(e) if e.status == axum::http::StatusCode::UNPROCESSABLE_ENTITY => {
+            render_server(&state, &admin, false, Some(e.detail)).await
+        }
+        Err(e) => Err(e.into()),
+    }
 }
 
 #[derive(Template)]

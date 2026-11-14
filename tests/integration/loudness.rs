@@ -4,7 +4,6 @@
 
 use std::path::Path;
 
-use autoreverse_server::Config;
 use autoreverse_server::library::paths::set_library_paths;
 use autoreverse_server::scanner::loudness::{self, LoudnessProgress};
 use axum::http::{Method, StatusCode};
@@ -475,9 +474,8 @@ async fn a_broken_file_does_not_stop_the_pass_and_is_not_tried_again(db: PgPool)
 
 #[sqlx::test]
 async fn switched_off_only_the_tags_are_read(db: PgPool) {
-    let config =
-        Config::from_lookup(|key| (key == "AUTOREVERSE_LOUDNESS").then(|| "0".to_owned())).unwrap();
-    let app = TestApp::with_config(db, config);
+    let app = TestApp::new(db);
+    app.state.settings.update(|s| s.loudness = false);
     let dir = tempfile::tempdir().unwrap();
     let plain = dir.path().join("01.wav");
     write_sine(&plain, 3.0, -20.0);

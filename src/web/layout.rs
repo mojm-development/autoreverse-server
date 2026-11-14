@@ -58,6 +58,7 @@ impl Shell {
             unheard_episode_count(db, user.id)
         )?;
         let path = uri.path().to_owned();
+        let settings = state.settings.get();
         Ok(Shell {
             accent: accent_for(&path),
             active_query: uri.query().map(|q| format!("?{q}")).unwrap_or_default(),
@@ -76,8 +77,8 @@ impl Shell {
                 skip_back,
                 skip_forward,
             },
-            radio: state.config.radio,
-            devices: state.config.devices,
+            radio: settings.radio,
+            devices: settings.devices,
         })
     }
 

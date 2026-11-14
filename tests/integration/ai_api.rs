@@ -1,6 +1,5 @@
 //! `/ai/*`, with a stand-in for the language model.
 
-use autoreverse_server::Config;
 use autoreverse_server::auth::tokens::issue_token;
 use axum::Router;
 use axum::http::StatusCode;
@@ -33,14 +32,13 @@ async fn fake_model(payload: Value) -> String {
 }
 
 fn with_model(db: PgPool, url: String) -> TestApp {
-    let config = Config::from_lookup(|key| match key {
-        "AUTOREVERSE_AI_PROVIDER" => Some("anthropic".into()),
-        "AUTOREVERSE_AI_API_KEY" => Some("test".into()),
-        "AUTOREVERSE_AI_URL" => Some(url.clone()),
-        _ => None,
-    })
-    .unwrap();
-    TestApp::with_config(db, config)
+    let app = TestApp::new(db);
+    app.state.settings.update(|s| {
+        s.ai.provider = Some("anthropic".into());
+        s.ai.api_key = Some("test".into());
+        s.ai.url = Some(url);
+    });
+    app
 }
 
 async fn track(app: &TestApp, item: i32, title: &str) -> i32 {

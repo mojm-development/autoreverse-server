@@ -218,7 +218,9 @@ pub fn backfill(state: &AppState, stations: &[Station]) {
         .filter(|station| station.logo_file.is_none())
         .filter_map(|station| {
             let source = match (&station.directory_id, &station.homepage) {
-                (Some(id), _) if state.config.radio_directory => Source::Directory(id.clone()),
+                (Some(id), _) if state.settings.get().radio_directory_on() => {
+                    Source::Directory(id.clone())
+                }
                 (_, Some(homepage)) => Source::Homepage(homepage.clone()),
                 _ => return None,
             };

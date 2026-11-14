@@ -265,15 +265,12 @@ async fn switched_off_the_server_asks_nobody(db: PgPool) {
     let web = FakeWeb::start().await;
     catalogues_know_acdc(&web);
     let data = library.data().to_str().unwrap().to_owned();
-    let mut config = Config::from_lookup(|key| match key {
-        "AUTOREVERSE_DATA" => Some(data.clone()),
-        "AUTOREVERSE_ARTIST_INFO" => Some("0".into()),
-        _ => None,
-    })
-    .unwrap();
+    let mut config =
+        Config::from_lookup(|key| (key == "AUTOREVERSE_DATA").then(|| data.clone())).unwrap();
     config.audiodb_url = web.url("/adb");
     config.music_catalog_url = web.url("/apple");
     let app = TestApp::with_config(db, config);
+    app.state.settings.update(|s| s.artist_info = false);
     let token = token(&app).await;
     album(app.db(), "AC/DC", "The Razors Edge").await;
 

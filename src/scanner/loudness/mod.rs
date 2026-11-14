@@ -342,7 +342,7 @@ pub async fn measure_pending(state: &AppState) -> Result<(), sqlx::Error> {
     if albums.is_empty() {
         return Ok(());
     }
-    let threads = state.config.loudness_threads.max(1);
+    let threads = state.settings.get().loudness_threads().max(1);
     tracing::info!(
         "[lautheit] {} Alben werden gemessen ({threads} gleichzeitig)",
         albums.len()
@@ -431,7 +431,7 @@ async fn run_claimed(state: &AppState) {
                     read.pending
                 );
             }
-            if state.config.loudness {
+            if state.settings.get().loudness {
                 measure_pending(state).await?;
             }
             Ok::<_, sqlx::Error>(())

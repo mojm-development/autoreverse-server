@@ -76,8 +76,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    let settings = autoreverse_server::settings::load(&pool, |key| std::env::var(key).ok()).await?;
     let addr = SocketAddr::new(config.host, config.port);
     let state = AppState::new(pool, config);
+    state.settings.set(settings);
     autoreverse_server::podcasts::job::start(state.clone());
     autoreverse_server::scanner::job::start(state.clone());
     autoreverse_server::library::artist_info::job::start(state.clone());

@@ -109,7 +109,7 @@ fn lock(state: &AppState) -> std::sync::MutexGuard<'_, Attempts> {
 
 /// Starts a run unless one is active or the last began too recently. Returns whether one runs now.
 pub fn start(state: &AppState, user_id: i32, force: bool) -> bool {
-    let Some(config) = state.config.ai.clone() else {
+    let Some(config) = state.settings.get().ai() else {
         return false;
     };
     {
@@ -521,7 +521,7 @@ pub async fn load(state: &AppState, user_id: i32) -> Result<FeedOut, sqlx::Error
         queries::paused_books(db, user_id, BOOK_IDLE_DAYS, SPOKEN_ROW_LENGTH),
     )?;
     Ok(FeedOut {
-        enabled: state.config.ai.is_some(),
+        enabled: state.settings.get().ai().is_some(),
         refreshing,
         has_history,
         checking_catalog,

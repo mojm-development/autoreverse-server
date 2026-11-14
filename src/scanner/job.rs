@@ -1,14 +1,14 @@
-//! Scans the library every `AUTOREVERSE_SCAN_HOURS` hours, so that new files appear by themselves.
+//! Scans the library every so many hours (Einstellungen → Server), so that new files appear by
+//! themselves. A changed interval counts from the moment it is saved.
 //!
 //! Nobody watches this scan, so it is the cautious kind: it removes nothing from an empty folder
 //! and leaves large disappearances for a person to confirm (`removal_problem`).
 
 use std::time::Duration;
 
-use tokio::time::{Instant, MissedTickBehavior, interval_at};
-
 use super::run::run_scan_with;
 use crate::library::paths::get_library_paths;
+use crate::settings::{Ticker, period_hours};
 use crate::state::AppState;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -25,22 +25,23 @@ pub fn start(state: AppState) {
     tokio::spawn(scan_loop(state));
 }
 
-async fn scan_loop(state: AppState) {
-    let hours = state.config.scan_hours;
-    if hours <= 0.0 {
-        tracing::info!("[scan] automatischer Scan ist aus (AUTOREVERSE_SCAN_HOURS=0)");
-        return;
+fn log_period(period: Option<Duration>) {
+    match period {
+        None => tracing::info!("[scan] automatischer Scan ist aus"),
+        Some(p) => {
+            let hours = p.as_secs_f64() / 3600.0;
+            tracing::info!(
+                "[scan] Bibliothek wird alle {hours} {} gescannt",
+                if hours == 1.0 { "Stunde" } else { "Stunden" }
+            );
+        }
     }
-    tracing::info!(
-        "[scan] Bibliothek wird alle {hours} {} gescannt",
-        if hours == 1.0 { "Stunde" } else { "Stunden" }
-    );
+}
+
+async fn scan_loop(state: AppState) {
     // Not at once: restarting the server should not mean a scan every time.
-    let period = Duration::from_secs_f64(hours * 3600.0);
-    let mut interval = interval_at(Instant::now() + period, period);
-    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-    loop {
-        interval.tick().await;
+    let mut ticker = Ticker::new(&state.settings, |s| period_hours(s.scan_hours), log_period);
+    while ticker.tick().await {
         match run_once(&state).await {
             Ok(Outcome::Finished) => {
                 let snapshot = state.scan.snapshot();
