@@ -342,17 +342,49 @@ pub fn parse_albums(body: &Value) -> Vec<CatalogAlbum> {
         .collect()
 }
 
+/// The words of a title, sorted, without the ones that only name an edition: "Best Of (Deluxe
+/// Edition)" and "Deluxe: Best Of" come to the same.
+fn album_words(title: &str) -> Vec<String> {
+    const EDITION: [&str; 9] = [
+        "deluxe",
+        "edition",
+        "version",
+        "bonus",
+        "expanded",
+        "remastered",
+        "remaster",
+        "special",
+        "anniversary",
+    ];
+    let mut words: Vec<String> = title
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_lowercase)
+        .filter(|w| !EDITION.contains(&w.as_str()))
+        .collect();
+    words.sort();
+    words
+}
+
 /// The albums of `catalogue` that are not among `library` (titles of the artist's albums here),
-/// with their positions in `catalogue`. "LOVE? (Deluxe Edition)" here counts as "LOVE?" there.
+/// with their positions in `catalogue`. "LOVE? (Deluxe Edition)" here counts as "LOVE?" there,
+/// and "Classics: Night Songs" there as "Night Songs (Classics)" here.
 pub fn missing_albums<'a>(
     catalogue: &'a [CatalogAlbum],
     library: &[String],
 ) -> Vec<(usize, &'a CatalogAlbum)> {
     let have: HashSet<String> = library.iter().map(|t| loose(t)).collect();
+    let have_words: HashSet<Vec<String>> = library
+        .iter()
+        .map(|t| album_words(t))
+        .filter(|w| !w.is_empty())
+        .collect();
     catalogue
         .iter()
         .enumerate()
-        .filter(|(_, album)| !have.contains(&loose(&album.title)))
+        .filter(|(_, album)| {
+            !have.contains(&loose(&album.title)) && !have_words.contains(&album_words(&album.title))
+        })
         .collect()
 }
 
@@ -1133,10 +1165,20 @@ mod tests {
             track_count: 12,
             artwork: None,
         };
-        let catalogue = [album("LOVE?"), album("Brave"), album("This Is Me...Then")];
+        let catalogue = [
+            album("LOVE?"),
+            album("Brave"),
+            album("This Is Me...Then"),
+            album("Classics: Night Songs"),
+            album("Harbour Lights: Live"),
+            album("Early Days (Remastered)"),
+        ];
         let library = [
             "LOVE? (Deluxe Edition)".to_owned(),
             "this is me... then".to_owned(),
+            "Night Songs (Classics)".to_owned(),
+            "Harbour Lights LIVE".to_owned(),
+            "Early Days (Deluxe Edition)".to_owned(),
         ];
         let missing: Vec<(usize, &str)> = missing_albums(&catalogue, &library)
             .into_iter()
