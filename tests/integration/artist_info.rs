@@ -548,3 +548,42 @@ async fn the_job_asks_again_about_answers_kept_without_albums(db: PgPool) {
     assert_eq!(done.pictures, 3);
     assert!(job::due(app.db(), 30.0).await.unwrap().is_empty());
 }
+
+#[sqlx::test]
+async fn a_young_answer_from_before_albums_is_served_and_renewed_by_the_page(db: PgPool) {
+    let library = TempLibrary::new();
+    let web = FakeWeb::start().await;
+    catalogues_know_acdc(&web);
+    let app = app_with(db, &library.data(), &web);
+    let token = token(&app).await;
+    album(app.db(), "AC/DC", "The Razors Edge").await;
+    sqlx::query(
+        "INSERT INTO artist_info (artist, found, info, fetched_at)
+         VALUES ('AC/DC', true, $1, now() - interval '1 hour')",
+    )
+    .bind(json!({"biographies": {"en": "Old text."}, "top_tracks": []}))
+    .execute(app.db())
+    .await
+    .unwrap();
+
+    let body = body_json(app.get("/artists/AC%2FDC/info?lang=en", Some(&token)).await).await;
+    assert_eq!(body["biography"], "Old text.");
+    assert_eq!(body["missing_albums"], json!([]));
+
+    let mut renewed = false;
+    for _ in 0..100 {
+        renewed = sqlx::query_scalar(
+            "SELECT coalesce(jsonb_typeof(info->'albums') = 'array', false) FROM artist_info",
+        )
+        .fetch_one(app.db())
+        .await
+        .unwrap();
+        if renewed {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    assert!(renewed);
+    let body = body_json(app.get("/artists/AC%2FDC/info?lang=en", Some(&token)).await).await;
+    assert_eq!(body["missing_albums"][0]["title"], "Back in Black");
+}
