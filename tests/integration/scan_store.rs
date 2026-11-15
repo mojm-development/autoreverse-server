@@ -288,6 +288,38 @@ async fn takes_the_cover_from_the_folder(db: PgPool) {
 }
 
 #[sqlx::test]
+async fn an_unchanged_item_without_a_cover_is_looked_at_again(db: PgPool) {
+    // The track sits in a subfolder, so only its stored path leads to the image there, and the
+    // image has no exact cover name: an unchanged pass must use the tracks and the fallback.
+    let dir = tempfile::tempdir().unwrap();
+    let folder = dir.path().join("A/B");
+    let disc = folder.join("CD 1");
+    std::fs::create_dir_all(&disc).unwrap();
+    let source = folder.to_str().unwrap();
+    let mut item = scanned(source, "B");
+    item.tracks = vec![track(disc.join("01.mp3").to_str().unwrap(), 1, "T")];
+    store(&db, std::slice::from_ref(&item)).await;
+    let cover = || async {
+        sqlx::query_scalar::<_, Option<String>>("SELECT cover_path FROM items")
+            .fetch_one(&db)
+            .await
+            .unwrap()
+    };
+    assert_eq!(cover().await, None);
+
+    std::fs::write(disc.join("Fall 29 - Scan.jpg"), vec![0u8; 4096]).unwrap();
+    item.tracks = Vec::new();
+    item.chapters = Vec::new();
+    item.unchanged = true;
+    let (report, _) = store(&db, &[item]).await;
+    assert_eq!(report.unchanged, 1);
+    assert_eq!(
+        cover().await.as_deref(),
+        Some(disc.join("Fall 29 - Scan.jpg").to_str().unwrap())
+    );
+}
+
+#[sqlx::test]
 async fn removes_items_under_the_root_only(db: PgPool) {
     seed(
         &db,

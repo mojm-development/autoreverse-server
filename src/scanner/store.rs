@@ -8,7 +8,7 @@ use futures_util::{StreamExt, stream};
 use sqlx::{PgPool, Postgres, Transaction};
 
 use super::books::{KnownFiles, ScanFailure, ScannedItem};
-use super::covers::{extract_embedded, find_cover_file};
+use super::covers::{embedded_candidates, extract_embedded, find_folder_cover};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct StoreReport {
@@ -38,8 +38,10 @@ pub async fn known_files(db: &PgPool) -> Result<KnownFiles, sqlx::Error> {
         .collect())
 }
 
-/// The cover to store: the current one while its file exists, else a cover file in the folder
-/// or in the first track's folder, else a picture embedded in one of the first three tracks.
+/// The cover to store: the current one while its file exists, else an image in the folder or in
+/// the first track's folder (`find_folder_cover`: exact names first, then any image), else a
+/// picture embedded in one of the tracks `embedded_candidates` picks (the first three, then a
+/// bounded sample of the rest).
 async fn resolve_cover(
     item_id: i32,
     dir: &str,
@@ -48,7 +50,10 @@ async fn resolve_cover(
     current: Option<String>,
 ) -> Option<String> {
     let dir = PathBuf::from(dir);
-    let tracks: Vec<PathBuf> = track_paths.iter().take(3).map(PathBuf::from).collect();
+    let tracks: Vec<PathBuf> = embedded_candidates(track_paths.len())
+        .into_iter()
+        .map(|i| PathBuf::from(&track_paths[i]))
+        .collect();
     let covers_dir = covers_dir.to_path_buf();
     let found = tokio::task::spawn_blocking(move || {
         if let Some(current) = &current
@@ -57,12 +62,8 @@ async fn resolve_cover(
             return Some(current.clone());
         }
         // An album of discs often keeps its cover in the first disc's folder.
-        let first_folder = tracks
-            .first()
-            .and_then(|t| t.parent())
-            .map(Path::to_path_buf);
-        find_cover_file(&dir)
-            .or_else(|| first_folder.as_deref().and_then(find_cover_file))
+        let first_folder = tracks.first().and_then(|t| t.parent());
+        find_folder_cover(&dir, first_folder)
             .or_else(|| {
                 tracks
                     .iter()
@@ -106,10 +107,27 @@ async fn store_one(
 
     if entry.unchanged {
         if let Some(existing) = existing {
+            // An unchanged folder has no tracks in `entry`. An item that still lacks a cover (or
+            // whose cover file vanished) gets its stored tracks, so the first track's folder and
+            // the embedded pictures are searched again on every scan — a cover added since, or
+            // one only a newer scanner finds, then lands without a forced rescan. Items with a
+            // cover skip the query; `resolve_cover` keeps theirs anyway.
+            let has_cover = match &existing.cover_path {
+                Some(path) => tokio::fs::try_exists(path).await.unwrap_or(false),
+                None => false,
+            };
+            let track_paths: Vec<String> = if has_cover {
+                Vec::new()
+            } else {
+                sqlx::query_scalar("SELECT path FROM tracks WHERE item_id = $1 ORDER BY position")
+                    .bind(existing.id)
+                    .fetch_all(&mut **tx)
+                    .await?
+            };
             let cover = resolve_cover(
                 existing.id,
                 &entry.source_path,
-                &[],
+                &track_paths,
                 covers_dir,
                 existing.cover_path.clone(),
             )
