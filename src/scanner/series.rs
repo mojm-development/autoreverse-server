@@ -26,9 +26,10 @@ impl SeriesGuess {
     };
 }
 
-const SEPARATOR: &str = "[-–—:·]";
-/// "Band", "Teil", "Folge", "Vol." … the words that introduce a volume number.
-const VOLUME_WORD: &str = r"(?:band|teil|folge|nr\.?|no\.?|vol\.?|volume|book|buch)";
+/// `_` too: rippers write it where a file name may not hold a colon ("Folge 237_ Titel").
+const SEPARATOR: &str = "[-–—:·_]";
+/// "Band", "Teil", "Folge", "Fall", "Vol." … the words that introduce a volume number.
+const VOLUME_WORD: &str = r"(?:band|teil|folge|fall|nr\.?|no\.?|vol\.?|volume|book|buch)";
 const NUMBER: &str = r"([0-9]{1,4}(?:[.,][0-9]{1,2})?)";
 
 struct Pattern {
@@ -46,7 +47,7 @@ static PATTERNS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
         // "Perry Rhodan, Band 3 - Titel" / "Perry Rhodan - Teil 3: Titel" / "Serie Vol. 3"
         pattern(
             format!(
-                r"(?i)^(.+?)[,\s]*\s*{SEPARATOR}?\s*\b{VOLUME_WORD}\s*{NUMBER}\b\s*{SEPARATOR}?\s*(.*)$"
+                r"(?i)^(.+?)[,\s]*\s*{SEPARATOR}?\s*\b{VOLUME_WORD}\s*{NUMBER}(?:\b|_)\s*{SEPARATOR}?\s*(.*)$"
             ),
             false,
         ),
@@ -69,6 +70,22 @@ static PATTERNS: LazyLock<Vec<Pattern>> = LazyLock::new(|| {
 /// A leading volume number: "03 - Der Fluch", "3. Der Fluch".
 static LEADING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(r"^{NUMBER}\s*(?:{SEPARATOR}|\.)\s*(.+)$")).expect("leading pattern")
+});
+
+/// A series tag that is nothing but a volume word ("Folge") names no series — some rippers write
+/// it into the movement frame of every episode.
+static BARE_VOLUME_WORD: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!(r"(?i)^\s*{VOLUME_WORD}\s*$")).expect("bare volume word pattern")
+});
+
+/// The volume in what follows a series name: "Folge 237_ Titel", "131_Titel",
+/// "Die neuen Fälle, Fall 60_ Titel". A volume word may come first, and words before it; without
+/// one the number has to lead.
+static VOLUME_AND_TITLE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!(
+        r"(?i)^(?:.*?\b{VOLUME_WORD}\s*)?{NUMBER}(?:\s*(?:{SEPARATOR}|\.)\s*(.*)|\s*)$"
+    ))
+    .expect("volume pattern")
 });
 
 static CLEAN_LEADING: LazyLock<Regex> =
@@ -140,6 +157,32 @@ pub fn parse_leading_index(name: &str) -> (Option<f64>, Option<String>) {
     }
 }
 
+/// The volume and the title after it, out of the text that follows a series name.
+fn volume_and_title(text: &str) -> (Option<f64>, Option<String>) {
+    let Some(caps) = VOLUME_AND_TITLE.captures(text.trim()) else {
+        return (None, None);
+    };
+    let rest = clean(caps.get(2).map_or("", |m| m.as_str()));
+    (to_index(&caps[1]), (!rest.is_empty()).then_some(rest))
+}
+
+/// What follows `author` at the start of `name` — "TKKG - 131_Titel" with author "TKKG" gives
+/// "131_Titel". `None` unless the name starts with the author and a separator.
+fn after_author<'n>(name: &'n str, author: &str) -> Option<&'n str> {
+    let author = author.trim();
+    if author.is_empty() {
+        return None;
+    }
+    let head = name.trim_start().get(..author.len())?;
+    if head.to_lowercase() != author.to_lowercase() {
+        return None;
+    }
+    let rest = &name.trim_start()[author.len()..];
+    let after = CLEAN_LEADING.replace(rest, "");
+    // Only a separator turns the author into a prefix: "TKKG Junior" is a series of its own.
+    (after.len() < rest.len()).then(|| &rest[rest.len() - after.len()..])
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SeriesSource<'a> {
     /// Series written into the file's tags, if the ripper bothered.
@@ -151,6 +194,8 @@ pub struct SeriesSource<'a> {
     pub parent_name: Option<&'a str>,
     /// True when the tree is deep enough for the parent to be a series.
     pub parent_is_series: bool,
+    /// The author folder of an Autor/Buch tree (two levels, no series folder between).
+    pub author_folder: Option<&'a str>,
     /// The title the scanner would use otherwise (an album tag, usually).
     pub title: &'a str,
     /// Whether that title came from a tag rather than from the folder name.
@@ -180,7 +225,7 @@ pub fn resolve_series(source: &SeriesSource<'_>) -> SeriesResolution {
     let mut series = source
         .tag_series
         .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && !BARE_VOLUME_WORD.is_match(s))
         .map(str::to_owned);
     let mut index = source.tag_series_index;
     let mut title = source.title.to_owned();
@@ -198,6 +243,37 @@ pub fn resolve_series(source: &SeriesSource<'_>) -> SeriesResolution {
             && let Some(rest) = &leading_rest
         {
             title = rest.clone();
+        }
+    }
+
+    // An Autor/Buch tree whose book folders (or album tags) repeat the author in front:
+    // "TKKG/TKKG - 131_Titel", "Sherlock Holmes/Sherlock Holmes - Die neuen Fälle, Fall 60_ Titel".
+    // The author folder is the series — whatever the rest calls it, and however it is spelt from
+    // one rip to the next; reading the series out of the rest split one shelf into several.
+    if series.is_none()
+        && !source.parent_is_series
+        && let Some(author) = source.author_folder.filter(|a| !a.trim().is_empty())
+    {
+        let in_folder = after_author(source.folder_name, author);
+        let in_title = source
+            .title_from_tag
+            .then(|| after_author(source.title, author))
+            .flatten();
+        if in_folder.is_some() || in_title.is_some() {
+            series = Some(author.trim().to_owned());
+            let (folder_index, folder_rest) = in_folder.map(volume_and_title).unwrap_or_default();
+            let (title_index, _) = in_title.map(volume_and_title).unwrap_or_default();
+            if index.is_none() {
+                index = folder_index
+                    .or(from_folder.index)
+                    .or(leading_index)
+                    .or(title_index);
+            }
+            if !source.title_from_tag
+                && let Some(rest) = folder_rest
+            {
+                title = rest;
+            }
         }
     }
 
@@ -387,6 +463,137 @@ mod tests {
         assert_eq!(
             resolve_series(&source),
             resolved(Some("Der Herr der Ringe"), Some(1.0), "Die Gefährten")
+        );
+    }
+
+    fn in_author_folder<'a>(folder: &'a str, title: &'a str, from_tag: bool) -> SeriesSource<'a> {
+        SeriesSource {
+            folder_name: folder,
+            title,
+            title_from_tag: from_tag,
+            author_folder: Some(folder.split('/').next().unwrap_or("")),
+            ..Default::default()
+        }
+    }
+
+    /// The shelves of one TKKG rip, spelt four ways; all of them are one series.
+    #[test]
+    fn the_author_folder_is_the_series_when_the_book_folders_repeat_it() {
+        let tkkg = |folder: &'static str,
+                    title: &'static str,
+                    from_tag: bool,
+                    tag: Option<&'static str>| {
+            resolve_series(&SeriesSource {
+                tag_series: tag,
+                author_folder: Some("TKKG"),
+                ..in_author_folder(folder, title, from_tag)
+            })
+        };
+        assert_eq!(
+            tkkg(
+                "TKKG - 131_Stundenlohn für flotte Gangster",
+                "TKKG - 131_Stundenlohn für flotte Gangster",
+                false,
+                None
+            ),
+            resolved(Some("TKKG"), Some(131.0), "Stundenlohn für flotte Gangster")
+        );
+        assert_eq!(
+            tkkg(
+                "TKKG - 100_Fieser Trick mit Nr. 100",
+                "100/Fieser Trick mit Nr. 100",
+                true,
+                None
+            ),
+            resolved(Some("TKKG"), Some(100.0), "100/Fieser Trick mit Nr. 100")
+        );
+        // The ripper wrote "Folge" into the series tag: a volume word is no series.
+        assert_eq!(
+            tkkg(
+                "TKKG - Folge 237_ K.I. Kriminelle Illusion",
+                "K.I. Kriminelle Illusion",
+                true,
+                Some("Folge")
+            ),
+            resolved(Some("TKKG"), Some(237.0), "K.I. Kriminelle Illusion")
+        );
+    }
+
+    #[test]
+    fn the_author_in_the_album_tag_is_enough_when_the_folder_leaves_it_out() {
+        let source = SeriesSource {
+            author_folder: Some("Sherlock Holmes"),
+            ..in_author_folder(
+                "Die neuen Fälle - Fall 07 - Der eisige Tod",
+                "Sherlock Holmes - Die neuen Fälle, Fall ",
+                true,
+            )
+        };
+        assert_eq!(
+            resolve_series(&source)
+                .series_index
+                .zip(resolve_series(&source).series),
+            Some((7.0, "Sherlock Holmes".to_owned()))
+        );
+        let source = SeriesSource {
+            author_folder: Some("Sherlock Holmes"),
+            ..in_author_folder(
+                "Sherlock Holmes - Die neuen Fälle, Fall 60_ Nervus Rerum",
+                "Sherlock Holmes - Die neuen Fälle, Fall 60_ Nervus Rerum",
+                false,
+            )
+        };
+        assert_eq!(
+            resolve_series(&source),
+            resolved(Some("Sherlock Holmes"), Some(60.0), "Nervus Rerum")
+        );
+    }
+
+    #[test]
+    fn the_author_folder_is_no_series_without_the_prefix() {
+        // "Tolkien/Der Herr der Ringe 01 - …" keeps the series its folder names.
+        let source = SeriesSource {
+            author_folder: Some("Tolkien"),
+            ..in_author_folder(
+                "Der Herr der Ringe 01 - Die Gefährten",
+                "Der Herr der Ringe 01 - Die Gefährten",
+                false,
+            )
+        };
+        assert_eq!(
+            resolve_series(&source).series.as_deref(),
+            Some("Der Herr der Ringe")
+        );
+        // A longer name that merely starts like the author is another series.
+        let source = SeriesSource {
+            author_folder: Some("TKKG"),
+            ..in_author_folder("TKKG Junior 03 - Titel", "TKKG Junior 03 - Titel", false)
+        };
+        assert_eq!(
+            resolve_series(&source).series.as_deref(),
+            Some("TKKG Junior")
+        );
+        // A real series tag still wins.
+        let source = SeriesSource {
+            tag_series: Some("Perry Rhodan"),
+            author_folder: Some("TKKG"),
+            ..in_author_folder("TKKG - 03 - Titel", "Titel", true)
+        };
+        assert_eq!(
+            resolve_series(&source).series.as_deref(),
+            Some("Perry Rhodan")
+        );
+    }
+
+    #[test]
+    fn reads_fall_and_underscores_like_folge_and_dashes() {
+        assert_eq!(
+            parse_series_name("Die neuen Fälle, Fall 60_ Nervus Rerum"),
+            guess("Die neuen Fälle", 60.0, "Nervus Rerum")
+        );
+        assert_eq!(
+            parse_series_name("Die neuen Fälle - Fall 07 - Der eisige Tod"),
+            guess("Die neuen Fälle", 7.0, "Der eisige Tod")
         );
     }
 

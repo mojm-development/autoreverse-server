@@ -380,6 +380,8 @@ fn scan_unit(
         .unwrap_or_else(|| dir_str.clone());
     let parent_is_series = kind == ItemKind::Book && parts.len() >= 3;
     let parent_name = parent_is_series.then(|| parts[1].as_str());
+    // Autor/Buch: the author folder may be the series too (`SeriesSource::author_folder`).
+    let author_folder = (kind == ItemKind::Book && parts.len() == 2).then(|| parts[0].as_str());
 
     if unchanged {
         // No tags are read for an untouched folder, so this pass sees only the tree.
@@ -389,6 +391,7 @@ fn scan_unit(
                     folder_name: &folder_name,
                     parent_name,
                     parent_is_series,
+                    author_folder,
                     title: &folder_name,
                     ..Default::default()
                 });
@@ -453,6 +456,7 @@ fn scan_unit(
                 folder_name: &folder_name,
                 parent_name,
                 parent_is_series,
+                author_folder,
                 title: &base_title,
                 title_from_tag,
             });
