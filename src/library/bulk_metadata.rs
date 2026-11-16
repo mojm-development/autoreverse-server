@@ -499,6 +499,8 @@ pub async fn plan_series(db: &PgPool, user_id: i32, body: &Value) -> ApiResult<B
                 folder_name: &folder_name,
                 parent_name: parent_is_series.then(|| parts[parts.len() - 2].as_str()),
                 parent_is_series,
+                // Autor/Buch: the author folder may be the series (`SeriesSource::author_folder`).
+                author_folder: (parts.len() == 2).then(|| parts[0].as_str()),
                 title: &row.title,
                 title_from_tag: true,
             });
