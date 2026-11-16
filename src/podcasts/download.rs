@@ -108,6 +108,28 @@ const MAX_EPISODE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 const TOO_LARGE: &str = "Die Datei ist zu groß";
 
+const NO_WRITE_ACCESS: &str = "Der Server darf im Podcast-Ordner nicht schreiben";
+const DISK_FULL: &str = "Auf dem Server ist kein Platz mehr frei";
+const NOT_SAVED: &str = "Der Server konnte die Folge nicht speichern";
+
+/// A write failure as the listener reads it. The text reaches a car display, where "Permission
+/// denied (os error 13)" means nothing to the driver; the full error with its path goes to the log
+/// for whoever runs the server.
+fn storage_error(destination: &Path, error: &std::io::Error) -> DownloadError {
+    tracing::warn!(
+        "[podcasts] Folge nicht gespeichert ({}): {error}",
+        destination.display()
+    );
+    let text = match error.kind() {
+        std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem => {
+            NO_WRITE_ACCESS
+        }
+        std::io::ErrorKind::StorageFull | std::io::ErrorKind::QuotaExceeded => DISK_FULL,
+        _ => NOT_SAVED,
+    };
+    DownloadError::Storage(text.to_owned())
+}
+
 /// Streams `response` into `destination` via a `.part` file, so a broken transfer never leaves a
 /// half file under the real name. The announced length is only a shortcut: the bytes that really
 /// arrive are counted too.
@@ -120,8 +142,7 @@ async fn write_file(
         return Err(DownloadError::Fetch(TOO_LARGE.into()));
     }
     let temp = temp_path(destination);
-    let storage =
-        |e: std::io::Error| DownloadError::Storage(format!("Speichern fehlgeschlagen: {e}"));
+    let storage = |e: std::io::Error| storage_error(destination, &e);
     if let Some(parent) = destination.parent() {
         tokio::fs::create_dir_all(parent).await.map_err(storage)?;
     }
