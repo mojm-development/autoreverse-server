@@ -11,6 +11,9 @@ use super::store::refresh;
 
 pub const KEEP_MIN: i32 = 0;
 pub const KEEP_MAX: i32 = 50;
+/// What applies until an admin says otherwise; the column default of `library_config` is the same
+/// number (migration `podcast_keep_default_five`).
+pub const KEEP_DEFAULT: i32 = 5;
 
 /// Into `KEEP_MIN..=KEEP_MAX`, fractions cut off.
 pub fn clamp_keep(value: f64) -> i32 {
@@ -34,7 +37,7 @@ pub async fn get_keep_default(db: &PgPool) -> Result<i32, sqlx::Error> {
         sqlx::query_scalar("SELECT podcast_keep_episodes FROM library_config WHERE id = 1")
             .fetch_optional(db)
             .await?;
-    Ok(keep.unwrap_or(0))
+    Ok(keep.unwrap_or(KEEP_DEFAULT))
 }
 
 pub async fn set_keep_default(db: &PgPool, keep: f64) -> Result<(), sqlx::Error> {
