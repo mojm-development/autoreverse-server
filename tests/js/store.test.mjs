@@ -128,6 +128,24 @@ test('pause()/resume() toggle playing without a network call', async () => {
 	assert.equal(fetch.calls.length, 1);
 });
 
+test('a track is asked for at the address the caller names, a station never', async () => {
+	// "Streaming-Qualität": the store only asks; what the address says is quality.js's.
+	const fetch = fakeFetch(session());
+	const asked = [];
+	const player = createPlayerStore({
+		fetch,
+		trackUrl: (trackId) => {
+			asked.push(trackId);
+			return `/tracks/${trackId}/stream?quality=low&format=opus`;
+		}
+	});
+	const el = fakeAudio();
+	player.attachAudioElement(el);
+	await player.play(42);
+	assert.equal(el.src, '/tracks/11/stream?quality=low&format=opus');
+	assert.deepEqual(asked, [11]);
+});
+
 test('subscribers hear about changes', async () => {
 	const { player } = store();
 	let calls = 0;

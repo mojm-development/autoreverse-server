@@ -1,7 +1,7 @@
 {#- legacy settings/playback/+page.svelte. After saving, the player picks the new values up from
-    `#page` (static/js/player/main.js). The two switches are not part of the form: they are kept
-    in the browser (static/js/player/queue.js, loudness.js), as the theme is, and take effect
-    at once. -#}
+    `#page` (static/js/player/main.js). The two switches and the quality are not part of the
+    form: they are kept in the browser (static/js/player/queue.js, loudness.js, quality.js), as
+    the theme is, and take effect at once — the quality from the next title on. -#}
 {% extends "layouts/settings.html" %}
 {% block title %}Wiedergabe · Autoreverse{% endblock %}
 {% block content %}
@@ -39,6 +39,17 @@
 			<span class="title">Lautstärke angleichen</span>
 			<span class="hint">Musik gleich laut abspielen: laute Titel werden leiser gestellt. Läuft ein Album am Stück, behalten seine Titel ihr Verhältnis zueinander. Hörbücher, Podcasts und Radiosender bleiben unverändert. Gilt für diesen Browser.</span>
 		</span>
+	</label>
+	<label class="autoplay quality">
+		<span>
+			<span class="title">Streaming-Qualität</span>
+			<span class="hint">Automatisch fordert kleinere Dateien an, wenn der Browser eine langsame Verbindung oder den Datensparmodus meldet. Datensparend lädt immer die kleinste Fassung. Gilt ab dem nächsten Titel und für diesen Browser.</span>
+		</span>
+		<select data-quality-select>
+			<option value="auto" selected>Automatisch</option>
+			<option value="original">Original</option>
+			<option value="saver">Datensparend</option>
+		</select>
 	</label>
 </div>
 {% endblock %}

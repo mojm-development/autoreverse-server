@@ -746,10 +746,10 @@ async fn retention_downloads_the_newest_missing_episodes(db: PgPool) {
 #[sqlx::test]
 async fn the_default_applies_unless_a_podcast_overrides_it(db: PgPool) {
     let podcast = show(&db, "Show", "http://127.0.0.1/feed").await;
-    assert_eq!(get_keep_default(&db).await.unwrap(), 0);
-    set_keep_default(&db, 5.0).await.unwrap();
     assert_eq!(get_keep_default(&db).await.unwrap(), 5);
-    assert_eq!(effective_keep(&db, None).await.unwrap(), 5);
+    set_keep_default(&db, 7.0).await.unwrap();
+    assert_eq!(get_keep_default(&db).await.unwrap(), 7);
+    assert_eq!(effective_keep(&db, None).await.unwrap(), 7);
     assert_eq!(effective_keep(&db, Some(2)).await.unwrap(), 2);
 
     set_keep_for_podcast(&db, podcast, Some(3.0)).await.unwrap();
@@ -766,6 +766,17 @@ async fn the_default_applies_unless_a_podcast_overrides_it(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(keep, None);
+}
+
+/// The row is written by the library settings without a number of its own; the column default
+/// must then be the same five as without a row.
+#[sqlx::test]
+async fn a_config_row_without_a_number_keeps_five(db: PgPool) {
+    sqlx::query("INSERT INTO library_config (id, books_dir) VALUES (1, '/books')")
+        .execute(&db)
+        .await
+        .unwrap();
+    assert_eq!(get_keep_default(&db).await.unwrap(), 5);
 }
 
 #[sqlx::test]
@@ -815,6 +826,9 @@ async fn the_scheduled_run_counts_new_episodes_and_names_the_failed_feed(db: PgP
     );
     let reachable = show(&db, "Show", &web.url("/feed")).await;
     let unreachable = show(&db, "Weg", "http://127.0.0.1:9/feed").await;
+    // Only the feeds are counted here; with the default of five the new episode's audio would be
+    // fetched from example.com and add a failure of its own.
+    set_keep_default(&db, 0.0).await.unwrap();
     let dir = tempfile::tempdir().unwrap();
     let run = refresh_all_and_retain(&db, &http_client(), dir.path(), dir.path())
         .await

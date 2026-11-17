@@ -281,6 +281,10 @@
 	padding-top: 16px;
 	border-top: 1px solid var(--line);
 }
+/* The quality is a choice of three, so its control sits below its text. */
+.settings-playback .autoplay.quality {
+	flex-direction: column;
+}
 .settings-playback .autoplay input {
 	margin-top: 3px;
 	accent-color: var(--a);

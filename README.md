@@ -385,7 +385,7 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `GET` `HEAD`           | `/radio/stations/{id}/stream`, `…/now`, `…/logo`  | Live stream through the server, running title, logo                    |
 | `GET`                  | `/radio/stations/search/logo?id=`                 | Logo of a search hit, fetched and served by the server                 |
 | `GET` `PATCH`          | `/tracks/{id}`                                    | One track; edit its metadata (admin)                                   |
-| `GET` `HEAD`           | `/tracks/{id}/stream`                             | Range-capable audio stream                                             |
+| `GET` `HEAD`           | `/tracks/{id}/stream?quality=&format=`            | Range-capable audio stream, as it is or smaller, see [Streaming quality](#streaming-quality) |
 | `GET`                  | `/tracks/{id}/lyrics`                             | The track's lyrics from the collection, see [Lyrics](#lyrics)          |
 | `POST`                 | `/play/{itemId}`                                  | Open a playback session                                                |
 | `POST`                 | `/sessions/{sessionId}/close`                     | Close a playback session: `{position?, listened?, tracks?}`, see [Listening time](#listening-time) |
@@ -868,6 +868,35 @@ plays unlevelled.
 down and never boosts. The target of −18 LUFS is low enough that nearly all music is turned
 down; a recording quieter than that plays as it is. Safari on iOS ignores `volume`, so nothing
 is levelled there.
+
+### Streaming quality
+
+`GET /tracks/{id}/stream` sends the file as it is in the library. For a slow or metered
+connection a client may ask for a smaller copy:
+
+| Parameter | Values                                   | Meaning                                              |
+|-----------|------------------------------------------|------------------------------------------------------|
+| `quality` | `high`, `medium`, `low`; `original`      | 192, 128 or 64 kbit/s. Absent or `original`: the file as it is. |
+| `format`  | `opus` (default), `aac`                  | Ogg Opus, or AAC-LC in an MP4 with its index in front (for AVPlayer, which reads no Ogg). Ignored without a `quality`. |
+
+Any other value is `422` (`Unbekannte Qualität`, `Unbekanntes Format`).
+
+What comes back is always a **whole file with a length**, range-capable like the original, so
+seeking and resuming work the same. That has two consequences worth knowing:
+
+- **The first request for a track in a quality waits** until the server has encoded it — two
+  or three seconds for a song, longer for a long file. The copy is kept (under `transcodes/` in
+  `AUTOREVERSE_DATA`, 10 GB at most, the ones not asked for longest go first), so every later
+  request is immediate. A player that opens the next title ahead of time warms it on the way.
+  Requests for the same copy at the same time share one encoding, and an encoding carries on
+  when the client hangs up.
+- **The answer may be the original after all**: where a copy would save little (the file's
+  bitrate is not more than 1.5 times the target — spoken word in MP3, mostly) or could not be
+  made. Read the `Content-Type` of the answer rather than assuming one; a client never has to
+  check which it got, and a server from before this ignores both parameters.
+
+Loudness values are those of the original and apply to the copy unchanged. The parameters make
+no difference to sessions, progress or listening time.
 
 ### Track radio
 

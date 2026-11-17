@@ -76,7 +76,7 @@ src/
                 logos (stored ones, those of the search hits, the icons of a homepage)
   devices/      remote control: wire shapes and their checks (mod.rs), the hub of online
                 devices and their event streams (hub.rs)
-  streaming/    HTTP Range responses
+  streaming/    HTTP Range responses; smaller copies for `?quality=` (transcode.rs)
 templates/      askama: base.html, layouts/, pages/, partials/ — compiled into the binary
 static/         css/ (tokens.css, app.css, components.css, pages/*.css), js/, icons
 migrations/     sqlx migrations — compiled into the binary, applied at every start
@@ -294,6 +294,29 @@ The contract for client authors is in the README ("Loudness"); the apps are buil
   `audio.volume`, so it only attenuates; album value for an album played as such, track value
   for `single` sessions, nothing for spoken word and stations. No second `<audio>` element:
   track changes are not gapless.
+
+### Streaming quality
+
+`streaming::transcode` behind `GET /tracks/{id}/stream?quality=high|medium|low&format=opus|aac`;
+the contract is in the README ("Streaming quality"), the apps are built against it. Rules that
+must hold:
+
+- **Always a whole file from the cache, never a pipe.** Players seek by byte range and AVPlayer
+  wants the `moov` atom first; both need a length. The first request therefore waits for
+  `ffmpeg`, in a task of its own (a client hanging up must not undo the work), one encoding
+  per copy however many requests wait for it, two at a time in the process.
+- **Asking never fails for the quality's sake.** Not worth it (`worth_it`: source bitrate ≤ 1.5 ×
+  target) or `ffmpeg` failed → the original goes out under its own `Content-Type`. Only an
+  unknown value is refused (422).
+- The copy's name carries the source's size and mtime, so a replaced file gets a new copy; old
+  ones age out through `prune` (10 GB, least recently asked for first — a hit sets the mtime).
+  Nothing about copies is in the database, and `transcodes/` may be deleted at any time.
+- The web player asks through `static/js/player/quality.js` (choice in `localStorage`, set
+  under Einstellungen → Wiedergabe; automatic goes by `navigator.connection`, which only some
+  browsers have). The store takes the address from `options.trackUrl` when a track is opened,
+  never in the middle of one: a seek is a byte range and only fits the file it began with.
+- Podcast episodes default to five kept per podcast (`retention::KEEP_DEFAULT`, the column
+  default of `library_config`): an episode only in its feed costs a download on the first tap.
 
 ### Playlists: sharing, folders, export and import
 
