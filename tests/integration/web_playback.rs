@@ -468,6 +468,8 @@ async fn album_and_player_offer_a_radio_and_the_settings_its_autoplay(db: PgPool
 
     let (_, html) = page(&app, "/settings/playback", &cookie).await;
     assert!(html.contains(r#"<input type="checkbox" data-autoplay-toggle checked />"#));
+    assert!(html.contains("<select data-quality-select>"));
+    assert!(html.contains(r#"<option value="saver">Datensparend</option>"#));
     assert!(html.contains("Autoplay"));
 }
 

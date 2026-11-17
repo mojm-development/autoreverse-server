@@ -35,6 +35,7 @@ mod server_info;
 mod server_settings;
 mod startup;
 mod stations;
+mod stream_quality;
 mod tokens;
 mod top_api;
 mod users_api;

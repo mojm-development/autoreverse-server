@@ -22,6 +22,7 @@ import {
 import { bindMediaSession } from './mediasession.js';
 import { createLyrics } from './lyrics.js';
 import { normalizeEnabled, setNormalize } from './loudness.js';
+import { pickFormat, pickQuality, qualityMode, setQualityMode, trackUrl } from './quality.js';
 import { REMOTE_QUEUE, projectedPosition, takeOverPlan, watchedDevice } from './devices.js';
 import { createDeviceLink } from './devicelink.js';
 import { renderDevicesPanel } from './devices-ui.js';
@@ -57,7 +58,13 @@ if (audio) {
 	const store = createPlayerStore({
 		preferences: lastServerPreferences ?? undefined,
 		onEnded: (ended) => onTrackEnded(ended),
-		normalize: () => normalizeEnabled(storage)
+		normalize: () => normalizeEnabled(storage),
+		trackUrl: (trackId) =>
+			trackUrl(
+				trackId,
+				pickQuality(qualityMode(storage), navigator.connection),
+				pickFormat((type) => audio.canPlayType(type) !== '')
+			)
 	});
 	store.attachAudioElement(audio);
 	const visualizers = createVisualizers({
@@ -189,6 +196,9 @@ if (audio) {
 		}
 		for (const toggle of document.querySelectorAll('[data-normalize-toggle]')) {
 			toggle.checked = normalizeEnabled(storage);
+		}
+		for (const select of document.querySelectorAll('[data-quality-select]')) {
+			select.value = qualityMode(storage);
 		}
 		const np = document.querySelector('[data-np]');
 		if (np && !mounted.has(np)) {
@@ -790,6 +800,11 @@ if (audio) {
 			return;
 		}
 		if (!(target instanceof HTMLSelectElement)) return;
+		if (target.matches('[data-quality-select]')) {
+			// From the next title on: the one playing keeps the file it began with.
+			setQualityMode(storage, target.value);
+			return;
+		}
 		if (target.matches('[data-np-speed]')) {
 			const value = Number(target.value);
 			store.setSpeed(value);

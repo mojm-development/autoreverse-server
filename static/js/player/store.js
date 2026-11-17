@@ -67,11 +67,15 @@ const MAX_HEARD_STEP = 5;
  *   playlist), so the store does not continue with the item's next track.
  * @param {() => boolean} [options.normalize] Whether the volume is levelled ("Lautstärke
  *   angleichen"); asked for every track, so the switch takes effect without a reload.
+ * @param {(trackId: number) => string} [options.trackUrl] The address of a track's audio
+ *   ("Streaming-Qualität", quality.js); asked when a track is opened, so a title keeps the
+ *   file it began with — a seek is a byte range, and that only fits the same file.
  */
 export function createPlayerStore(options = {}) {
 	const request = options.fetch ?? ((...args) => fetch(...args));
 	const onEnded = options.onEnded;
 	const normalize = options.normalize ?? (() => true);
+	const trackUrl = options.trackUrl ?? ((trackId) => `/tracks/${trackId}/stream`);
 	const createAudioContext =
 		options.createAudioContext ??
 		(() => (globalThis.AudioContext ? new globalThis.AudioContext() : null));
@@ -254,7 +258,7 @@ export function createPlayerStore(options = {}) {
 			heardMark = null;
 			pendingOffset = null;
 		} else {
-			audioEl.src = `/tracks/${track.id}/stream`;
+			audioEl.src = trackUrl(track.id);
 			setOffset(offset);
 		}
 		audioEl.playbackRate = current.speed;

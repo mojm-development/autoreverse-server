@@ -9,7 +9,7 @@ use axum::{Json, Router, routing::get};
 use serde::Serialize;
 use serde_json::Value;
 
-use super::validate::ApiJson;
+use super::validate::{ApiJson, ApiQuery};
 use crate::auth::{ApiAdmin, ApiUser};
 use crate::error::{ApiError, ApiResult};
 use crate::library::lyrics::Lyrics;
@@ -18,6 +18,7 @@ use crate::library::queries;
 use crate::serialize::{TrackDetail, TrackOut};
 use crate::state::AppState;
 use crate::streaming::ranges::range_response;
+use crate::streaming::transcode::{self, UnknownValue};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -63,21 +64,53 @@ async fn find_track(state: &AppState, raw_id: &str) -> ApiResult<queries::Track>
     queries::track(&state.db, id).await?.ok_or_else(not_found)
 }
 
+#[derive(serde::Deserialize)]
+struct StreamQuery {
+    quality: Option<String>,
+    format: Option<String>,
+}
+
 /// The audio file with HTTP range support. Works with the session cookie as well as a bearer
 /// token, so the web player's `<audio src>` needs no extra auth.
+///
+/// `?quality=high|medium|low` (and `format=opus|aac`) asks for a smaller copy for a slow
+/// connection (`streaming::transcode`): a whole, range-capable file like the original, made on
+/// the first request. Where a copy would save nothing, or cannot be made, the original goes
+/// out — a client only ever asks, it never has to check what it got.
 async fn stream(
     State(state): State<AppState>,
     _user: ApiUser,
     Path(raw_id): Path<String>,
+    ApiQuery(query): ApiQuery<StreamQuery>,
     method: Method,
     headers: HeaderMap,
 ) -> ApiResult<Response> {
+    let target = transcode::parse_target(query.quality.as_deref(), query.format.as_deref())
+        .map_err(|UnknownValue(name)| match name {
+            "format" => ApiError::unprocessable("Unbekanntes Format"),
+            _ => ApiError::unprocessable("Unbekannte Qualität"),
+        })?;
     let row = find_track(&state, &raw_id).await?;
-    let path = FsPath::new(&row.path);
+    let original = FsPath::new(&row.path);
     let gone = || ApiError::new(StatusCode::GONE, "Datei nicht mehr vorhanden");
-    if !tokio::fs::metadata(path).await.is_ok_and(|m| m.is_file()) {
+    let Some(size) = tokio::fs::metadata(original)
+        .await
+        .ok()
+        .filter(|m| m.is_file())
+        .map(|m| m.len())
+    else {
         return Err(gone());
-    }
+    };
+    let copy = match target.filter(|t| transcode::worth_it(size, row.duration, t.quality)) {
+        Some(target) => state
+            .transcoder
+            .ensure(&state.config.transcodes_dir, row.id, original, target)
+            .await
+            .inspect_err(|e| tracing::warn!("[qualität] {}: {e}", row.path))
+            .ok(),
+        None => None,
+    };
+    let path = copy.as_deref().unwrap_or(original);
     let range = headers.get(header::RANGE).and_then(|v| v.to_str().ok());
     range_response(path, range, method == Method::HEAD)
         .await

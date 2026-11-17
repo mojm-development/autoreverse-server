@@ -22,6 +22,8 @@ pub struct Config {
     pub playlists_dir: PathBuf,
     /// Scaled-down covers and artist images, rendered on first request; safe to delete.
     pub thumbs_dir: PathBuf,
+    /// Tracks re-encoded for a slow connection (`streaming::transcode`); a cache, safe to delete.
+    pub transcodes_dir: PathBuf,
     /// The iTunes Search API; `AUTOREVERSE_PODCAST_DIRECTORY_URL` points it elsewhere (the e2e
     /// run serves a fixture, so no browser test reaches the internet).
     pub podcast_directory_url: String,
@@ -90,6 +92,7 @@ impl Config {
             artists_dir: data_dir.join("artists"),
             playlists_dir: data_dir.join("playlists"),
             thumbs_dir: data_dir.join("thumbs"),
+            transcodes_dir: data_dir.join("transcodes"),
             radio_dir: data_dir.join("radio"),
             data_dir,
             podcast_directory_url: non_empty("AUTOREVERSE_PODCAST_DIRECTORY_URL")

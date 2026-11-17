@@ -45,6 +45,8 @@ pub struct AppState {
     pub artist_info_renewing: crate::library::artist_info::Renewing,
     /// What admins set under Einstellungen → Server; the defaults until `main` loads them.
     pub settings: crate::settings::Shared,
+    /// The cache of tracks re-encoded for `?quality=` and the work that fills it.
+    pub transcoder: crate::streaming::transcode::Transcoder,
 }
 
 impl AppState {
@@ -69,6 +71,7 @@ impl AppState {
             devices: Arc::default(),
             artist_info_renewing: Default::default(),
             settings: Default::default(),
+            transcoder: Default::default(),
         }
     }
 }
