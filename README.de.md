@@ -365,7 +365,7 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `POST`                 | `/me/password`                                    | Eigenes Passwort ändern                                                     |
 | `GET` `PUT`            | `/me/playback`                                    | Wiedergabeeinstellungen                                                     |
 | `GET`                  | `/items`                                          | Titel auflisten — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=` |
-| `GET` `PATCH`          | `/items/{id}`                                     | Einzelner Titel; Metadaten bearbeiten (Verwalter)                           |
+| `GET` `PATCH`          | `/items/{id}`                                     | Einzelner Titel (eine Folge nennt ihren Podcast in `parent_id`); Metadaten bearbeiten (Verwalter) |
 | `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Metadaten in Masse bearbeiten und zurücknehmen (Verwalter)                  |
 | `POST`                 | `/items/series`                                   | Reihen und Bandnummern erkennen oder zuweisen, vorab als Probelauf (Verwalter) |
 | `GET`                  | `/items/{id}/children`                            | Tracks bzw. Episoden eines Titels                                           |

@@ -850,6 +850,39 @@ async fn the_scheduled_run_counts_new_episodes_and_names_the_failed_feed(db: PgP
     assert_eq!(episodes_of(&db, reachable).await.len(), 1);
 }
 
+// ---- an episode names its show ----
+
+#[sqlx::test]
+async fn an_episode_names_its_show_and_nothing_else_names_one(db: PgPool) {
+    let app = TestApp::new(db);
+    let user = app.user("oskar", false).await;
+    let token = app.token(user).await;
+    let podcast = show(app.db(), "Maschinenraum", "https://x/feed.xml").await;
+    let episode = dated_episode(app.db(), podcast, 5, None).await;
+    let album = seed(app.db(), Seed::new("album", "Neu!")).await;
+
+    let body = body_json(app.get(&format!("/items/{episode}"), Some(&token)).await).await;
+    assert_eq!(body["parent_id"], podcast);
+    let body = body_json(app.get(&format!("/items/{podcast}"), Some(&token)).await).await;
+    assert_eq!(body["parent_id"], serde_json::Value::Null);
+    assert!(body.as_object().unwrap().contains_key("parent_id"));
+    let body = body_json(app.get(&format!("/items/{album}"), Some(&token)).await).await;
+    assert_eq!(body["parent_id"], serde_json::Value::Null);
+
+    // A list stays as it was: the field is the single item's.
+    let body = body_json(
+        app.get(&format!("/items/{podcast}/children"), Some(&token))
+            .await,
+    )
+    .await;
+    assert!(
+        !body["items"][0]
+            .as_object()
+            .unwrap()
+            .contains_key("parent_id")
+    );
+}
+
 // ---- podcastOverview ----
 
 #[sqlx::test]
