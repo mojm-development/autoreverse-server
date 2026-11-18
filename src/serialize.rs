@@ -205,13 +205,17 @@ impl From<NewEpisode> for NewEpisodeOut {
     }
 }
 
-/// A single item: the summary plus its description and genre (`genre` is new in Rust).
+/// A single item: the summary plus its description and genre (`genre` is new in Rust), and
+/// for an episode the show it belongs to (`parent_id`, new in Rust as well; `null` for anything
+/// that stands on its own). Kept out of [`ItemSummary`]: in a list of a show's episodes every
+/// row would say the same.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ItemDetail {
     #[serde(flatten)]
     pub summary: ItemSummary,
     pub description: Option<String>,
     pub genre: Option<String>,
+    pub parent_id: Option<i32>,
 }
 
 impl From<&Item> for ItemDetail {
@@ -220,6 +224,7 @@ impl From<&Item> for ItemDetail {
             summary: row.into(),
             description: row.description.clone(),
             genre: row.genre.clone(),
+            parent_id: row.parent_id,
         }
     }
 }

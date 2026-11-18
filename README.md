@@ -363,7 +363,7 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `POST`                 | `/me/password`                                    | Change own password                                                    |
 | `GET` `PUT`            | `/me/playback`                                    | Playback preferences                                                   |
 | `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=` |
-| `GET` `PATCH`          | `/items/{id}`                                     | One item; edit its metadata (admin)                                    |
+| `GET` `PATCH`          | `/items/{id}`                                     | One item (an episode names its show in `parent_id`); edit its metadata (admin) |
 | `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Bulk metadata edit and its undo (admin)                                |
 | `POST`                 | `/items/series`                                   | Detect or assign series and volume numbers, dry run by default (admin) |
 | `GET`                  | `/items/{id}/children`                            | Tracks / episodes of an item                                           |
