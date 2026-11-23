@@ -127,6 +127,11 @@ pub struct ItemSummary {
     pub missing_since: Option<DateTime<Utc>>,
     #[serde(serialize_with = "iso_opt")]
     pub published_at: Option<DateTime<Utc>>,
+    /// Who reads a book. Left out instead of `null` where there is none (every other kind, and
+    /// a book whose tags name nobody): the summary is part of many answers that never had the
+    /// field, and those keep their shape.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub narrator: Option<String>,
 }
 
 impl From<&Item> for ItemSummary {
@@ -143,6 +148,7 @@ impl From<&Item> for ItemSummary {
             year: row.year,
             missing_since: row.missing_since,
             published_at: row.published_at,
+            narrator: (row.kind == "book").then(|| row.narrator.clone()).flatten(),
         }
     }
 }
@@ -162,9 +168,13 @@ pub struct BookSummary {
 
 impl From<&BookEntry> for BookSummary {
     fn from(row: &BookEntry) -> Self {
+        let mut summary = ItemSummary::from(&row.item);
+        // This row always names the narrator, `null` included; the summary's own would be the
+        // same key a second time.
+        let narrator = summary.narrator.take();
         BookSummary {
-            summary: (&row.item).into(),
-            narrator: row.item.narrator.clone(),
+            summary,
+            narrator,
             duration: row.duration,
             position: row.position,
         }
@@ -205,7 +215,8 @@ impl From<NewEpisode> for NewEpisodeOut {
     }
 }
 
-/// A single item: the summary plus its description and genre (`genre` is new in Rust), and
+/// A single item: the summary (with it a book's `narrator`) plus its description and genre
+/// (`genre` is new in Rust), and
 /// for an episode the show it belongs to (`parent_id`, new in Rust as well; `null` for anything
 /// that stands on its own). Kept out of [`ItemSummary`]: in a list of a show's episodes every
 /// row would say the same.

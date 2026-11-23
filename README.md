@@ -367,8 +367,8 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `POST`                 | `/me/listens`                                     | Report listening time measured outside a session, see [Listening time](#listening-time) |
 | `POST`                 | `/me/password`                                    | Change own password                                                    |
 | `GET` `PUT`            | `/me/playback`                                    | Playback preferences                                                   |
-| `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=` |
-| `GET` `PATCH`          | `/items/{id}`                                     | One item (an episode names its show in `parent_id`); edit its metadata (admin) |
+| `GET`                  | `/items`                                          | List items — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=`; a book names its `narrator` |
+| `GET` `PATCH`          | `/items/{id}`                                     | One item (an episode names its show in `parent_id`, a book its `narrator`); edit its metadata (admin) |
 | `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Bulk metadata edit and its undo (admin)                                |
 | `POST`                 | `/items/series`                                   | Detect or assign series and volume numbers, dry run by default (admin) |
 | `GET`                  | `/items/{id}/children`                            | Tracks / episodes of an item                                           |
@@ -1429,7 +1429,7 @@ with the model it already has:
 | `year`          | integer or null |                                                                        |
 | `missing_since` | string or null | Always `null` here: missing items are left out.                         |
 | `published_at`  | string or null | `null` for books.                                                       |
-| `narrator`      | string or null | Added to the summary.                                                   |
+| `narrator`      | string or null | Who reads the book. Always present here; in `/items` and `/items/{id}` the key is left out when nobody is named. |
 | `series_index`  | number or null | The volume number within `series` (may be fractional, e.g. `2.5`). Part of every item summary. |
 | `duration`      | number         | Added: total length in seconds, `0` if unknown.                         |
 | `position`      | number         | Added: the user's saved position in seconds; `0` except in `rediscover_books`. |
