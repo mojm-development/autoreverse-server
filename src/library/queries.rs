@@ -464,6 +464,30 @@ pub async fn progress(
         .await
 }
 
+/// A position together with the time it was last written.
+#[derive(Debug, Clone, Copy, PartialEq, sqlx::FromRow)]
+pub struct TimedProgress {
+    pub position: f64,
+    pub finished: bool,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// The user's position in an item and when it was written; `None` if they never played it.
+pub async fn timed_progress(
+    db: &PgPool,
+    user_id: i32,
+    item_id: i32,
+) -> Result<Option<TimedProgress>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT position, finished, updated_at FROM progress
+         WHERE user_id = $1 AND item_id = $2",
+    )
+    .bind(user_id)
+    .bind(item_id)
+    .fetch_optional(db)
+    .await
+}
+
 /// Progress plus the item's total duration, for many items at once.
 #[derive(Debug, Clone, Copy, PartialEq, sqlx::FromRow)]
 pub struct ProgressEntry {

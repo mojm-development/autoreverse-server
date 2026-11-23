@@ -346,6 +346,11 @@ header where a throttle applies. Timestamps are ISO-8601 in UTC with whole secon
 `/progress/continue` returns `duration` (the summed track durations) and `has_cover` alongside
 each entry, so a client can draw a progress bar without fetching the whole item.
 
+`GET /progress/{itemId}` returns the account's `position`, `finished` and `updated_at` in one item
+(`updated_at` is `null` if the account has never played it). A client that plays a downloaded copy
+starts without `POST /play/{itemId}` and asks here first, so it resumes where another device
+stopped. Unlike `/play`, a finished item keeps its position.
+
 `/items` takes `?sort=title|added|series|played` (default `title`); `played` orders by the asking
 user's own progress. An unknown value is a 422 rather than a silent fallback.
 
