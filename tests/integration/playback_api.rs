@@ -336,6 +336,89 @@ async fn play_404s_for_an_unknown_item_and_401s_without_a_session(db: PgPool) {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
+// --- GET /progress/{itemId} -----------------------------------------------------------------
+
+#[sqlx::test]
+async fn reading_progress_returns_the_position_with_the_time_it_was_written(db: PgPool) {
+    let (app, token, user) = signed_in(db).await;
+    let book = seed(app.db(), Seed::new("book", "X")).await;
+    seed_progress(app.db(), user, book, 42.5, false).await;
+    sqlx::query("UPDATE progress SET updated_at = '2026-11-20T08:15:30.789Z' WHERE user_id = $1")
+        .bind(user)
+        .execute(app.db())
+        .await
+        .unwrap();
+
+    let response = app.get(&format!("/progress/{book}"), Some(&token)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        body_json(response).await,
+        // Whole seconds and a `Z`: the iOS app rejects fractional seconds.
+        json!({"position": 42.5, "finished": false, "updated_at": "2026-11-20T08:15:30Z"})
+    );
+}
+
+#[sqlx::test]
+async fn reading_progress_of_a_finished_item_says_so(db: PgPool) {
+    let (app, token, user) = signed_in(db).await;
+    let book = seed(app.db(), Seed::new("book", "X")).await;
+    seed_progress(app.db(), user, book, 3600.0, true).await;
+
+    let body = body_json(app.get(&format!("/progress/{book}"), Some(&token)).await).await;
+    assert_eq!(body["position"], 3600.0);
+    assert_eq!(body["finished"], true);
+    assert!(body["updated_at"].is_string());
+}
+
+#[sqlx::test]
+async fn reading_progress_of_a_never_played_item_is_zero_without_a_time(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    let book = seed(app.db(), Seed::new("book", "X")).await;
+
+    let response = app.get(&format!("/progress/{book}"), Some(&token)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        body_json(response).await,
+        json!({"position": 0, "finished": false, "updated_at": null})
+    );
+}
+
+#[sqlx::test]
+async fn reading_progress_never_shows_another_accounts_position(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    let other = app.user("tim", false).await;
+    let book = seed(app.db(), Seed::new("book", "X")).await;
+    seed_progress(app.db(), other, book, 900.0, false).await;
+
+    let body = body_json(app.get(&format!("/progress/{book}"), Some(&token)).await).await;
+    assert_eq!(
+        body,
+        json!({"position": 0, "finished": false, "updated_at": null})
+    );
+}
+
+#[sqlx::test]
+async fn reading_progress_404s_for_an_unknown_item_and_401s_without_a_session(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    for uri in ["/progress/999", "/progress/abc"] {
+        let response = app.get(uri, Some(&token)).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
+        assert_eq!(detail(response).await, "Unbekanntes Item");
+    }
+    let response = app.get("/progress/1", None).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test]
+async fn reading_progress_leaves_the_continue_list_route_alone(db: PgPool) {
+    let (app, token, user) = signed_in(db).await;
+    let book = seed(app.db(), Seed::new("book", "X")).await;
+    seed_progress(app.db(), user, book, 42.5, false).await;
+
+    let body = body_json(app.get("/progress/continue", Some(&token)).await).await;
+    assert_eq!(body["items"][0]["id"], book);
+}
+
 // --- POST /sessions/{id}/close --------------------------------------------------------------
 
 async fn open(app: &TestApp, token: &str, item: i32) -> String {

@@ -1,10 +1,10 @@
-//! Playback: `POST /play/{itemId}`, `PUT|POST /progress/{itemId}`, `GET /progress/continue`,
+//! Playback: `POST /play/{itemId}`, `GET|PUT|POST /progress/{itemId}`, `GET /progress/continue`,
 //! `POST /sessions/{sessionId}/close`, `GET /me/stats`, `GET /me/history`, `POST /me/listens`,
 //! `GET|PUT /me/playback`.
 //!
 //! The iOS app lives on these routes; shapes, defaults and `detail` texts follow legacy exactly.
 //! `listened` on closing a session, closing without a `position`, `/me/listens` and `/me/history`
-//! are newer than legacy and purely additive.
+//! are newer than legacy and purely additive, as is reading a single item's progress.
 
 use std::collections::HashMap;
 
@@ -26,14 +26,19 @@ use crate::library::playback::{
     continue_listening, listening_history, listening_stats, open_session, save_position,
 };
 use crate::library::queries::{self, Item};
-use crate::serialize::{ChapterOut, HistoryEntry, ItemSummary, TrackOut, js_number, js_number_opt};
+use crate::serialize::{
+    ChapterOut, HistoryEntry, ItemSummary, TrackOut, iso_opt, js_number, js_number_opt,
+};
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/play/{item_id}", post(play))
         // POST too: `navigator.sendBeacon` on page unload can only POST.
-        .route("/progress/{item_id}", post(put_progress).put(put_progress))
+        .route(
+            "/progress/{item_id}",
+            get(get_progress).post(put_progress).put(put_progress),
+        )
         .route("/progress/continue", get(continue_list))
         .route("/sessions/{session_id}/close", post(close))
         .route("/me/stats", get(stats))
@@ -117,6 +122,35 @@ async fn put_progress(
     };
     save_position(&state.db, user.id, row.id, position, Some(finished)).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Serialize)]
+struct ProgressOut {
+    #[serde(serialize_with = "js_number")]
+    position: f64,
+    finished: bool,
+    /// `null`: this account has never played the item.
+    #[serde(serialize_with = "iso_opt")]
+    updated_at: Option<DateTime<Utc>>,
+}
+
+/// The account's position in one item, with the time it was last written.
+///
+/// A client that plays a downloaded copy starts without `POST /play/{id}` and so never sees the
+/// position another device left here. It asks before such a start. Unlike `/play`, a finished
+/// item keeps its position: the caller decides what "finished" means for its start.
+async fn get_progress(
+    State(state): State<AppState>,
+    user: ApiUser,
+    Path(raw_id): Path<String>,
+) -> ApiResult<Json<ProgressOut>> {
+    let row = find_item(&state, &raw_id).await?;
+    let saved = queries::timed_progress(&state.db, user.id, row.id).await?;
+    Ok(Json(ProgressOut {
+        position: saved.map_or(0.0, |p| p.position),
+        finished: saved.is_some_and(|p| p.finished),
+        updated_at: saved.map(|p| p.updated_at),
+    }))
 }
 
 #[derive(Serialize)]

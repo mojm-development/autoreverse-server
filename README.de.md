@@ -348,6 +348,11 @@ Zeitstempel sind ISO-8601 in UTC mit ganzen Sekunden (`2026-10-14T18:22:57Z`).
 `/progress/continue` liefert zu jedem Eintrag zusätzlich `duration` (die Summe der Trackdauern)
 und `has_cover` — damit lässt sich ein Fortschrittsbalken zeichnen, ohne das ganze Item zu laden.
 
+`GET /progress/{itemId}` liefert `position`, `finished` und `updated_at` des Kontos in einem Item
+(`updated_at` ist `null`, wenn das Konto es nie gespielt hat). Ein Client, der eine heruntergeladene
+Kopie abspielt, startet ohne `POST /play/{itemId}` und fragt vorher hier, damit er dort fortsetzt,
+wo ein anderes Gerät aufgehört hat. Anders als bei `/play` behält ein beendetes Item seine Position.
+
 `/items` nimmt `?sort=title|added|series|played` (Vorgabe `title`); `played` ordnet nach dem
 Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller Rückfall.
 
