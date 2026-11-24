@@ -896,7 +896,7 @@ async fn continue_returns_duration_and_has_cover(db: PgPool) {
 }
 
 #[sqlx::test]
-async fn continue_skips_near_end_progress_before_limiting(db: PgPool) {
+async fn continue_skips_zero_and_near_end_progress_before_limiting(db: PgPool) {
     let (app, token, user) = signed_in(db).await;
     let open = seed(app.db(), Seed::new("book", "Noch offen")).await;
     let near_end = seed(app.db(), Seed::new("book", "Fast fertig")).await;
@@ -905,6 +905,9 @@ async fn continue_skips_near_end_progress_before_limiting(db: PgPool) {
     seed_track(app.db(), near_end, 1, "/near-end", 3_600.0).await;
     seed_progress(app.db(), user, open, 9_900.0, false).await;
     seed_progress(app.db(), user, near_end, 3_580.0, false).await;
+    let reset = seed(app.db(), Seed::new("book", "Zurückgesetzt")).await;
+    seed_track(app.db(), reset, 1, "/reset", 3_600.0).await;
+    seed_progress(app.db(), user, reset, 0.0, false).await;
 
     let body = body_json(app.get("/progress/continue?limit=1", Some(&token)).await).await;
     assert_eq!(body["items"].as_array().unwrap().len(), 1);

@@ -53,8 +53,10 @@
 					<span class="eyebrow" style="color: var(--{{ entry.accent }})">{{ entry.kind }}</span>
 					<span class="title">{{ entry.title }}</span>
 					<span class="subtitle">{{ entry.subtitle }}</span>
+					{% if entry.has_duration %}
 					<div class="progress"><div class="fill" style="width: {{ entry.percent }}%"></div></div>
 					<span class="duration mono">{{ entry.duration }}</span>
+					{% endif %}
 				</div>
 			</a>
 			{% endfor %}

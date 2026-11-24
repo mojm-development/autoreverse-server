@@ -69,6 +69,10 @@ async fn the_start_page_shows_continue_listening_and_the_newest_items(db: PgPool
     .await;
     seed_track(app.db(), album, 1, "/m/1.mp3", 1500.0).await;
     seed_progress(app.db(), user, album, 10.0, false).await;
+    let unknown = seed(app.db(), Seed::new("book", "Unbekannte Dauer")).await;
+    seed_progress(app.db(), user, unknown, 25.0, false).await;
+    let reset = seed(app.db(), Seed::new("book", "Zurückgesetzt")).await;
+    seed_progress(app.db(), user, reset, 0.0, false).await;
     let finished = seed(app.db(), Seed::new("book", "Ausgehört")).await;
     seed_progress(app.db(), user, finished, 10.0, true).await;
     seed(
@@ -85,7 +89,15 @@ async fn the_start_page_shows_continue_listening_and_the_newest_items(db: PgPool
     assert!(html.contains("<title>Start · Autoreverse</title>"));
     assert!(html.contains(", Oskar</h1>"));
     assert!(html.contains("<h2>Weiter hören</h2>"));
-    assert!(html.contains("2 offen"));
+    assert!(html.contains("3 offen"));
+    let unknown_card = format!(r#"<a href="/library/books/{unknown}" class="continue-card">"#);
+    let (_, unknown_card) = html.split_once(&unknown_card).unwrap();
+    let (unknown_card, _) = unknown_card.split_once("</a>").unwrap();
+    assert!(!unknown_card.contains(r#"class="progress""#));
+    assert!(!unknown_card.contains(r#"class="duration mono""#));
+    assert!(!html.contains(&format!(
+        r#"<a href="/library/books/{reset}" class="continue-card">"#
+    )));
     assert!(html.contains(&format!(
         r#"<a href="/library/books/{book}" class="continue-card">"#
     )));

@@ -382,6 +382,7 @@ pub async fn continue_listening(
              SELECT sum(tracks.duration) AS duration FROM tracks WHERE tracks.item_id = item.id
          ) AS total ON true
          WHERE progress.user_id = $1 AND progress.finished = false
+           AND progress.position > 0
            AND NOT (coalesce(total.duration, 0) > 0
                     AND progress.position >= total.duration * 0.99
                     AND total.duration - progress.position < 60)
