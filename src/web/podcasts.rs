@@ -132,7 +132,7 @@ pub struct EpisodeCard {
     pub cover_url: Option<String>,
     pub index: Option<usize>,
     pub show: Option<(String, String)>,
-    /// `unheard`, `started` or `finished`, for the filter pills.
+    /// Playback status used by the filter pills.
     pub status: &'static str,
 }
 
@@ -180,7 +180,10 @@ fn status_of(started: Option<bool>) -> &'static str {
 }
 
 fn card(input: CardInput, status: &'static str) -> EpisodeCard {
-    let started = !input.finished && input.position > 0.0;
+    let near_end =
+        !input.finished && crate::library::playback::near_end(input.position, input.duration);
+    let started = !input.finished && !near_end && input.position > 0.0;
+    let status = if near_end { "near-end" } else { status };
     let percent = if input.duration > 0.0 {
         (input.position / input.duration * 100.0).min(100.0)
     } else {

@@ -39,6 +39,7 @@ pub struct ContinueCard {
     pub subtitle: String,
     /// Width of the progress bar, `0`–`100` with three decimals.
     pub percent: String,
+    pub has_duration: bool,
     pub duration: String,
 }
 
@@ -63,6 +64,7 @@ impl From<&ContinueEntry> for ContinueCard {
             title: e.title.clone(),
             subtitle: subtitle.clone().unwrap_or_default(),
             percent: format!("{percent:.3}"),
+            has_duration: e.duration > 0.0,
             duration: format_duration(e.duration),
         }
     }

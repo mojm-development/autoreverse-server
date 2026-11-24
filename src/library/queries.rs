@@ -941,6 +941,9 @@ pub async fn paused_books(
                 progress.position
          FROM progress JOIN items ON items.id = progress.item_id {BOOK_DURATION}
          WHERE progress.user_id = $1 AND progress.position > 0 AND progress.finished = false
+           AND NOT (coalesce(total.duration, 0) > 0
+                    AND progress.position >= total.duration * 0.99
+                    AND total.duration - progress.position < 60)
            AND progress.updated_at < now() - make_interval(days => $2)
            AND items.kind = 'book' AND items.missing_since IS NULL
            AND items.duplicate_of IS NULL
