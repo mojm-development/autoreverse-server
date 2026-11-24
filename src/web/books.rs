@@ -35,13 +35,15 @@ pub enum Status {
     Listening,
     Unstarted,
     Finished,
+    NearEnd,
 }
 
 impl Status {
-    fn of(progress: Option<&ProgressEntry>) -> Status {
+    fn of(progress: Option<&ProgressEntry>, duration: f64) -> Status {
         match progress {
             None => Status::Unstarted,
             Some(p) if p.finished => Status::Finished,
+            Some(p) if crate::library::playback::near_end(p.position, duration) => Status::NearEnd,
             Some(_) => Status::Listening,
         }
     }
@@ -60,6 +62,7 @@ impl Status {
             Status::Listening => "listening",
             Status::Unstarted => "unstarted",
             Status::Finished => "finished",
+            Status::NearEnd => "near-end",
         }
     }
 }
@@ -82,7 +85,7 @@ pub struct BookRow {
 
 impl BookRow {
     fn new(book: &Item, duration: f64, progress: Option<&ProgressEntry>) -> BookRow {
-        let status = Status::of(progress);
+        let status = Status::of(progress, duration);
         let percent = match progress {
             Some(_) if status == Status::Finished && duration > 0.0 => 100,
             Some(p) if duration > 0.0 => ((p.position / duration) * 100.0).round().max(0.0) as u32,
