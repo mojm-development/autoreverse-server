@@ -369,8 +369,8 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `POST`                 | `/me/listens`                                     | Hörzeit nachmelden, die ohne Sitzung gemessen wurde, siehe [Hörzeit](#hörzeit) |
 | `POST`                 | `/me/password`                                    | Eigenes Passwort ändern                                                     |
 | `GET` `PUT`            | `/me/playback`                                    | Wiedergabeeinstellungen                                                     |
-| `GET`                  | `/items`                                          | Titel auflisten — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=` |
-| `GET` `PATCH`          | `/items/{id}`                                     | Einzelner Titel (eine Folge nennt ihren Podcast in `parent_id`); Metadaten bearbeiten (Verwalter) |
+| `GET`                  | `/items`                                          | Titel auflisten — `?kind=book\|album\|podcast\|episode`, `?q=`, `?artist=`, `?genre=`, `?missing=`; ein Hörbuch nennt seinen Sprecher in `narrator` |
+| `GET` `PATCH`          | `/items/{id}`                                     | Einzelner Titel (eine Folge nennt ihren Podcast in `parent_id`, ein Hörbuch seinen Sprecher in `narrator`); Metadaten bearbeiten (Verwalter) |
 | `POST`                 | `/items/bulk`, `/items/bulk/undo`                 | Metadaten in Masse bearbeiten und zurücknehmen (Verwalter)                  |
 | `POST`                 | `/items/series`                                   | Reihen und Bandnummern erkennen oder zuweisen, vorab als Probelauf (Verwalter) |
 | `GET`                  | `/items/{id}/children`                            | Tracks bzw. Episoden eines Titels                                           |
@@ -1404,7 +1404,7 @@ liest es mit dem Modell, das er schon hat:
 | `year`          | Ganzzahl / null     |                                                                        |
 | `missing_since` | Zeichenkette / null | Hier immer `null`: Fehlendes wird ausgelassen.                         |
 | `published_at`  | Zeichenkette / null | Bei Büchern `null`.                                                    |
-| `narrator`      | Zeichenkette / null | Zusätzlich zur Zusammenfassung.                                        |
+| `narrator`      | Zeichenkette / null | Wer das Buch liest. Hier immer vorhanden; in `/items` und `/items/{id}` fehlt der Schlüssel, wenn niemand genannt ist. |
 | `series_index`  | Zahl / null         | Die Bandnummer in `series` (kann gebrochen sein, z. B. `2.5`). Teil jeder Item-Zusammenfassung. |
 | `duration`      | Zahl                | Zusätzlich: Gesamtlänge in Sekunden, `0`, wenn unbekannt.              |
 | `position`      | Zahl                | Zusätzlich: gespeicherte Position in Sekunden; `0` außer in `rediscover_books`. |

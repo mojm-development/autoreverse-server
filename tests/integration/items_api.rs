@@ -127,6 +127,56 @@ async fn the_list_has_the_summary_shape_without_cover_path_or_description(db: Pg
 }
 
 #[sqlx::test]
+async fn a_book_names_its_narrator_in_the_list_and_the_detail(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    let read = seed(
+        app.db(),
+        Seed {
+            narrator: Some("Stefan Kaminski"),
+            ..Seed::new("book", "Der Schwarm")
+        },
+    )
+    .await;
+    let unread = seed(app.db(), Seed::new("book", "Tehanu")).await;
+
+    let body = body_json(app.get("/items?kind=book&sort=title", Some(&token)).await).await;
+    assert_eq!(titles(&body), ["Der Schwarm", "Tehanu"]);
+    assert_eq!(body["items"][0]["narrator"], "Stefan Kaminski");
+    // Nobody named: the key is left out, not null.
+    assert!(body["items"][1].get("narrator").is_none());
+
+    let body = body_json(
+        app.get("/library/more?kind=book&sort=title&offset=0", Some(&token))
+            .await,
+    )
+    .await;
+    assert_eq!(body["items"][0]["narrator"], "Stefan Kaminski");
+
+    let detail = body_json(app.get(&format!("/items/{read}"), Some(&token)).await).await;
+    assert_eq!(detail["narrator"], "Stefan Kaminski");
+    let detail = body_json(app.get(&format!("/items/{unread}"), Some(&token)).await).await;
+    assert!(detail.get("narrator").is_none());
+}
+
+#[sqlx::test]
+async fn only_books_have_a_narrator(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    // The column is filled for a book only; a stray value on another kind stays inside.
+    let album = seed(
+        app.db(),
+        Seed {
+            narrator: Some("Niemand"),
+            ..Seed::new("album", "Neu! 75")
+        },
+    )
+    .await;
+    let body = body_json(app.get("/items?kind=album", Some(&token)).await).await;
+    assert!(body["items"][0].get("narrator").is_none());
+    let detail = body_json(app.get(&format!("/items/{album}"), Some(&token)).await).await;
+    assert!(detail.get("narrator").is_none());
+}
+
+#[sqlx::test]
 async fn the_list_filters_by_kind_search_and_missing(db: PgPool) {
     let (app, token, _) = signed_in(db).await;
     seed(app.db(), Seed::new("album", "Nordlicht")).await;
