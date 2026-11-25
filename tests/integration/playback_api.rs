@@ -867,6 +867,55 @@ async fn progress_validates_item_and_position(db: PgPool) {
     assert_eq!(detail(response).await, "Ungültiger JSON-Body");
 }
 
+// --- GET /progress ----------------------------------------------------------------------------
+
+#[sqlx::test]
+async fn listing_progress_includes_finished_items_newest_first(db: PgPool) {
+    let (app, token, user) = signed_in(db).await;
+    let other = app.user("tim", false).await;
+    let begun = seed(app.db(), Seed::new("book", "Angefangen")).await;
+    seed_track(app.db(), begun, 1, "/a", 100.0).await;
+    seed_track(app.db(), begun, 2, "/b", 200.0).await;
+    let done = seed(app.db(), Seed::new("episode", "Fertig")).await;
+    let theirs = seed(app.db(), Seed::new("book", "Fremd")).await;
+    seed_progress(app.db(), user, begun, 50.5, false).await;
+    seed_progress(app.db(), user, done, 900.0, true).await;
+    seed_progress(app.db(), other, theirs, 5.0, false).await;
+    for (item, at) in [
+        (begun, "2026-11-01T08:00:00.700Z"),
+        (done, "2026-11-02T09:30:00Z"),
+    ] {
+        sqlx::query("UPDATE progress SET updated_at = $2::timestamptz WHERE item_id = $1")
+            .bind(item)
+            .bind(at)
+            .execute(app.db())
+            .await
+            .unwrap();
+    }
+
+    let response = app.get("/progress", Some(&token)).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        body_json(response).await.to_string(),
+        json!({"items": [
+            {"id": done, "kind": "episode", "position": 900, "finished": true,
+             "duration": 0, "updated_at": "2026-11-02T09:30:00Z"},
+            {"id": begun, "kind": "book", "position": 50.5, "finished": false,
+             "duration": 300, "updated_at": "2026-11-01T08:00:00Z"}
+        ]})
+        .to_string()
+    );
+}
+
+#[sqlx::test]
+async fn listing_progress_is_empty_without_any_and_401s_without_a_session(db: PgPool) {
+    let (app, token, _) = signed_in(db).await;
+    let body = body_json(app.get("/progress", Some(&token)).await).await;
+    assert_eq!(body, json!({"items": []}));
+    let response = app.get("/progress", None).await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
 // --- GET /progress/continue -----------------------------------------------------------------
 
 #[sqlx::test]
