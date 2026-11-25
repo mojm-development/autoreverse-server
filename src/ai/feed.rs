@@ -20,6 +20,7 @@ use super::music::{
 };
 use super::musicbrainz::{self, MissingAlbum};
 use crate::library::queries;
+use crate::library::radio::Chance;
 use crate::serialize::{BookSummary, NewEpisodeOut};
 use crate::state::AppState;
 
@@ -29,6 +30,30 @@ const MIN_RETRY: Duration = Duration::from_secs(3600);
 const MAX_SUGGESTIONS: usize = 12;
 const MAX_MIXES: usize = 4;
 const MAX_MIX_ALBUMS: usize = 20;
+/// How many earlier mix names the model is told to stay away from: three runs' worth, so a theme
+/// comes back after a few days at the earliest.
+const MAX_RECENT_MIX_NAMES: usize = 12;
+/// One mix of every run leaves the familiar ground. Without it each mix is "fits the taste",
+/// and the taste list is the same every day — so were the mixes.
+const DISCOVERY_ANGLE: &str = "Neuland: überwiegend Alben, die oben nicht als gehört stehen, \
+    gern aus Genres, Ländern oder Jahrzehnten, die dort kaum vorkommen — aber mit einer \
+    erkennbaren Brücke zum Gehörten";
+/// The lenses the other mixes are drawn from, a different handful per run. Mood or occasion
+/// alone ("Entspannt", "Unterwegs") was all the model ever came up with.
+const MIX_ANGLES: &[&str] = &[
+    "ein Jahrzehnt oder eine Ära, quer durch die Genres",
+    "eine Region, ein Land oder eine Stadt und ihr Klang",
+    "ein Instrument oder eine Klangfarbe im Mittelpunkt",
+    "ein Tempo oder eine Energie, die sich durch den ganzen Mix zieht",
+    "eine Tageszeit oder Jahreszeit",
+    "ein Kontrast: zwei Genres, die man selten nebeneinander hört",
+    "Wurzeln: die Vorläufer und Einflüsse dessen, was oben gern gehört wird",
+    "die stilleren, wenig gehörten Alben der Lieblingsinterpreten und ihres Umfelds",
+    "eine Erzählung mit Anfang und Ende, die sich über den Mix hinweg entwickelt",
+    "ein Genre, das oben nur am Rand vorkommt, in seiner besten Form",
+    "Stimmen: Sängerinnen und Sänger mit unverwechselbarem Ausdruck",
+    "instrumental, ganz ohne Gesang",
+];
 const RAIL_LENGTH: i64 = 14;
 const MAX_WANTED: usize = 16;
 const CANDIDATES_PER_ARTIST: usize = 25;
@@ -69,6 +94,8 @@ struct Stored {
     wanted: Vec<WantedAlbum>,
     suggestions: Vec<Suggestion>,
     mixes: Vec<Mix>,
+    /// Names of the mixes of earlier runs, newest first, so the next run picks other themes.
+    recent_mix_names: Vec<String>,
     artists: Vec<DiscoveredArtist>,
     truncated: bool,
 }
@@ -161,17 +188,25 @@ async fn run(state: &AppState, config: &AiConfig, user_id: i32) -> Result<(), Ai
     if taste.is_empty() {
         return store(state, user_id, &Stored::default()).await;
     }
+    let previous = previous_feed(&state.db, user_id).await?;
+    let recent = remembered_mix_names(&[], &previous);
+    let angles = mix_angles(&mut Chance::from_os());
     let answer = config
-        .generate(&state.http, SYSTEM, &prompt(&albums, &taste), &schema())
+        .generate(
+            &state.http,
+            SYSTEM,
+            &prompt(&albums, &taste, &angles, &recent),
+            &schema(),
+        )
         .await?;
     let suggestions = checked_suggestions(&answer, &albums, &heard);
     let mixes = build_mixes(&state.db, &answer, &albums).await?;
-    let previous = previous_feed(&state.db, user_id).await?;
-    let mixes = if mixes.is_empty() {
+    let (mixes, recent_mix_names) = if mixes.is_empty() {
         tracing::warn!("[ai] keine brauchbaren Mixes in der Antwort, die bisherigen bleiben");
-        previous.mixes
+        (previous.mixes, previous.recent_mix_names)
     } else {
-        mixes
+        let recent = remembered_mix_names(&mixes, &previous);
+        (mixes, recent)
     };
     // These are separate requests; one failing must not throw away what already succeeded.
     let artists = match music::discover(config, &state.http, &state.db, user_id).await {
@@ -192,6 +227,7 @@ async fn run(state: &AppState, config: &AiConfig, user_id: i32) -> Result<(), Ai
         wanted,
         suggestions,
         mixes,
+        recent_mix_names,
         artists,
         truncated,
     };
@@ -285,13 +321,60 @@ fn pick_wanted(answer: &Value, candidates: &[MissingAlbum]) -> Vec<WantedAlbum> 
         .collect()
 }
 
-fn prompt(albums: &[CatalogAlbum], taste: &str) -> String {
+/// The discovery lens and `MAX_MIXES - 1` others, drawn without repeats; the order is the order
+/// of the mixes in the answer.
+fn mix_angles(chance: &mut Chance) -> Vec<&'static str> {
+    let mut pool: Vec<&str> = MIX_ANGLES.to_vec();
+    let mut angles = vec![DISCOVERY_ANGLE];
+    while angles.len() < MAX_MIXES && !pool.is_empty() {
+        let index = ((chance.draw() * pool.len() as f64) as usize).min(pool.len() - 1);
+        angles.push(pool.swap_remove(index));
+    }
+    angles
+}
+
+/// The names to avoid next time: the new mixes first, then the stored ones and what was avoided
+/// before, each once (by case), at most `MAX_RECENT_MIX_NAMES`. The stored mixes count too, so a
+/// payload from before this list already steers the first run.
+fn remembered_mix_names(new: &[Mix], previous: &Stored) -> Vec<String> {
+    let mut seen = HashSet::new();
+    new.iter()
+        .chain(&previous.mixes)
+        .map(|m| &m.name)
+        .chain(&previous.recent_mix_names)
+        .map(|name| name.trim())
+        .filter(|name| !name.is_empty() && seen.insert(name.to_lowercase()))
+        .take(MAX_RECENT_MIX_NAMES)
+        .map(str::to_owned)
+        .collect()
+}
+
+fn prompt(albums: &[CatalogAlbum], taste: &str, angles: &[&str], recent: &[String]) -> String {
+    let angles = angles
+        .iter()
+        .enumerate()
+        .map(|(i, angle)| format!("   Mix {}: {angle}", i + 1))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let avoid = if recent.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n   Diese Mixe gab es zuletzt schon; wiederhole keines dieser Themen, auch nicht \
+             unter anderem Namen: {}.",
+            recent.join(", ")
+        )
+    };
     format!(
         "Bisher gern gehört:\n{taste}\n\nAlben der Sammlung (id|Interpret|Titel|Jahr|Genre):\n{}\n\n\
          1. albums: Wähle bis zu {MAX_SUGGESTIONS} Alben, die zu diesem Geschmack passen und oben \
          noch nicht als gehört stehen. Begründe jedes in einem kurzen, konkreten Satz.\n\
-         2. mixes: Erfinde {MAX_MIXES} unterschiedliche Mixes nach Stimmung oder Anlass, die zu diesem \
-         Geschmack passen, jeweils mit kurzem Namen, einem Satz Beschreibung und möglichst {MAX_MIX_ALBUMS} passenden Album-ids.",
+         2. mixes: Erfinde {MAX_MIXES} Mixes, in dieser Reihenfolge je einen zu diesen Blickwinkeln:\n\
+         {angles}\n   Der Geschmack oben ist der Ausgangspunkt, nicht die Grenze: Jeder Mix darf und \
+         soll Alben enthalten, die noch nicht gehört wurden. Die Mixe sollen sich deutlich \
+         voneinander unterscheiden und möglichst wenige Alben teilen.{avoid}\n   Jeder Mix bekommt \
+         einen kurzen, eigenen Namen, einen Satz Beschreibung und möglichst {MAX_MIX_ALBUMS} \
+         passende Album-ids.",
         music::catalog_lines(albums)
     )
 }
@@ -538,4 +621,68 @@ pub async fn load(state: &AppState, user_id: i32) -> Result<FeedOut, sqlx::Error
         continue_series: continue_series.iter().map(BookSummary::from).collect(),
         rediscover_books: rediscover_books.iter().map(BookSummary::from).collect(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mix(name: &str) -> Mix {
+        Mix {
+            name: name.into(),
+            description: String::new(),
+            cover_ids: Vec::new(),
+            tracks: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn every_run_has_a_discovery_mix_and_distinct_angles() {
+        for seed in 1..50 {
+            let angles = mix_angles(&mut Chance::seeded(seed));
+            assert_eq!(angles.len(), MAX_MIXES);
+            assert_eq!(angles[0], DISCOVERY_ANGLE);
+            let distinct: HashSet<_> = angles.iter().collect();
+            assert_eq!(distinct.len(), MAX_MIXES);
+        }
+    }
+
+    #[test]
+    fn the_angles_change_from_run_to_run() {
+        let runs: HashSet<Vec<&str>> = (1..20)
+            .map(|seed| mix_angles(&mut Chance::seeded(seed * 7919)))
+            .collect();
+        assert!(runs.len() > 10);
+    }
+
+    #[test]
+    fn recent_names_put_the_new_first_and_keep_each_once() {
+        let previous = Stored {
+            mixes: vec![mix("Nachtfahrt"), mix("Sonntag")],
+            recent_mix_names: vec!["sonntag".into(), "Regen".into(), " ".into()],
+            ..Stored::default()
+        };
+        let names = remembered_mix_names(&[mix("Neuland"), mix("Nachtfahrt")], &previous);
+        assert_eq!(names, ["Neuland", "Nachtfahrt", "Sonntag", "Regen"]);
+    }
+
+    #[test]
+    fn recent_names_are_bounded() {
+        let previous = Stored {
+            recent_mix_names: (0..30).map(|i| format!("Alt {i}")).collect(),
+            ..Stored::default()
+        };
+        let names = remembered_mix_names(&[mix("Neu")], &previous);
+        assert_eq!(names.len(), MAX_RECENT_MIX_NAMES);
+        assert_eq!(names[0], "Neu");
+    }
+
+    #[test]
+    fn the_prompt_names_the_angles_and_what_to_avoid() {
+        let text = prompt(&[], "A – B", &["eins", "zwei"], &["Nachtfahrt".into()]);
+        assert!(text.contains("Mix 1: eins"));
+        assert!(text.contains("Mix 2: zwei"));
+        assert!(text.contains("Nachtfahrt"));
+        assert!(!prompt(&[], "A – B", &["eins"], &[]).contains("zuletzt"));
+    }
 }

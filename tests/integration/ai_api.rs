@@ -6,6 +6,7 @@ use axum::http::StatusCode;
 use axum::routing::post;
 use serde_json::{Value, json};
 use sqlx::PgPool;
+use std::sync::{Arc, Mutex};
 
 use crate::common::{Seed, TestApp, body_json, body_text, seed};
 
@@ -29,6 +30,30 @@ async fn fake_model(payload: Value) -> String {
     let address = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, router).await });
     format!("http://{address}")
+}
+
+/// Like [`fake_model`], and keeps the prompt of every request.
+async fn recording_model(payload: Value) -> (String, Arc<Mutex<Vec<String>>>) {
+    let answer = json!({"stop_reason": "end_turn",
+        "content": [{"type": "text", "text": payload.to_string()}]});
+    let prompts = Arc::new(Mutex::new(Vec::new()));
+    let seen = prompts.clone();
+    let router = Router::new().route(
+        "/v1/messages",
+        post(move |axum::Json(request): axum::Json<Value>| {
+            let answer = answer.clone();
+            let seen = seen.clone();
+            async move {
+                let prompt = request["messages"][0]["content"].as_str().unwrap_or("");
+                seen.lock().unwrap().push(prompt.to_owned());
+                axum::Json(answer)
+            }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, router).await });
+    (format!("http://{address}"), prompts)
 }
 
 fn with_model(db: PgPool, url: String) -> TestApp {
@@ -427,6 +452,43 @@ async fn mixes_run_for_two_hours(db: PgPool) {
     app.get("/ai/feed", Some(&token)).await;
     let body = settled_feed(&app, &token).await;
     assert!(running_time(&body["mixes"][0]["tracks"]) >= 7200.0);
+}
+
+#[sqlx::test]
+async fn the_next_run_is_told_which_mixes_there_were(db: PgPool) {
+    let probe = TestApp::new(db.clone());
+    let album = seed(probe.db(), Seed::new("album", "Autobahn")).await;
+    track(&probe, album, "Kometenmelodie").await;
+    let heard = seed(probe.db(), Seed::new("album", "Gehört")).await;
+    let (url, prompts) = recording_model(json!({
+        "albums": [],
+        "mixes": [{"name": "Nachtfahrt", "description": "", "ids": [album]}],
+        "artists": [],
+    }))
+    .await;
+    let app = with_model(db, url);
+    let token = signed_in(&app).await;
+    listen(&app, heard, 3600.0).await;
+    app.get("/ai/feed", Some(&token)).await;
+    settled_feed(&app, &token).await;
+    let response = app
+        .post_json("/ai/feed/refresh", json!({}), Some(&token))
+        .await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    // The run is marked before the answer goes out, so this waits for it.
+    settled_feed(&app, &token).await;
+    let mix_prompts: Vec<String> = prompts
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|p| p.contains("2. mixes"))
+        .cloned()
+        .collect();
+    assert_eq!(mix_prompts.len(), 2);
+    assert!(mix_prompts[0].contains("Neuland"));
+    assert!(!mix_prompts[0].contains("zuletzt"));
+    assert!(mix_prompts[1].contains("zuletzt"));
+    assert!(mix_prompts[1].contains("Nachtfahrt"));
 }
 
 // --- Spoken word in the feed ----------------------------------------------------------------
