@@ -4,8 +4,10 @@
 //! listening say. Albums are scored against the seed (genre, year, artist) and against the
 //! user's taste, with the same measure the suggestions use (`ai::music`: listening below
 //! `MIN_SECONDS_FOR_TASTE` says nothing, a favourite counts like `FAVORITE_SECONDS` heard), plus
-//! a share of chance, so two calls differ. The best albums each give a track, round after round
-//! — close ones first, so a radio starts near its seed and opens up from there.
+//! a share of chance, so two calls differ. Genre and artist decide what fits at all; year, taste
+//! and chance only order it, so a much-heard album of another genre comes last. The best albums
+//! each give a track, round after round — close ones first, so a radio starts near its seed and
+//! opens up from there.
 //!
 //! Scoring is per album because everything known is known per album: genre and year sit on the
 //! item, and `listen_events` books time to items. Two queries whatever the library's size: every
@@ -31,6 +33,38 @@ const ARTIST_WEIGHT: f64 = 2.0;
 const YEAR_WEIGHT: f64 = 1.5;
 const TASTE_WEIGHT: f64 = 1.0;
 const CHANCE_WEIGHT: f64 = 2.0;
+/// What year and taste still count for an album that shares no genre with a seed that has one.
+/// Without this, an album heard a lot from the same years outranked one of the seed's own
+/// genre: Pop from the charts in a Deutschrock radio.
+const UNRELATED_SHARE: f64 = 0.2;
+/// Families of genres, by a part of the name: "Deutschrock" and "Hard Rock" are both rock,
+/// "Gangsta Rap" and "Hip-Hop" both hip-hop. Sharing a family counts like sharing a word.
+const GENRE_FAMILIES: &[&[&str]] = &[
+    &[
+        "rock", "punk", "metal", "grunge", "hardcore", "oi!", "emo", "ska",
+    ],
+    &["pop", "dance", "disco", "synth"],
+    &["schlager", "volksmusik", "volkstümlich"],
+    &["hip-hop", "hip hop", "hiphop", "rap", "trap", "grime"],
+    &[
+        "electro", "techno", "house", "trance", "edm", "dubstep", "drum", "bass", "ambient",
+    ],
+    &["jazz", "swing", "bebop", "fusion"],
+    &["blues", "soul", "r&b", "rnb", "funk", "gospel"],
+    &["folk", "country", "americana", "bluegrass", "singer"],
+    &[
+        "klassik",
+        "classical",
+        "orchest",
+        "symphon",
+        "opera",
+        "oper",
+        "baroque",
+        "barock",
+    ],
+    &["reggae", "dub", "dancehall"],
+    &["latin", "reggaeton", "salsa", "bachata", "cumbia"],
+];
 /// A favourite track is a little more likely to be the one its album gives.
 const LIKED_TRACK_BONUS: f64 = 0.6;
 /// Albums this close in years count as the same time; from `YEAR_FAR` on, as unrelated.
@@ -180,11 +214,23 @@ fn genre_similarity(seed: &[String], other: &[String]) -> f64 {
             .map(str::to_owned)
             .collect()
     };
-    if words(seed).is_disjoint(&words(other)) {
+    let families = |names: &[String]| -> HashSet<usize> {
+        names.iter().flat_map(|name| genre_families(name)).collect()
+    };
+    if words(seed).is_disjoint(&words(other)) && families(seed).is_disjoint(&families(other)) {
         0.0
     } else {
         0.5
     }
+}
+
+/// The families a genre name belongs to ("Pop Rock" to two).
+fn genre_families(name: &str) -> impl Iterator<Item = usize> + '_ {
+    GENRE_FAMILIES
+        .iter()
+        .enumerate()
+        .filter(move |(_, parts)| parts.iter().any(|part| name.contains(part)))
+        .map(|(index, _)| index)
 }
 
 /// 1 within `YEAR_NEAR` years, falling to 0 at `YEAR_FAR`; 0 where either year is unknown.
@@ -205,15 +251,39 @@ fn taste(album: &Album) -> f64 {
     (seconds / FULL_TASTE_SECONDS).min(1.0)
 }
 
-fn affinity(anchor: &Anchor, album: &Album) -> f64 {
-    GENRE_WEIGHT * genre_similarity(&anchor.genres, &genre_names(album.genre.as_deref()))
-        + YEAR_WEIGHT * year_closeness(anchor.year, album.year)
+/// Genre and artist say what fits; year, taste and chance (`draw`, in `[0, 1)`) only order what
+/// fits. Where the seed has a genre and the album shares nothing of it, those count for little,
+/// so such an album fills the list's end rather than its start. A seed without any genre leaves
+/// them in full.
+fn affinity(anchor: &Anchor, album: &Album, draw: f64) -> f64 {
+    let genre = genre_similarity(&anchor.genres, &genre_names(album.genre.as_deref()));
+    let related = anchor.genres.is_empty() || genre > 0.0 || album.by_seed_artist;
+    let secondary = YEAR_WEIGHT * year_closeness(anchor.year, album.year)
+        + TASTE_WEIGHT * taste(album)
+        + CHANCE_WEIGHT * draw;
+    GENRE_WEIGHT * genre
         + if album.by_seed_artist {
             ARTIST_WEIGHT
         } else {
             0.0
         }
-        + TASTE_WEIGHT * taste(album)
+        + if related {
+            secondary
+        } else {
+            UNRELATED_SHARE * secondary
+        }
+}
+
+/// Every genre the seed artist's albums carry, for a seed without a genre of its own.
+fn artist_genres(albums: &[Album]) -> Vec<String> {
+    let mut genres: Vec<String> = albums
+        .iter()
+        .filter(|a| a.by_seed_artist)
+        .flat_map(|a| genre_names(a.genre.as_deref()))
+        .collect();
+    genres.sort();
+    genres.dedup();
+    genres
 }
 
 /// The albums to take tracks from, closest first: those that fit an artist's share, enough for a
@@ -222,12 +292,7 @@ fn affinity(anchor: &Anchor, album: &Album) -> f64 {
 fn pick_albums(anchor: &Anchor, albums: Vec<Album>, limit: usize, chance: &mut Chance) -> Vec<i32> {
     let mut scored: Vec<(f64, Album)> = albums
         .into_iter()
-        .map(|album| {
-            (
-                affinity(anchor, &album) + CHANCE_WEIGHT * chance.draw(),
-                album,
-            )
-        })
+        .map(|album| (affinity(anchor, &album, chance.draw()), album))
         .collect();
     scored.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.id.cmp(&b.1.id)));
     let wanted = limit + 20;
@@ -442,20 +507,22 @@ pub async fn radio(
     };
     let mut albums = present_albums(db, user_id, seed_artist.as_deref()).await?;
     let (genres, year) = match described {
-        Some((genre, year)) => (genre_names(genre.as_deref()), year),
+        // An album without a genre tag is what its artist's other albums are; without this the
+        // genre counted nothing and year and taste alone chose.
+        Some((genre, year)) => match genre_names(genre.as_deref()) {
+            genres if genres.is_empty() => (artist_genres(&albums), year),
+            genres => (genres, year),
+        },
         // An artist is what their albums are: every genre those carry, and their middle year.
         None => {
             let own: Vec<&Album> = albums.iter().filter(|a| a.by_seed_artist).collect();
             if own.is_empty() {
                 return Err(RadioError::UnknownArtist);
             }
-            let mut genres: Vec<String> = own
-                .iter()
-                .flat_map(|a| genre_names(a.genre.as_deref()))
-                .collect();
-            genres.sort();
-            genres.dedup();
-            (genres, median_year(own.iter().filter_map(|a| a.year)))
+            (
+                artist_genres(&albums),
+                median_year(own.iter().filter_map(|a| a.year)),
+            )
         }
     };
     let (seed_artist_share, artist_share) = shares(limit, matches!(seed, RadioSeed::Artist(_)));
@@ -519,6 +586,28 @@ mod tests {
     }
 
     #[test]
+    fn genres_of_one_family_are_related() {
+        assert_eq!(
+            genre_similarity(&names("Deutschrock"), &names("Hard Rock")),
+            0.5
+        );
+        assert_eq!(genre_similarity(&names("Deutschrock"), &names("Punk")), 0.5);
+        assert_eq!(
+            genre_similarity(&names("Gangsta Rap"), &names("Hip-Hop")),
+            0.5
+        );
+        assert_eq!(genre_similarity(&names("Deutschrock"), &names("Pop")), 0.0);
+        assert_eq!(
+            genre_similarity(&names("Deutschrock"), &names("Latin")),
+            0.0
+        );
+        assert_eq!(
+            genre_similarity(&names("Deutschrock"), &names("Schlager")),
+            0.0
+        );
+    }
+
+    #[test]
     fn years_count_when_close() {
         assert_eq!(year_closeness(Some(1980), Some(1982)), 1.0);
         assert_eq!(year_closeness(Some(1980), Some(1989)), 0.5);
@@ -575,6 +664,47 @@ mod tests {
             near.sort_unstable();
             assert_eq!(near, [2, 4], "seed {seed}");
         }
+    }
+
+    #[test]
+    fn a_much_heard_album_of_another_genre_stays_behind_the_seeds_genre() {
+        let mut chart = album(1, "pitbull", "Latin Pop", 1990);
+        chart.liked = true;
+        chart.heard = 36_000.0;
+        let albums = vec![
+            chart,
+            album(2, "b", "Punk", 1975),
+            album(3, "c", "Hard Rock", 2020),
+        ];
+        for seed in 1..50 {
+            let order = pick_albums(&anchor(10), albums.clone(), 10, &mut Chance::seeded(seed));
+            assert_eq!(order[2], 1, "seed {seed}");
+        }
+    }
+
+    #[test]
+    fn without_a_genre_on_the_seed_year_and_taste_decide() {
+        let mut heard = album(1, "a", "Pop", 1990);
+        heard.heard = 36_000.0;
+        let far = album(2, "b", "Rock", 1950);
+        let anchor = Anchor {
+            genres: Vec::new(),
+            ..anchor(10)
+        };
+        assert!(affinity(&anchor, &heard, 0.0) > affinity(&anchor, &far, 0.0));
+    }
+
+    #[test]
+    fn a_seed_without_genre_takes_its_artists_genres() {
+        let mut own = album(1, "seed", "Deutschrock; Punk", 1992);
+        own.by_seed_artist = true;
+        let mut also_own = album(2, "seed", "Rock", 2004);
+        also_own.by_seed_artist = true;
+        let other = album(3, "x", "Pop", 2004);
+        assert_eq!(
+            artist_genres(&[own, also_own, other]),
+            ["deutschrock", "punk", "rock"]
+        );
     }
 
     #[test]
