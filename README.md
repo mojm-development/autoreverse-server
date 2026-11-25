@@ -351,6 +351,12 @@ each entry, so a client can draw a progress bar without fetching the whole item.
 starts without `POST /play/{itemId}` and asks here first, so it resumes where another device
 stopped. Unlike `/play`, a finished item keeps its position.
 
+`GET /progress` lists everything the account has a position in, finished items included, most
+recently saved first: `{items: [{id, kind, position, finished, duration, updated_at}]}`
+(`duration` is the summed track durations, 0 without tracks). Unlike `/progress/continue` it
+leaves nothing out, so an app that keeps its own copy of the progress learns what was heard or
+finished on another device. A server from before answers 404.
+
 `/items` takes `?sort=title|added|series|played` (default `title`); `played` orders by the asking
 user's own progress. An unknown value is a 422 rather than a silent fallback.
 
@@ -395,6 +401,7 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `POST`                 | `/play/{itemId}`                                  | Open a playback session                                                |
 | `POST`                 | `/sessions/{sessionId}/close`                     | Close a playback session: `{position?, listened?, tracks?}`, see [Listening time](#listening-time) |
 | `GET` `PUT/POST`       | `/progress/{itemId}`, `/progress/continue`        | Playback progress and continue-listening                               |
+| `GET`                  | `/progress`                                       | All of the account's progress, finished items included                 |
 | `GET` `POST` `DELETE`  | `/bookmarks`, `/bookmarks/{id}`                   | Bookmarks                                                              |
 | `GET`                  | `/favorites`                                      | Favorites                                                              |
 | `POST` `DELETE`        | `/favorites/items/{id}`, `/favorites/tracks/{id}` | Toggle favorites                                                       |

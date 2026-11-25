@@ -396,6 +396,37 @@ pub async fn continue_listening(
     .await
 }
 
+/// A user's saved progress in one item, with the time it was saved.
+#[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
+pub struct ProgressRow {
+    pub id: i32,
+    pub kind: String,
+    pub position: f64,
+    pub finished: bool,
+    /// Sum of the track durations; 0 without tracks, never null.
+    pub duration: f64,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Every progress row of the user, finished ones and those of missing items included, most
+/// recently saved first. One statement however many items.
+pub async fn all_progress(db: &PgPool, user_id: i32) -> Result<Vec<ProgressRow>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT item.id, item.kind, progress.position, progress.finished,
+                coalesce(total.duration, 0)::double precision AS duration, progress.updated_at
+         FROM progress
+         JOIN items AS item ON item.id = progress.item_id
+         LEFT JOIN LATERAL (
+             SELECT sum(tracks.duration) AS duration FROM tracks WHERE tracks.item_id = item.id
+         ) AS total ON true
+         WHERE progress.user_id = $1
+         ORDER BY progress.updated_at DESC, item.id",
+    )
+    .bind(user_id)
+    .fetch_all(db)
+    .await
+}
+
 /// One stretch of listening to one item, as `GET /me/history` lists it.
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct HistoryRun {

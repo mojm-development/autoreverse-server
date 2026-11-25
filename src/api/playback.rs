@@ -1,10 +1,10 @@
-//! Playback: `POST /play/{itemId}`, `GET|PUT|POST /progress/{itemId}`, `GET /progress/continue`,
-//! `POST /sessions/{sessionId}/close`, `GET /me/stats`, `GET /me/history`, `POST /me/listens`,
+//! Playback: `POST /play/{itemId}`, `GET|PUT|POST /progress/{itemId}`, `GET /progress`,
+//! `GET /progress/continue`, `POST /sessions/{sessionId}/close`, `GET /me/stats`, `GET /me/history`, `POST /me/listens`,
 //! `GET|PUT /me/playback`.
 //!
 //! The iOS app lives on these routes; shapes, defaults and `detail` texts follow legacy exactly.
 //! `listened` on closing a session, closing without a `position`, `/me/listens` and `/me/history`
-//! are newer than legacy and purely additive, as is reading a single item's progress.
+//! are newer than legacy and purely additive, as is reading progress (one item's or all of it).
 
 use std::collections::HashMap;
 
@@ -22,12 +22,13 @@ use crate::auth::preferences::{
 };
 use crate::error::{ApiError, ApiResult};
 use crate::library::playback::{
-    ListenOutcome, ListenReport, ListeningStats, TrackShare, book_listen, close_session,
-    continue_listening, listening_history, listening_stats, open_session, save_position,
+    ListenOutcome, ListenReport, ListeningStats, ProgressRow, TrackShare, all_progress,
+    book_listen, close_session, continue_listening, listening_history, listening_stats,
+    open_session, save_position,
 };
 use crate::library::queries::{self, Item};
 use crate::serialize::{
-    ChapterOut, HistoryEntry, ItemSummary, TrackOut, iso_opt, js_number, js_number_opt,
+    ChapterOut, HistoryEntry, ItemSummary, TrackOut, iso, iso_opt, js_number, js_number_opt,
 };
 use crate::state::AppState;
 
@@ -39,6 +40,7 @@ pub fn router() -> Router<AppState> {
             "/progress/{item_id}",
             get(get_progress).post(put_progress).put(put_progress),
         )
+        .route("/progress", get(list_progress))
         .route("/progress/continue", get(continue_list))
         .route("/sessions/{session_id}/close", post(close))
         .route("/me/stats", get(stats))
@@ -150,6 +152,53 @@ async fn get_progress(
         position: saved.map_or(0.0, |p| p.position),
         finished: saved.is_some_and(|p| p.finished),
         updated_at: saved.map(|p| p.updated_at),
+    }))
+}
+
+/// One entry of `GET /progress`.
+#[derive(Serialize)]
+struct ProgressEntry {
+    id: i32,
+    kind: String,
+    #[serde(serialize_with = "js_number")]
+    position: f64,
+    finished: bool,
+    #[serde(serialize_with = "js_number")]
+    duration: f64,
+    #[serde(serialize_with = "iso")]
+    updated_at: DateTime<Utc>,
+}
+
+impl From<ProgressRow> for ProgressEntry {
+    fn from(row: ProgressRow) -> Self {
+        ProgressEntry {
+            id: row.id,
+            kind: row.kind,
+            position: row.position,
+            finished: row.finished,
+            duration: row.duration,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct ProgressListOut {
+    items: Vec<ProgressEntry>,
+}
+
+/// Everything the account has a position in, finished items included, most recently saved first.
+///
+/// Unlike `/progress/continue` it leaves nothing out: an app that keeps its own copy of the
+/// progress (to play downloads offline) learns here what was heard or finished on other devices,
+/// for its lists as much as for the next start.
+async fn list_progress(
+    State(state): State<AppState>,
+    user: ApiUser,
+) -> ApiResult<Json<ProgressListOut>> {
+    let rows = all_progress(&state.db, user.id).await?;
+    Ok(Json(ProgressListOut {
+        items: rows.into_iter().map(ProgressEntry::from).collect(),
     }))
 }
 
