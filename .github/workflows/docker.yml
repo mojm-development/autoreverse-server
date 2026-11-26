@@ -42,6 +42,11 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          # Stamped into the binary, so the settings can say which build is running. A run whose
+          # event has no head commit leaves the date empty; the label then names the commit only.
+          build-args: |
+            AUTOREVERSE_COMMIT=${{ github.sha }}
+            AUTOREVERSE_COMMIT_DATE=${{ github.event.head_commit.timestamp }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # mode=max also keeps the dependency layer of the build stage, so a push that only
