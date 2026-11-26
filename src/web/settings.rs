@@ -411,7 +411,7 @@ async fn server_action(
 struct AboutPage {
     shell: Shell,
     sections: Vec<&'static Section>,
-    version: &'static str,
+    version: String,
     counts: LibraryCounts,
     /// Admins only, like `user_count` in `GET /server/info`.
     user_count: Option<i64>,
@@ -433,7 +433,7 @@ async fn about(State(state): State<AppState>, user: WebUser, uri: Uri) -> WebRes
     let page = AboutPage {
         shell,
         sections,
-        version: crate::VERSION,
+        version: crate::build_info::label(),
         counts,
         user_count,
         data_dir,

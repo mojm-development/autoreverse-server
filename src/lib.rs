@@ -6,6 +6,7 @@ pub mod ai;
 pub mod api;
 pub mod app;
 pub mod auth;
+pub mod build_info;
 pub mod cli;
 pub mod config;
 pub mod db;

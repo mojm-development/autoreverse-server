@@ -423,7 +423,7 @@ user's own progress. An unknown value is a 422 rather than a silent fallback.
 | `PATCH` `DELETE`       | `/users/{id}`                                     | Update / delete a user (admin)                                         |
 | `GET` `DELETE`         | `/me/devices`, `/me/devices/events`, `/me/devices/{device_id}` | The account's online devices, a device's event stream, signing off — see [Remote control](#remote-control) |
 | `PUT` `POST`           | `/me/devices/{device_id}/state`, `…/commands`, `…/transfer` | Report what plays, steer another device, hand playback over |
-| `GET`                  | `/server/info`                                    | Library counts; user count for admins; `radio`, `radio_directory`, `devices`; `web_url`, see [Sharing a link](#sharing-a-link) |
+| `GET`                  | `/server/info`                                    | Library counts; user count for admins; `radio`, `radio_directory`, `devices`; `web_url`, see [Sharing a link](#sharing-a-link); `version`, `commit` and `commit_date` of the running build (both `null` for an unstamped one) |
 | `GET` `PATCH`          | `/server/settings`                                | Admins: the server's settings, see [Server settings](#server-settings) |
 | `GET`                  | `/ai/status`                                      | Whether a language model is set up                                     |
 | `GET` `POST`           | `/ai/feed`, `/ai/feed/refresh`                    | The "Entdecken" feed, see [Discover feed](#discover-feed); generate its model-made parts anew |

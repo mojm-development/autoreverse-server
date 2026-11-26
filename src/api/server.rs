@@ -7,6 +7,7 @@ use serde_json::{Map, Value};
 
 use crate::api::validate::ApiJson;
 use crate::auth::{ApiAdmin, ApiUser};
+use crate::build_info;
 use crate::error::ApiResult;
 use crate::library::queries::{LibraryCounts, library_counts};
 use crate::settings;
@@ -39,6 +40,10 @@ async fn patch_settings(
 struct InfoOut {
     #[serde(flatten)]
     counts: LibraryCounts,
+    /// Which build answers (new in Rust), for the clients' settings; see `build_info`.
+    version: &'static str,
+    commit: Option<&'static str>,
+    commit_date: Option<&'static str>,
     /// Only admins learn how many accounts exist; `null` for everyone else.
     user_count: Option<i64>,
     /// What this server offers beyond the library, for clients to show or hide: internet radio
@@ -65,6 +70,9 @@ async fn info(State(state): State<AppState>, user: ApiUser) -> ApiResult<Json<In
     let settings = state.settings.get();
     Ok(Json(InfoOut {
         counts,
+        version: crate::VERSION,
+        commit: build_info::commit(),
+        commit_date: build_info::commit_date(),
         user_count,
         radio: settings.radio,
         radio_directory: settings.radio_directory_on(),
