@@ -15,6 +15,9 @@ SHELL := /bin/bash
 COMPOSE := docker compose
 DB_SERVICE := postgres
 DB_USER := autoreverse
+# Der gebaute Stand, für die Versionsanzeige in den Einstellungen.
+STAMP_COMMIT = $(shell git rev-parse HEAD 2>/dev/null)
+STAMP_DATE = $(shell git log -1 --format=%cI 2>/dev/null)
 
 .PHONY: help setup dev run stop doctor \
         db db-stop db-reset db-shell db-logs password \
@@ -106,10 +109,12 @@ build: ## Release-Build nach target/release/autoreverse-server
 	@cargo build --release
 
 image: ## Baut das Docker-Image autoreverse-server:dev
-	@docker build -t autoreverse-server:dev .
+	@docker build -t autoreverse-server:dev \
+		--build-arg AUTOREVERSE_COMMIT=$(STAMP_COMMIT) \
+		--build-arg AUTOREVERSE_COMMIT_DATE=$(STAMP_DATE) .
 
 stack: .env ## Der komplette Docker-Stack inklusive App auf http://localhost:8180
-	@$(COMPOSE) up --build
+	@AUTOREVERSE_COMMIT=$(STAMP_COMMIT) AUTOREVERSE_COMMIT_DATE=$(STAMP_DATE) $(COMPOSE) up --build
 
 stack-stop: ## Hält den kompletten Stack an
 	@$(COMPOSE) down

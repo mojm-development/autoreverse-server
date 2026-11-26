@@ -366,7 +366,7 @@ async fn the_about_page_shows_version_and_server_info(db: PgPool) {
     assert!(html.contains("<h1>Über Autoreverse</h1>"));
     assert!(html.contains(&format!(
         r#"<p class="version mono">autoreverse {}</p>"#,
-        env!("CARGO_PKG_VERSION")
+        autoreverse_server::build_info::label()
     )));
     assert!(html.contains(r#"<dt>Hörbücher</dt><dd class="mono">1</dd>"#));
     assert!(!html.contains("<dt>Nutzer</dt>"));

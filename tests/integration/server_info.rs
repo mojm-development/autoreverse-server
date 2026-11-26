@@ -1,5 +1,6 @@
 //! `GET /server/info` (legacy tests/integration/server-info.test.ts).
 
+use autoreverse_server::build_info;
 use axum::http::StatusCode;
 use serde_json::json;
 use sqlx::PgPool;
@@ -15,7 +16,9 @@ async fn includes_user_count_for_an_admin(db: PgPool) {
     assert_eq!(
         body,
         json!({ "book_count": 0, "album_count": 0, "podcast_count": 0, "track_count": 0, "user_count": 1,
-                "radio": true, "radio_directory": true, "devices": true, "web_url": null })
+                "radio": true, "radio_directory": true, "devices": true, "web_url": null,
+                "version": env!("CARGO_PKG_VERSION"), "commit": build_info::commit(),
+                "commit_date": build_info::commit_date() })
     );
 }
 

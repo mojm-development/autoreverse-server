@@ -39,9 +39,15 @@ RUN mkdir src && echo 'fn main() {}' > src/main.rs && touch src/lib.rs \
 COPY src src
 COPY templates templates
 COPY migrations migrations
+# The commit the image is built from, shown in the settings of the web UI and the clients. Empty
+# is fine: then only the version is named. Declared this late so a new commit keeps the
+# dependency layer above.
+ARG AUTOREVERSE_COMMIT=
+ARG AUTOREVERSE_COMMIT_DATE=
 # Templates (askama) and migrations (sqlx::migrate!) are compiled into the binary.
 RUN touch src/main.rs src/lib.rs \
-	&& cargo build --release --locked --target "$(cat /triple)" \
+	&& AUTOREVERSE_COMMIT="$AUTOREVERSE_COMMIT" AUTOREVERSE_COMMIT_DATE="$AUTOREVERSE_COMMIT_DATE" \
+		cargo build --release --locked --target "$(cat /triple)" \
 	&& cp "target/$(cat /triple)/release/autoreverse-server" /autoreverse-server
 
 # --- Runtime ----------------------------------------------------------------

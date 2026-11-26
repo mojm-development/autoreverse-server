@@ -20,7 +20,13 @@ services:
 
   # `make db` / `make dev` start only `postgres`; `make stack` builds and starts the app too.
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Which commit this is, for the settings. `make stack` fills it in; by hand:
+        # AUTOREVERSE_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
+        AUTOREVERSE_COMMIT: ${AUTOREVERSE_COMMIT:-}
+        AUTOREVERSE_COMMIT_DATE: ${AUTOREVERSE_COMMIT_DATE:-}
     # The image runs as UID 1000. If the podcast folder on the host belongs to someone else,
     # set that user here, e.g. user: '1001:1001'.
     ports:

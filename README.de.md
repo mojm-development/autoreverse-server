@@ -414,7 +414,7 @@ Fortschritt des fragenden Nutzers. Ein unbekannter Wert ergibt 422 statt stiller
 | `PATCH` `DELETE`       | `/users/{id}`                                     | Benutzer ändern / löschen (Verwalter)                                       |
 | `GET` `DELETE`         | `/me/devices`, `/me/devices/events`, `/me/devices/{device_id}` | Die Online-Geräte des Kontos, der Ereignisstrom eines Geräts, Abmelden – siehe [Fernsteuerung](#fernsteuerung) |
 | `PUT` `POST`           | `/me/devices/{device_id}/state`, `…/commands`, `…/transfer` | Melden, was läuft; ein anderes Gerät steuern; die Wiedergabe übertragen |
-| `GET`                  | `/server/info`                                    | Bestandszahlen, für Verwalter auch Benutzerzahl; `radio`, `radio_directory`, `devices`; `web_url`, siehe [Als Link teilen](#als-link-teilen) |
+| `GET`                  | `/server/info`                                    | Bestandszahlen, für Verwalter auch Benutzerzahl; `radio`, `radio_directory`, `devices`; `web_url`, siehe [Als Link teilen](#als-link-teilen); `version`, `commit` und `commit_date` des laufenden Builds (die beiden `null` bei einem Build ohne Stempel) |
 | `GET` `PATCH`          | `/server/settings`                                | Verwalter: die Einstellungen des Servers, siehe [Server-Einstellungen](#server-einstellungen) |
 | `GET`                  | `/ai/status`                                      | Ob ein Sprachmodell eingerichtet ist                                        |
 | `GET` `POST`           | `/ai/feed`, `/ai/feed/refresh`                    | Der „Entdecken"-Feed, siehe [Entdecken-Feed](#entdecken-feed); seine KI-Teile neu erzeugen |
