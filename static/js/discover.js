@@ -85,8 +85,12 @@
 		return save;
 	}
 
-	function trackList(tracks) {
-		const list = el('ol', 'discover-tracks');
+	/**
+	 * The tracks as rows the player can queue. `playable` adds a button per row that starts the
+	 * list there, as on a playlist page.
+	 */
+	function trackList(tracks, playable = false) {
+		const list = el('ol', playable ? 'discover-tracks playable' : 'discover-tracks');
 		tracks.forEach((track, index) => {
 			const row = el('li');
 			// The player reads these, as it does on a playlist page.
@@ -96,7 +100,18 @@
 			row.dataset.entryKind = 'album';
 			const name = el('div', 'ellipsis');
 			name.append(el('span', '', track.title), el('span', 'artist', ` · ${track.artist ?? track.item_title}`));
-			row.append(el('span', 'number', String(index + 1)), name, el('span', 'time', clock(track.duration)));
+			row.append(el('span', 'number', String(index + 1)));
+			if (playable) {
+				const play = el('button', 'icon-btn small');
+				play.type = 'button';
+				play.dataset.action = 'play-entry';
+				play.dataset.entryIndex = `${index}`;
+				play.setAttribute('aria-label', `${track.title} abspielen`);
+				play.title = 'Ab hier abspielen';
+				play.append(icon('play'));
+				row.append(play);
+			}
+			row.append(name, el('span', 'time', clock(track.duration)));
 			list.append(row);
 		});
 		return list;
@@ -243,25 +258,86 @@
 		target.replaceChildren(card);
 	}
 
-	function mixCard(mix, index) {
-		const card = el('article', 'discover-mix');
-		card.dataset.playlistId = `discover-mix-${index}`;
-		const top = el('div', 'top');
-		const collage = el('div', 'collage');
+	/** The queue a mix plays under, on its card and on its page alike — by name, as in the apps. */
+	function mixPlaylistId(mix) {
+		return `discover-mix:${mix.name}`;
+	}
+
+	function mixHref(mix) {
+		return `/library/discover/mix?name=${encodeURIComponent(mix.name)}`;
+	}
+
+	function mixLength(mix) {
+		const total = mix.tracks.reduce((sum, track) => sum + track.duration, 0);
+		return [`${mix.tracks.length} Titel`, humanDuration(total)].filter(Boolean).join(' · ');
+	}
+
+	function collage(mix, size) {
+		const box = el('div', 'collage');
 		if (mix.cover_ids.length) {
-			for (let i = 0; i < 4; i += 1) collage.append(cover(mix.cover_ids[i % mix.cover_ids.length], 256));
+			for (let i = 0; i < 4; i += 1) box.append(cover(mix.cover_ids[i % mix.cover_ids.length], size));
 		}
-		const text = el('div');
-		text.append(el('h3', '', mix.name), el('p', '', mix.description), el('span', 'meta', `${mix.tracks.length} Titel`));
-		top.append(collage, text);
-		const details = el('details');
-		details.append(el('summary', '', 'Titel anzeigen'), trackList(mix.tracks));
-		const actions = el('div', 'actions');
-		const buttons = el('div', 'buttons');
-		buttons.append(playButton('play-playlist', 'Abspielen'), savePlaylistButton(mix.name, mix.tracks, 'secondary'));
-		actions.append(details, buttons);
-		card.append(top, actions);
+		return box;
+	}
+
+	/**
+	 * A card of the same height as its neighbours: the whole card opens the mix's page, the round
+	 * button plays it. The rows stay in the card, hidden, because the player queues what it finds
+	 * under `data-playlist-id`.
+	 */
+	function mixCard(mix) {
+		const card = el('article', 'discover-mix');
+		card.dataset.playlistId = mixPlaylistId(mix);
+		const text = el('div', 'text');
+		const title = el('h3');
+		const open = el('a', 'open', mix.name);
+		open.href = mixHref(mix);
+		title.append(open);
+		const play = el('button', 'primary round');
+		play.type = 'button';
+		play.dataset.action = 'play-playlist';
+		play.setAttribute('aria-label', `${mix.name} abspielen`);
+		play.title = 'Abspielen';
+		play.append(icon('play'));
+		const foot = el('div', 'foot');
+		foot.append(el('span', 'meta', mixLength(mix)), play);
+		text.append(title, el('p', '', mix.description), foot);
+		const rows = trackList(mix.tracks);
+		rows.hidden = true;
+		card.append(collage(mix, 256), text, rows);
 		return card;
+	}
+
+	/** The page of one mix (`/library/discover/mix?name=…`), filled from the stored feed. */
+	async function loadMix(root) {
+		const status = root.querySelector('[data-mix-status]');
+		if (!status) return;
+		const name = root.dataset.mixName;
+		let feed;
+		try {
+			feed = await call('/ai/feed');
+		} catch (e) {
+			status.textContent = e.message;
+			return;
+		}
+		if (!root.isConnected) return;
+		const mix = feed.mixes.find((candidate) => candidate.name === name);
+		status.textContent = '';
+		if (!mix) {
+			const missing = root.querySelector('[data-mix-missing]');
+			if (feed.refreshing) {
+				missing.querySelector('[data-mix-missing-title]').textContent = 'Deine Mixes entstehen gerade neu';
+				missing.querySelector('[data-mix-missing-detail]').textContent = 'Dieser ist danach vielleicht nicht mehr dabei.';
+			}
+			missing.hidden = false;
+			return;
+		}
+		root.querySelector('[data-mix-collage]').replaceWith(collage(mix, 384));
+		root.querySelector('[data-mix-description]').textContent = mix.description;
+		root.querySelector('[data-mix-subline]').textContent = mixLength(mix);
+		root.querySelector('[data-mix-actions]').append(savePlaylistButton(mix.name, mix.tracks, 'secondary'));
+		root.querySelector('[data-mix-tracks]').replaceChildren(trackList(mix.tracks, true));
+		root.querySelector('[data-mix-head]').hidden = false;
 	}
 
 	function artistCard(artist) {
@@ -408,6 +484,11 @@
 	function init() {
 		const root = page();
 		if (root) bind(root);
+		const mix = document.querySelector('[data-mix-page]');
+		if (mix && !mix.dataset.bound) {
+			mix.dataset.bound = '1';
+			void loadMix(mix);
+		}
 	}
 
 	document.addEventListener('htmx:load', init);
