@@ -1,0 +1,36 @@
+{#- One mix of "Entdecken", opened from its card. static/js/discover.js looks the mix up by its
+    name in /ai/feed and fills the page; static/js/player plays its rows like a playlist's. A
+    mix lives only until the next run replaces the list, so the page says so when it is gone. -#}
+{% extends "layouts/app.html" %}
+{% import "partials/ui.html" as ui %}
+{% block title %}{% if name.is_empty() %}Mix{% else %}{{ name }}{% endif %} · Autoreverse{% endblock %}
+{% block content %}
+<div class="content discover-page mix-page" style="--a: var(--music)" data-mix-page data-mix-name="{{ name }}" data-playlist-id="discover-mix:{{ name }}">
+	<a class="mix-back" href="/library/discover">← Entdecken</a>
+	{% if ai_enabled %}
+	<header class="mix-head" data-mix-head hidden>
+		<div class="collage" data-mix-collage></div>
+		<div class="head">
+			<span class="eyebrow">Mix</span>
+			<h1 data-mix-title>{{ name }}</h1>
+			<p class="description" data-mix-description></p>
+			<p class="subline" data-mix-subline></p>
+			<div class="actions buttons" data-mix-actions>
+				<button type="button" class="primary" data-action="play-playlist">{% call ui::icon("play") %}{% endcall %} Abspielen</button>
+			</div>
+		</div>
+	</header>
+	<div class="discover-mixes-empty" data-mix-missing hidden>
+		<div role="status">
+			<strong data-mix-missing-title>Diesen Mix gibt es nicht mehr</strong>
+			<p data-mix-missing-detail>Die Mixes wurden inzwischen neu erstellt.</p>
+		</div>
+		<a class="primary" href="/library/discover">Zu deinen Mixes</a>
+	</div>
+	<p class="discover-status" data-mix-status role="status">Einen Moment …</p>
+	<div data-mix-tracks></div>
+	{% else %}
+	<p class="discover-off">Für Mixes ist auf dem Server noch keine KI eingerichtet.</p>
+	{% endif %}
+</div>
+{% endblock %}

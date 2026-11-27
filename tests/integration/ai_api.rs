@@ -195,6 +195,42 @@ async fn the_web_page_renders_with_and_without_a_model(db: PgPool) {
     assert!(with.contains("data-ai-playlist-form"));
 }
 
+#[sqlx::test]
+async fn a_mix_has_a_page_of_its_own_found_by_name(db: PgPool) {
+    let app = with_model(db, "http://127.0.0.1:9".into());
+    let token = signed_in(&app).await;
+    let response = app
+        .get(
+            "/library/discover/mix?name=Wurzeln%20%26%20%3CRock%3E",
+            Some(&token),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let page = body_text(response).await;
+    // static/js/discover.js looks the mix up by this name; the player queues it under the same
+    // id as its card on "Entdecken". The name comes from a model, so it arrives escaped.
+    assert!(
+        page.contains(r#"data-mix-name="Wurzeln &#38; &#60;Rock&#62;""#),
+        "{page}"
+    );
+    assert!(page.contains(r#"data-playlist-id="discover-mix:Wurzeln &#38; &#60;Rock&#62;""#));
+    assert!(page.contains(r#"href="/library/discover""#));
+    assert!(!page.contains("<Rock>"));
+}
+
+#[sqlx::test]
+async fn a_mix_page_without_a_model_says_so(db: PgPool) {
+    let app = TestApp::new(db);
+    let token = signed_in(&app).await;
+    let page = body_text(
+        app.get("/library/discover/mix?name=Wurzeln", Some(&token))
+            .await,
+    )
+    .await;
+    assert!(page.contains("noch keine KI eingerichtet"));
+    assert!(!page.contains("data-mix-head"));
+}
+
 /// Polls until the background run has stored something.
 async fn settled_feed(app: &TestApp, token: &str) -> Value {
     for _ in 0..100 {

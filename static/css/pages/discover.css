@@ -423,17 +423,23 @@
 	grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
 	gap: 14px;
 }
+/* One row of cards, all as high as the tallest: the list of tracks lives on the mix's page. */
 .discover-mix {
+	position: relative;
+	display: flex;
+	gap: 14px;
 	padding: 14px;
 	border: 1px solid var(--line);
 	border-radius: var(--radius-lg);
 	background: linear-gradient(100deg, color-mix(in srgb, var(--a) 26%, transparent), transparent 75%), var(--panel);
+	transition: border-color 0.15s;
 }
-.discover-mix .top {
-	display: flex;
-	gap: 14px;
+.discover-mix:hover,
+.discover-mix:focus-within {
+	border-color: var(--line-strong);
 }
-.discover-mix .collage {
+.discover-mix .collage,
+.mix-head .collage {
 	display: grid;
 	flex: none;
 	grid-template-columns: 1fr 1fr;
@@ -444,44 +450,123 @@
 	border-radius: var(--radius-md);
 	background: var(--tile);
 }
-.discover-mix .collage img {
+.discover-mix .collage img,
+.mix-head .collage img {
 	display: block;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
 }
+.discover-mix .text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
 .discover-mix h3 {
 	margin: 0 0 4px;
 	font: 700 17px var(--font-sans);
 }
+.discover-mix .open {
+	color: inherit;
+	text-decoration: none;
+}
+/* The whole card is the link; the play button sits above it. */
+.discover-mix .open::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+.discover-mix .open:focus-visible {
+	outline: none;
+}
+.discover-mix:has(.open:focus-visible) {
+	outline: 2px solid var(--a);
+	outline-offset: 2px;
+}
 .discover-mix p {
+	display: -webkit-box;
 	margin: 0;
+	overflow: hidden;
 	color: var(--dim);
 	font-size: 13px;
 	line-height: 1.4;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
 }
-.discover-mix .meta {
-	display: block;
-	margin-top: 6px;
-	color: var(--faint);
-	font-size: 12px;
-}
-.discover-mix .actions {
+.discover-mix .foot {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 10px;
-	margin-top: 12px;
+	margin-top: auto;
+	padding-top: 10px;
 }
-.discover-mix summary {
-	color: var(--dim);
+.discover-mix .meta {
+	color: var(--faint);
 	font-size: 12px;
-	cursor: pointer;
 }
-.discover-mix details .discover-tracks {
-	margin-top: 8px;
+.discover-mix .round {
+	position: relative;
+	z-index: 1;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border-radius: 50%;
 }
 
+.mix-back {
+	display: inline-block;
+	margin-bottom: 16px;
+	color: var(--dim);
+	font-size: 13px;
+	text-decoration: none;
+}
+.mix-back:hover {
+	color: var(--text);
+}
+.mix-head {
+	display: flex;
+	align-items: flex-end;
+	gap: 24px;
+	margin-bottom: 24px;
+}
+.mix-head[hidden] {
+	display: none;
+}
+.mix-head .collage {
+	width: 200px;
+	height: 200px;
+}
+.mix-head .eyebrow {
+	color: var(--faint);
+	font-size: 12px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.mix-head h1 {
+	margin: 4px 0 8px;
+}
+.mix-head .description {
+	max-width: 60ch;
+	margin: 0 0 6px;
+	color: var(--dim);
+	line-height: 1.45;
+}
+.mix-head .subline {
+	margin: 0 0 14px;
+	color: var(--faint);
+	font-size: 13px;
+}
+.mix-page .discover-mixes-empty {
+	margin-bottom: 16px;
+}
+.discover-tracks.playable li {
+	grid-template-columns: 26px 32px minmax(0, 1fr) auto;
+	align-items: center;
+	padding: 4px 0;
+}
 .discover-page section[hidden] {
 	display: none;
 }
@@ -499,6 +584,15 @@
 	.discover-mixes {
 		grid-template-columns: minmax(0, 1fr);
 	}
+	.mix-head {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 16px;
+	}
+	.mix-head .collage {
+		width: 160px;
+		height: 160px;
+	}
 	.discover-rail {
 		grid-auto-columns: 140px;
 	}
@@ -514,17 +608,6 @@
 }
 .discover-feature .primary {
 	margin-top: 14px;
-}
-.discover-mix .actions {
-	flex-wrap: wrap;
-	align-items: flex-start;
-}
-.discover-mix details {
-	flex: 1 1 100%;
-	order: 2;
-}
-.discover-mix .buttons {
-	order: 1;
 }
 .discover-tracks li[aria-current='true'] {
 	color: var(--a);
